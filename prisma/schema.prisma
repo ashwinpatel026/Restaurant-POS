@@ -1,0 +1,209 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  firstName String
+  lastName  String
+  phone     String?
+  role      UserRole
+  isActive  Boolean  @default(true)
+  outletId  Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Outlet {
+  id          Int      @id @default(autoincrement())
+  name        String
+  code        String   @unique
+  address     String
+  city        String
+  state       String
+  zipCode     String
+  phone       String
+  email       String
+  isActive    Boolean  @default(true)
+  openingTime String
+  closingTime String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("outlets")
+}
+
+model Availability {
+  availabilityId  Int       @id @default(autoincrement()) @map("availability_id")
+  avaiDays        String?   @map("avai_days")
+  avilTime        String?   @map("avil_time")
+  createdBy       Int?      @map("createdby")
+  createdOn       DateTime  @default(now()) @map("createdon")
+  isSyncSqlserver Int?      @map("is_sync_sqlserver")
+  storeCode       String?   @map("Store_code")
+
+  @@map("tbl_availability")
+}
+
+model StationGroup {
+  stationGroupId  Int       @id @default(autoincrement()) @map("station_group_id")
+  groupName       String    @map("groupname")
+  isActive        Int       @default(1) @map("Is_Active")
+  createdBy       Int?      @map("createdby")
+  createdOn       DateTime  @default(now()) @map("createdon")
+  updatedBy       Int?      @map("updatedby")
+  updatedOn       DateTime? @map("updatedon")
+  isSyncSqlserver Int?      @map("is_sync_sqlserver")
+  storeCode       String?   @map("Store_code")
+
+  @@map("tbl_station_group")
+}
+
+model StationGroupList {
+  stationGroupListId Int       @id @default(autoincrement()) @map("tbl_station_group_list_id")
+  stationGroupId     Int       @map("station_group_id")
+  stationId          Int       @map("stationid")
+  isActive           Int       @default(1) @map("is_active")
+  createdBy          Int?      @map("createdby")
+  createdOn          DateTime  @default(now()) @map("createdon")
+  isSyncSqlserver    Int?      @map("is_sync_sqlserver")
+  storeCode          String?   @map("Store_code")
+
+  @@map("tbl_station_group_list")
+}
+
+model MenuMaster {
+  tblMenuMasterId   Int       @id @default(autoincrement()) @map("tbl_Menu_Master_Id")
+  name              String    @map("Name")
+  labelName         String?   @map("label_name")
+  colorCode         String?   @map("color_code")
+  taxId             Int       @map("tax_id")
+  stationGroupId    Int?      @map("station_group_id")
+  availabilityId    Int?      @map("availibility_id")
+  isActive          Int       @default(1) @map("Is_Active")
+  createdBy         Int?      @map("createdby")
+  createdOn         DateTime  @default(now()) @map("createdon")
+  updatedBy         Int?      @map("updatedby")
+  updatedOn         DateTime? @map("updatedon")
+  isSyncSqlserver   Int?      @map("is_sync_sqlserver")
+  storeCode         String?   @map("Store_code")
+
+  @@map("tbl_Menu_Master")
+}
+
+model MenuCategory {
+  tblMenuCategoryId Int       @id @default(autoincrement()) @map("tbl_Menu_Category_Id")
+  tblMenuMasterId   Int       @map("tbl_Menu_Master_Id")
+  name              String    @map("Name")
+  colorCode         String?   @map("color_code")
+  isActive          Int       @default(1) @map("is_active")
+  createdBy         Int?      @map("createdby")
+  createdOn         DateTime  @default(now()) @map("createdon")
+  isSyncSqlserver   Int?      @map("is_sync_sqlserver")
+  storeCode         String?   @map("Store_code")
+
+  @@map("tbl_Menu_Category")
+}
+
+model MenuItem {
+  tblMenuItemId     Int       @id @default(autoincrement()) @map("tbl_Menu_Item_Id")
+  tblMenuCategoryId Int       @map("tbl_Menu_Category_Id")
+  name              String    @map("Name")
+  labelName         String    @map("label_name")
+  colorCode         String?   @map("color_code")
+  calories          String?   @map("calories")
+  descrip           String?   @map("descrip")
+  skuPlu            Int?      @map("sku_plu")
+  isAlcohol         Int       @default(0) @map("is_alcohol")
+  menuImg           String?   @map("menu_img") // longtext for base64 images
+  priceStrategy     Int       @map("price_strategy")
+  price             Decimal   @map("Price")
+  isActive          Int       @default(1) @map("is_active")
+  createdBy         Int?      @map("createdby")
+  createdOn         DateTime  @default(now()) @map("createdon")
+  isSyncSqlserver   Int?      @map("is_sync_sqlserver")
+  storeCode         String?   @map("Store_code")
+
+  @@map("tbl_Menu_Item")
+}
+
+model Modifier {
+  tblModifierId     Int       @id @default(autoincrement()) @map("tbl_Modifier_Id")
+  tblMenuItemId     Int?      @map("tbl_Menu_Item_Id")
+  name              String    @map("Name")
+  labelName         String    @map("label_name")
+  colorCode         String?   @map("color_code")
+  priceStrategy     Int       @map("price_strategy")
+  price             Decimal?  @map("price")
+  required          Int       @map("required")
+  isMultiselect     Int       @map("is_multiselect")
+  minSelection      Int       @map("min_selection")
+  maxSelection      Int       @map("max_selection")
+  createdBy         Int?      @map("createdby")
+  createdOn         DateTime  @default(now()) @map("createdon")
+  isSyncSqlserver   Int?      @map("is_sync_sqlserver")
+  storeCode         String?   @map("Store_code")
+
+  // Relationship to ModifierItems
+  modifierItems ModifierItem[]
+
+  @@map("tbl_Modifier")
+}
+
+model ModifierItem {
+  tblModifierItemId Int       @id @default(autoincrement()) @map("tbl_Modifier_Item_Id")
+  tblModifierId     Int       @map("tbl_Modifier_Id")
+  name              String    @map("Name")
+  labelName         String    @map("label_name")
+  colorCode         String?   @map("color_code")
+  price             Decimal   @map("Price")
+  isSyncSqlserver   Int?      @map("is_sync_sqlserver")
+  storeCode         String?   @map("Store_code")
+
+  // Relationship to Modifier
+  modifier Modifier @relation(fields: [tblModifierId], references: [tblModifierId])
+
+  @@map("tbl_Modifier_Item")
+}
+
+model MenuItemModifier {
+  menuItemModifierId Int       @id @default(autoincrement()) @map("menu_item_modifier_id")
+  tblMenuItemId      Int       @map("tbl_Menu_Item_Id")
+  tblModifierId      Int       @map("tbl_Modifier_Id")
+  isSyncSqlserver    Int?      @map("is_sync_sqlserver")
+  storeCode          String?   @map("Store_code")
+
+  @@map("tbl_menu_item_modifier")
+}
+
+model Tax {
+  tblTaxId        Int      @id @default(autoincrement()) @map("tbl_tax_id")
+  taxname         String   @map("taxname")
+  taxrate         Decimal  @map("taxrate") @db.Decimal(22, 2)
+  isSyncSqlserver Int      @default(0) @map("is_sync_sqlserver")
+  storeCode       String?  @map("Store_code")
+
+  @@map("tbl_tax")
+}
+
+// Enums
+enum UserRole {
+  SUPER_ADMIN
+  OUTLET_MANAGER
+  CAPTAIN
+  CASHIER
+  KITCHEN_STAFF
+}
