@@ -136,7 +136,7 @@ export async function PUT(
           const modifierAssignments = selectedModifiers.map((modifierId: number) => ({
             tblMenuItemId: itemId,
             tblModifierId: modifierId,
-            storeCode: 'MAIN'
+            storeCode: process.env.STORE_CODE || null
           }))
 
           await prisma.menuItemModifier.createMany({

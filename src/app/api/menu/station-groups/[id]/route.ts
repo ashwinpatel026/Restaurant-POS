@@ -15,23 +15,19 @@ export async function GET(
     }
 
     const resolvedParams = await params
-    const groupId = parseInt(resolvedParams.id)
+    const stationId = parseInt(resolvedParams.id)
 
-    const stationGroup = await prisma.stationGroup.findUnique({
-      where: { stationGroupId: groupId },
-      include: {
-        stationGroupLists: true,
-        menuMasters: true
-      }
+    const prepStation = await prisma.prepStation.findUnique({
+      where: { prepStationId: stationId }
     })
 
-    if (!stationGroup) {
-      return NextResponse.json({ error: 'Station group not found' }, { status: 404 })
+    if (!prepStation) {
+      return NextResponse.json({ error: 'Prep station not found' }, { status: 404 })
     }
 
-    return NextResponse.json(stationGroup)
+    return NextResponse.json(prepStation)
   } catch (error) {
-    console.error('Error fetching station group:', error)
+    console.error('Error fetching prep station:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -51,25 +47,36 @@ export async function PUT(
     }
 
     const resolvedParams = await params
-    const groupId = parseInt(resolvedParams.id)
+    const stationId = parseInt(resolvedParams.id)
     const body = await request.json()
 
-    const stationGroup = await prisma.stationGroup.update({
-      where: { stationGroupId: groupId },
+    const { prepStationName, stationId: bodyStationId, sendToExpediter, alwaysPrintTicket, printerCode, isActive } = body
+
+    if (!prepStationName) {
+      return NextResponse.json(
+        { error: 'Prep station name is required' },
+        { status: 400 }
+      )
+    }
+
+    const prepStation = await prisma.prepStation.update({
+      where: { prepStationId: stationId },
       data: {
-        ...body,
+        prepStationName,
+        stationId: bodyStationId ? parseInt(bodyStationId) : null,
+        isActive: isActive ? 1 : 0,
+        sendToExpediter: sendToExpediter ? 1 : 0,
+        alwaysPrintTicket: alwaysPrintTicket ? 1 : 0,
+        printerCode: printerCode || null,
         updatedBy: parseInt(session.user.id),
-        updatedOn: new Date()
-      },
-      include: {
-        stationGroupLists: true,
-        menuMasters: true
+        updatedOn: new Date(),
+        storeCode: process.env.STORE_CODE || null
       }
     })
 
-    return NextResponse.json(stationGroup)
+    return NextResponse.json(prepStation)
   } catch (error) {
-    console.error('Error updating station group:', error)
+    console.error('Error updating prep station:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -89,15 +96,15 @@ export async function DELETE(
     }
 
     const resolvedParams = await params
-    const groupId = parseInt(resolvedParams.id)
+    const stationId = parseInt(resolvedParams.id)
 
-    await prisma.stationGroup.delete({
-      where: { stationGroupId: groupId }
+    await prisma.prepStation.delete({
+      where: { prepStationId: stationId }
     })
 
-    return NextResponse.json({ message: 'Station group deleted successfully' })
+    return NextResponse.json({ message: 'Prep station deleted successfully' })
   } catch (error) {
-    console.error('Error deleting station group:', error)
+    console.error('Error deleting prep station:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

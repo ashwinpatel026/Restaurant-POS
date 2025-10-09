@@ -47,42 +47,56 @@ model Outlet {
 }
 
 model Availability {
-  availabilityId  Int       @id @default(autoincrement()) @map("availability_id")
-  avaiDays        String?   @map("avai_days")
-  avilTime        String?   @map("avil_time")
-  createdBy       Int?      @map("createdby")
-  createdOn       DateTime  @default(now()) @map("createdon")
-  isSyncSqlserver Int?      @map("is_sync_sqlserver")
-  storeCode       String?   @map("Store_code")
+  availabilityId Int       @id @default(autoincrement()) @map("availability_id")
+  avaiCode       String    @unique @map("avai_code") @db.VarChar(100)
+  avaiName       String    @unique @map("avai_name") @db.VarChar(100)
+  isActive       Int       @default(1) @map("is_active")
+  createdBy      Int?      @map("createdby")
+  createdOn      DateTime  @default(now()) @map("createdon")
+  isSyncMysql    Int?      @map("is_sync_mysql")
+  storeCode      String?   @map("Store_code") @db.VarChar(100)
+
+  // Relationship to schedules
+  schedules AvailabilitySchedule[]
 
   @@map("tbl_availability")
 }
 
-model StationGroup {
-  stationGroupId  Int       @id @default(autoincrement()) @map("station_group_id")
-  groupName       String    @map("groupname")
-  isActive        Int       @default(1) @map("Is_Active")
-  createdBy       Int?      @map("createdby")
-  createdOn       DateTime  @default(now()) @map("createdon")
-  updatedBy       Int?      @map("updatedby")
-  updatedOn       DateTime? @map("updatedon")
-  isSyncSqlserver Int?      @map("is_sync_sqlserver")
-  storeCode       String?   @map("Store_code")
+model AvailabilitySchedule {
+  id          Int       @id @default(autoincrement())
+  avaiCode    String    @map("avai_code") @db.VarChar(100)
+  dayName     DayName   @map("day_name")
+  startTime   DateTime  @map("start_time") @db.Time()
+  endTime     DateTime  @map("end_time") @db.Time()
+  createdBy   Int?      @map("createdby")
+  createdOn   DateTime  @default(now()) @map("createdon")
+  isSyncMysql Int?      @map("is_sync_mysql")
+  storeCode   String?   @map("Store_code") @db.VarChar(100)
 
-  @@map("tbl_station_group")
+  // Relationship to Availability
+  availability Availability @relation(fields: [avaiCode], references: [avaiCode], onDelete: Cascade)
+
+  @@index([avaiCode])
+  @@map("tbl_availability_schedule")
 }
 
-model StationGroupList {
-  stationGroupListId Int       @id @default(autoincrement()) @map("tbl_station_group_list_id")
-  stationGroupId     Int       @map("station_group_id")
-  stationId          Int       @map("stationid")
+model PrepStation {
+  prepStationId      Int       @id @default(autoincrement()) @map("prep_station_id")
+  prepStationCode    String?   @unique @map("prep_station_code") @db.VarChar(100)
+  prepStationName    String?   @map("prep_station_name") @db.VarChar(500)
+  stationId          Int?      @map("stationid")
   isActive           Int       @default(1) @map("is_active")
+  sendToExpediter    Int?      @map("send_to_expediter")
+  alwaysPrintTicket  Int?      @map("always_print_ticket")
+  printerCode        String?   @map("printer_code") @db.VarChar(100)
   createdBy          Int?      @map("createdby")
   createdOn          DateTime  @default(now()) @map("createdon")
-  isSyncSqlserver    Int?      @map("is_sync_sqlserver")
-  storeCode          String?   @map("Store_code")
+  updatedBy          Int?      @map("updatedby")
+  updatedOn          DateTime? @map("updatedon")
+  isSyncMysql        Int?      @map("is_sync_mysql")
+  storeCode          String?   @map("Store_code") @db.VarChar(100)
 
-  @@map("tbl_station_group_list")
+  @@map("tbl_prep_station")
 }
 
 model MenuMaster {
@@ -191,12 +205,44 @@ model MenuItemModifier {
 
 model Tax {
   tblTaxId        Int      @id @default(autoincrement()) @map("tbl_tax_id")
-  taxname         String   @map("taxname")
-  taxrate         Decimal  @map("taxrate") @db.Decimal(22, 2)
+  taxname         String   @map("taxname") @db.VarChar(30)
+  taxrate         Decimal  @map("taxrate") @db.Decimal(22, 2) @default(0.00)
+  createdBy       Int?     @map("created_by")
+  createdDate     DateTime @default(now()) @map("created_date")
   isSyncSqlserver Int      @default(0) @map("is_sync_sqlserver")
-  storeCode       String?  @map("Store_code")
+  storeCode       String?  @map("Store_code") @db.VarChar(100)
 
   @@map("tbl_tax")
+}
+
+model Shift {
+  tblShiftId     Int       @id @default(autoincrement()) @map("tbl_shift_id")
+  shiftId        Int?      @map("Shiftid")
+  batchId        Int?      @map("batchid")
+  shiftStart     DateTime? @map("ShiftStart")
+  shiftEnd       DateTime? @map("ShiftEnd")
+  shiftNumber    Int?      @map("shiftnumber")
+  employeeId     Int?      @map("employeeid")
+  isOpen         Int       @default(1) @map("isopen")
+  stationId      Int?      @map("stationid")
+  employeeUserId String?   @map("EmployeeUserID") @db.VarChar(20)
+  isSyncMysql    Int?      @map("is_sync_mysql")
+  storeCode      String?   @map("Store_code") @db.VarChar(100)
+
+  @@map("tbl_shift")
+}
+
+model Printer {
+  printerId     Int       @id @default(autoincrement()) @map("printer_id")
+  printerCode   String?   @unique @map("printer_code") @db.VarChar(100)
+  printerName   String?   @map("printer_name") @db.VarChar(200)
+  isActive      Int?      @map("is_active")
+  createdBy     Int?      @map("createdby")
+  createdOn     DateTime  @default(now()) @map("createdon")
+  isSyncMysql   Int?      @map("is_sync_mysql")
+  storeCode     String?   @map("Store_code") @db.VarChar(100)
+
+  @@map("tbl_printer")
 }
 
 // Enums
@@ -206,4 +252,15 @@ enum UserRole {
   CAPTAIN
   CASHIER
   KITCHEN_STAFF
+}
+
+enum DayName {
+  Monday
+  Tuesday
+  Wednesday
+  Thursday
+  Friday
+  Saturday
+  Sunday
+  AllDays
 }

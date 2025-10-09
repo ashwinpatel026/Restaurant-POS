@@ -14,6 +14,33 @@
     @apply px-4 py-2 rounded-lg font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   
+  /* Force 24-hour format for time inputs */
+  input[type="time"] {
+    font-family: monospace;
+    text-align: center;
+  }
+  
+  /* Hide AM/PM field in WebKit browsers */
+  input[type="time"]::-webkit-datetime-edit-ampm-field {
+    display: none;
+  }
+  
+  /* Hide AM/PM field in Firefox */
+  input[type="time"]::-moz-datetime-edit-ampm-field {
+    display: none;
+  }
+  
+  /* Additional WebKit selectors for different browsers */
+  input[type="time"]::-webkit-datetime-edit-text {
+    color: transparent;
+  }
+  
+  /* Force 24-hour format in all browsers */
+  input[type="time"] {
+    -webkit-appearance: none;
+    -moz-appearance: textfield;
+  }
+  
   .btn-primary {
     @apply bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800;
   }
@@ -79,6 +106,48 @@
   
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+
+  /* Custom scrollbar styles for sidebar */
+  .sidebar-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(209 213 219) rgb(243 244 246);
+  }
+
+  .sidebar-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .sidebar-scrollbar::-webkit-scrollbar-track {
+    background: rgb(243 244 246);
+    border-radius: 3px;
+  }
+
+  .sidebar-scrollbar::-webkit-scrollbar-thumb {
+    background: rgb(209 213 219);
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+  }
+
+  .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgb(156 163 175);
+  }
+
+  /* Dark mode scrollbar styles */
+  .dark .sidebar-scrollbar {
+    scrollbar-color: rgb(75 85 99) rgb(31 41 55);
+  }
+
+  .dark .sidebar-scrollbar::-webkit-scrollbar-track {
+    background: rgb(31 41 55);
+  }
+
+  .dark .sidebar-scrollbar::-webkit-scrollbar-thumb {
+    background: rgb(75 85 99);
+  }
+
+  .dark .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgb(107 114 128);
   }
 }
 

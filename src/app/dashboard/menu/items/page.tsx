@@ -682,16 +682,16 @@ export default function MenuItemsPage() {
       >
         <div className="space-y-4">
           <div className="flex items-center">
-            <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
-              <TrashIcon className="h-6 w-6 text-red-600" />
+            <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/20">
+              <TrashIcon className="h-6 w-6 text-red-600 dark:text-red-400" />
             </div>
           </div>
           <div className="text-center">
-            <h3 className="text-lg font-medium text-gray-900">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
               Delete Menu Item
             </h3>
             <div className="mt-2">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 Are you sure you want to delete this menu item? This action
                 cannot be undone and will affect any related modifiers or
                 orders.
@@ -705,14 +705,14 @@ export default function MenuItemsPage() {
                 setShowConfirmModal(false);
                 setDeletingId(null);
               }}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
+              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={confirmDelete}
-              className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-lg hover:bg-red-700 dark:hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
             >
               Delete
             </button>
@@ -846,7 +846,7 @@ function MenuItemForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Name *
           </label>
           <input
@@ -854,13 +854,13 @@ function MenuItemForm({
             required
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Enter item name"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Label Name *
           </label>
           <input
@@ -870,7 +870,7 @@ function MenuItemForm({
             onChange={(e) =>
               setFormData({ ...formData, labelName: e.target.value })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="Enter display label"
           />
         </div>
@@ -878,7 +878,7 @@ function MenuItemForm({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Category *
           </label>
           <select
@@ -887,7 +887,7 @@ function MenuItemForm({
             onChange={(e) =>
               setFormData({ ...formData, tblMenuCategoryId: e.target.value })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">Select Category</option>
             {categories.map((category) => (
@@ -902,7 +902,7 @@ function MenuItemForm({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Price *
           </label>
           <input
@@ -917,13 +917,13 @@ function MenuItemForm({
                 price: parseFloat(e.target.value) || 0,
               })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="0.00"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Price Strategy
           </label>
           <select
@@ -934,7 +934,7 @@ function MenuItemForm({
                 priceStrategy: parseInt(e.target.value),
               })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value={1}>Base Price</option>
             <option value={2}>Size Price</option>
@@ -945,7 +945,7 @@ function MenuItemForm({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Description
           </label>
           <textarea
@@ -953,14 +953,14 @@ function MenuItemForm({
             onChange={(e) =>
               setFormData({ ...formData, descrip: e.target.value })
             }
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             rows={3}
             placeholder="Enter item description"
           />
 
           {/* Color Code moved here after Description */}
           <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Color Code
             </label>
             <input
@@ -969,7 +969,7 @@ function MenuItemForm({
               onChange={(e) =>
                 setFormData({ ...formData, colorCode: e.target.value })
               }
-              className="w-full h-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full h-10 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
 
@@ -985,9 +985,9 @@ function MenuItemForm({
                     isAlcohol: e.target.checked ? 1 : 0,
                   })
                 }
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
               />
-              <span className="ml-2 text-sm text-gray-700">
+              <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
                 Contains Alcohol
               </span>
             </label>
@@ -1002,15 +1002,17 @@ function MenuItemForm({
                     isActive: e.target.checked ? 1 : 0,
                   })
                 }
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
               />
-              <span className="ml-2 text-sm text-gray-700">Active</span>
+              <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                Active
+              </span>
             </label>
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Additional Info
           </label>
           <div className="space-y-2">
@@ -1020,7 +1022,7 @@ function MenuItemForm({
               onChange={(e) =>
                 setFormData({ ...formData, calories: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Calories"
             />
             <input
@@ -1029,12 +1031,12 @@ function MenuItemForm({
               onChange={(e) =>
                 setFormData({ ...formData, skuPlu: e.target.value })
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="SKU/PLU"
             />
             {/* Image upload + preview */}
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Image
               </label>
               <input
@@ -1092,14 +1094,14 @@ function MenuItemForm({
 
                   reader.readAsDataURL(file);
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 dark:file:bg-blue-900/20 dark:file:text-blue-400 hover:file:bg-blue-100 dark:hover:file:bg-blue-900/30"
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 Supported formats: JPG, PNG, GIF (Max size: 1MB)
               </p>
               {imageLoading && (
-                <div className="flex items-center space-x-2 text-sm text-blue-600">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                <div className="flex items-center space-x-2 text-sm text-blue-600 dark:text-blue-400">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 dark:border-blue-400"></div>
                   <span>Processing image...</span>
                 </div>
               )}
@@ -1108,7 +1110,7 @@ function MenuItemForm({
                   <img
                     src={formData.menuImg}
                     alt="Preview"
-                    className="h-24 w-24 object-cover rounded border"
+                    className="h-24 w-24 object-cover rounded border border-gray-300 dark:border-gray-600"
                   />
                   <button
                     type="button"
@@ -1120,7 +1122,7 @@ function MenuItemForm({
                       ) as HTMLInputElement;
                       if (fileInput) fileInput.value = "";
                     }}
-                    className="mt-1 text-xs text-red-600 hover:text-red-800"
+                    className="mt-1 text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
                   >
                     Remove Image
                   </button>

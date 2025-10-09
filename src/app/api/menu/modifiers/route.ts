@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
         minSelection: parseInt(minSelection),
         maxSelection: parseInt(maxSelection),
         createdBy: parseInt(session.user.id),
-        storeCode: 'MAIN'
+        storeCode: process.env.STORE_CODE || null
       }
     })
 
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
         colorCode: item.colorCode || '#3B82F6',
         price: item.price || 0, // Keep as number, Prisma will handle Decimal conversion
         tblModifierId: modifier.tblModifierId,
-        storeCode: 'MAIN'
+        storeCode: process.env.STORE_CODE || null
       }))
 
       await prisma.modifierItem.createMany({

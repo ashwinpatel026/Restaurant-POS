@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/database'
+import { generateUniqueCode } from '@/lib/codeGenerator'
 
 export async function GET() {
   try {
@@ -11,13 +12,13 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const taxes = await prisma.tax.findMany({
-      orderBy: { taxname: 'asc' }
+    const printers = await prisma.printer.findMany({
+      orderBy: { createdOn: 'desc' }
     })
 
-    return NextResponse.json(taxes)
+    return NextResponse.json(printers)
   } catch (error) {
-    console.error('Error fetching taxes:', error)
+    console.error('Error fetching printers:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -34,23 +35,45 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { taxname, taxrate } = body
+    const { printerName, isActive } = body
 
-    const tax = await prisma.tax.create({
+    // Validate required fields
+    if (!printerName) {
+      return NextResponse.json(
+        { error: 'Printer name is required' },
+        { status: 400 }
+      )
+    }
+
+    // Generate printer code automatically
+    const printerCode = await generateUniqueCode('printer', 'printerCode')
+
+    const printer = await prisma.printer.create({
       data: {
-        taxname,
-        taxrate: parseFloat(taxrate),
+        printerCode,
+        printerName,
+        isActive: isActive ? 1 : 0,
         createdBy: parseInt(session.user.id),
         storeCode: process.env.STORE_CODE || null
       }
     })
 
-    return NextResponse.json(tax, { status: 201 })
-  } catch (error) {
-    console.error('Error creating tax:', error)
+    return NextResponse.json(printer, { status: 201 })
+  } catch (error: any) {
+    console.error('Error creating printer:', error)
+    
+    // Handle unique constraint violation
+    if (error.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'Printer code already exists' },
+        { status: 400 }
+      )
+    }
+
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     )
   }
 }
+

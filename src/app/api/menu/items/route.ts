@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
           price: parseFloat(price),
           tblMenuCategoryId: parseInt(tblMenuCategoryId),
           createdBy: parseInt(session.user.id),
-          storeCode: 'MAIN'
+          storeCode: process.env.STORE_CODE || null
         }
       })
     })
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
         const modifierAssignments = selectedModifiers.map((modifierId: number) => ({
           tblMenuItemId: menuItem.tblMenuItemId,
           tblModifierId: modifierId,
-          storeCode: 'MAIN'
+          storeCode: process.env.STORE_CODE || null
         }))
 
         await prisma.menuItemModifier.createMany({

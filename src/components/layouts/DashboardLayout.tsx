@@ -23,6 +23,7 @@ import {
   TagIcon,
   SunIcon,
   MoonIcon,
+  PrinterIcon,
 } from "@heroicons/react/24/outline";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -37,7 +38,7 @@ const navigation: MenuItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: HomeIcon },
   { name: "Orders", href: "/dashboard/orders", icon: ShoppingBagIcon },
   {
-    name: "Menu Management",
+    name: "Menu Master",
     href: "/dashboard/menu",
     icon: CubeIcon,
     roles: ["SUPER_ADMIN", "ADMIN"],
@@ -58,8 +59,20 @@ const navigation: MenuItem[] = [
     roles: ["SUPER_ADMIN", "ADMIN", "OUTLET_MANAGER"],
   },
   {
+    name: "Printers",
+    href: "/dashboard/printer",
+    icon: PrinterIcon,
+    roles: ["SUPER_ADMIN", "ADMIN", "OUTLET_MANAGER"],
+  },
+  {
+    name: "Prep Station",
+    href: "/dashboard/menu/station-groups",
+    icon: CubeIcon,
+    roles: ["SUPER_ADMIN", "ADMIN", "OUTLET_MANAGER"],
+  },
+  {
     name: "Availability",
-    href: "/dashboard/menu/availability",
+    href: "/dashboard/availability",
     icon: ClockIcon,
     roles: ["SUPER_ADMIN", "ADMIN", "OUTLET_MANAGER"],
   },
@@ -138,7 +151,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+          <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto sidebar-scrollbar">
             {filteredNavigation.map((item) => {
               const isActive = pathname === item.href;
               return (

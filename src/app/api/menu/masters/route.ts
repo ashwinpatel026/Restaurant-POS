@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
         stationGroupId: stationGroupId ? parseInt(stationGroupId) : null,
         availabilityId: availabilityId ? parseInt(availabilityId) : null,
         createdBy: parseInt(session.user.id),
-        storeCode: 'MAIN' // You can make this dynamic based on user's outlet
+        storeCode: process.env.STORE_CODE || null
       }
     })
 

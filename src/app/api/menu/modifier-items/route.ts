@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
         colorCode,
         price: parseFloat(price),
         tblModifierId: parseInt(tblModifierId),
-        storeCode: 'MAIN'
+        storeCode: process.env.STORE_CODE || null
       }
     })
 

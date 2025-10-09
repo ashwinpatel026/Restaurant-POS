@@ -15,20 +15,19 @@ export async function GET(
     }
 
     const resolvedParams = await params
-    const availabilityId = parseInt(resolvedParams.id)
+    const printerId = parseInt(resolvedParams.id)
 
-    const availability = await prisma.availability.findUnique({
-      where: { availabilityId },
-      include: { schedules: true }
+    const printer = await prisma.printer.findUnique({
+      where: { printerId }
     })
 
-    if (!availability) {
-      return NextResponse.json({ error: 'Availability not found' }, { status: 404 })
+    if (!printer) {
+      return NextResponse.json({ error: 'Printer not found' }, { status: 404 })
     }
 
-    return NextResponse.json(availability)
+    return NextResponse.json(printer)
   } catch (error) {
-    console.error('Error fetching availability:', error)
+    console.error('Error fetching printer:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -48,38 +47,32 @@ export async function PUT(
     }
 
     const resolvedParams = await params
-    const availabilityId = parseInt(resolvedParams.id)
+    const printerId = parseInt(resolvedParams.id)
     const body = await request.json()
-    const { avaiName, isActive } = body
+
+    const { printerName, isActive } = body
 
     // Validate required fields
-    if (!avaiName) {
+    if (!printerName) {
       return NextResponse.json(
-        { error: 'Availability name is required' },
+        { error: 'Printer name is required' },
         { status: 400 }
       )
     }
 
-    const availability = await prisma.availability.update({
-      where: { availabilityId },
+    // Update printer (printer code cannot be changed)
+    const printer = await prisma.printer.update({
+      where: { printerId },
       data: {
-        avaiName,
+        printerName,
         isActive: isActive ? 1 : 0,
         storeCode: process.env.STORE_CODE || null
-      },
-      include: { schedules: true }
+      }
     })
 
-    return NextResponse.json(availability)
+    return NextResponse.json(printer)
   } catch (error: any) {
-    console.error('Error updating availability:', error)
-    
-    if (error.code === 'P2002') {
-      return NextResponse.json(
-        { error: 'Availability name already exists' },
-        { status: 400 }
-      )
-    }
+    console.error('Error updating printer:', error)
 
     return NextResponse.json(
       { error: 'Internal server error' },
@@ -100,19 +93,19 @@ export async function DELETE(
     }
 
     const resolvedParams = await params
-    const availabilityId = parseInt(resolvedParams.id)
+    const printerId = parseInt(resolvedParams.id)
 
-    // Delete availability (cascades to schedules)
-    await prisma.availability.delete({
-      where: { availabilityId }
+    await prisma.printer.delete({
+      where: { printerId }
     })
 
-    return NextResponse.json({ message: 'Availability deleted successfully' })
+    return NextResponse.json({ message: 'Printer deleted successfully' })
   } catch (error) {
-    console.error('Error deleting availability:', error)
+    console.error('Error deleting printer:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
     )
   }
 }
+

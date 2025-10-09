@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/database'
+import { generateUniqueCode } from '@/lib/codeGenerator'
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,6 +13,11 @@ export async function GET(request: NextRequest) {
     }
 
     const availability = await prisma.availability.findMany({
+      include: {
+        schedules: {
+          orderBy: { dayName: 'asc' }
+        }
+      },
       orderBy: { createdOn: 'desc' }
     })
 
@@ -34,20 +40,41 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { avaiDays, avilTime } = body
+    const { avaiName, isActive } = body
 
+    // Validate required fields
+    if (!avaiName) {
+      return NextResponse.json(
+        { error: 'Availability name is required' },
+        { status: 400 }
+      )
+    }
+
+    // Generate availability code automatically
+    const avaiCode = await generateUniqueCode('availability' as any, 'avaiCode')
+
+    // Create availability record
     const availability = await prisma.availability.create({
       data: {
-        avaiDays,
-        avilTime,
+        avaiCode,
+        avaiName,
+        isActive: isActive ? 1 : 0,
         createdBy: parseInt(session.user.id),
-        storeCode: 'MAIN'
+        storeCode: process.env.STORE_CODE || null
       }
     })
 
     return NextResponse.json(availability, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating availability:', error)
+    
+    if (error.code === 'P2002') {
+      return NextResponse.json(
+        { error: 'Availability code or name already exists' },
+        { status: 400 }
+      )
+    }
+
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
         colorCode,
         tblMenuMasterId: parseInt(tblMenuMasterId),
         createdBy: parseInt(session.user.id),
-        storeCode: 'MAIN'
+        storeCode: process.env.STORE_CODE || null
       }
     })
 

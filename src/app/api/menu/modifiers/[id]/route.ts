@@ -93,7 +93,7 @@ export async function PUT(
         colorCode: item.colorCode || '#3B82F6',
         price: item.price || 0,
         tblModifierId: modifier.tblModifierId,
-        storeCode: 'MAIN'
+        storeCode: process.env.STORE_CODE || null
       }))
 
       await prisma.modifierItem.createMany({

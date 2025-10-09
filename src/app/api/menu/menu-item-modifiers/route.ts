@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       data: {
         tblMenuItemId: parseInt(tblMenuItemId),
         tblModifierId: parseInt(tblModifierId),
-        storeCode: 'MAIN'
+        storeCode: process.env.STORE_CODE || null
       }
     })
 

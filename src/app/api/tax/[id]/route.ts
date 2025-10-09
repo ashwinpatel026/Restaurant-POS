@@ -60,7 +60,7 @@ export async function PUT(
       data: {
         taxname,
         taxrate: parseFloat(taxrate),
-        storeCode: null
+        storeCode: process.env.STORE_CODE || null
       }
     })
 
