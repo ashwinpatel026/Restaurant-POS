@@ -12,42 +12,18 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const modifierId = searchParams.get('modifierId')
+    const modifierGroupCode = searchParams.get('modifierGroupCode') || undefined
 
     const where: any = {}
-    if (modifierId) {
-      where.tblModifierId = parseInt(modifierId)
-    }
+    if (modifierGroupCode) where.modifierGroupCode = modifierGroupCode
 
-    // Fetch modifier items without include (temporary fix until Prisma client is regenerated)
-    const modifierItems = await prisma.modifierItem.findMany({
+    const items = await (prisma as any).modifierItem.findMany({
       where,
-      orderBy: { tblModifierItemId: 'asc' }
+      orderBy: [{ modifierGroupCode: 'asc' }, { displayOrder: 'asc' }, { createdOn: 'desc' }]
     })
 
-    // Manually fetch modifier data and attach it
-    const modifierIds = [...new Set(modifierItems.map((item: any) => item.tblModifierId))]
-    const modifiers = await prisma.modifier.findMany({
-      where: {
-        tblModifierId: { in: modifierIds }
-      },
-      select: {
-        tblModifierId: true,
-        name: true,
-        labelName: true
-      }
-    })
-
-    // Create a map for quick lookup
-    const modifierMap = new Map(modifiers.map((mod: any) => [mod.tblModifierId, mod]))
-
-    // Attach modifier data to each item
-    const itemsWithModifiers = modifierItems.map((item: any) => ({
-      ...item,
-      modifier: modifierMap.get(item.tblModifierId) || null
-    }))
-
-    return NextResponse.json(itemsWithModifiers)
+    const data = items.map((i: any) => ({ ...i, id: i.id.toString() }))
+    return NextResponse.json(data)
   } catch (error) {
     console.error('Error fetching modifier items:', error)
     return NextResponse.json(
@@ -66,35 +42,23 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, labelName, colorCode, price, tblModifierId } = body
+    const { modifierGroupCode, name, labelName, colorCode, price } = body
 
-    const modifierItem = await prisma.modifierItem.create({
+    const created = await (prisma as any).modifierItem.create({
       data: {
-        name,
-        labelName,
-        colorCode,
-        price: parseFloat(price),
-        tblModifierId: parseInt(tblModifierId),
-        storeCode: process.env.STORE_CODE || null
+        modifierItemCode: await (await import('@/lib/codeGenerator')).generateUniqueCode('modifierItem', 'modifierItemCode'),
+        modifierGroupCode: modifierGroupCode || null,
+        name: name || null,
+        labelName: labelName || null,
+        colorCode: colorCode || null,
+        price: typeof price === 'number' ? price : null,
+        isActive: 1,
+        storeCode: process.env.STORE_CODE || null,
       }
     })
 
-    // Fetch modifier data for the created item
-    const modifier = await prisma.modifier.findUnique({
-      where: { tblModifierId: modifierItem.tblModifierId },
-      select: {
-        tblModifierId: true,
-        name: true,
-        labelName: true
-      }
-    })
-
-    const itemWithModifier = {
-      ...modifierItem,
-      modifier
-    }
-
-    return NextResponse.json(itemWithModifier, { status: 201 })
+    const data = { ...created, id: created.id.toString() }
+    return NextResponse.json(data, { status: 201 })
   } catch (error) {
     console.error('Error creating modifier item:', error)
     return NextResponse.json(

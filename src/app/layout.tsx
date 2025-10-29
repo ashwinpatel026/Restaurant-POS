@@ -9,6 +9,14 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Restaurant POS System",
   description: "Comprehensive Point of Sale System for Restaurant Chain",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/assets/image/favicon.png", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/assets/image/favicon.png",
+  },
 };
 
 export default function RootLayout({

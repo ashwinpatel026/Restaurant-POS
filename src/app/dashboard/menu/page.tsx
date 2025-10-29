@@ -5,57 +5,43 @@ import DashboardLayout from "@/components/layouts/DashboardLayout";
 import {
   ArrowRightIcon,
   ChartBarIcon,
-  CogIcon,
   DocumentTextIcon,
   TagIcon,
   CubeIcon,
-  BuildingOfficeIcon,
-  ListBulletIcon,
-  ClockIcon,
 } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { PageSkeleton } from "@/components/ui/SkeletonLoader";
 
 export default function MenuManagementPage() {
   const [stats, setStats] = useState({
     menuMasters: 0,
     categories: 0,
     menuItems: 0,
-    stationGroups: 0,
-    availability: 0,
   });
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchStats();
-  }, []);
-
-  const fetchStats = async () => {
-    try {
-      const [mastersRes, categoriesRes, itemsRes, groupsRes, availRes] =
-        await Promise.all([
+    const fetchCounts = async () => {
+      try {
+        const [mastersRes, categoriesRes, itemsRes] = await Promise.all([
           fetch("/api/menu/masters"),
           fetch("/api/menu/categories"),
           fetch("/api/menu/items"),
-          fetch("/api/menu/station-groups"),
-          fetch("/api/menu/availability"),
         ]);
 
-      const newStats = {
-        menuMasters: mastersRes.ok ? (await mastersRes.json()).length : 0,
-        categories: categoriesRes.ok ? (await categoriesRes.json()).length : 0,
-        menuItems: itemsRes.ok ? (await itemsRes.json()).length : 0,
-        stationGroups: groupsRes.ok ? (await groupsRes.json()).length : 0,
-        availability: availRes.ok ? (await availRes.json()).length : 0,
-      };
-
-      setStats(newStats);
-    } catch (error) {
-      console.error("Error loading stats:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+        setStats({
+          menuMasters: mastersRes.ok ? (await mastersRes.json()).length : 0,
+          categories: categoriesRes.ok
+            ? (await categoriesRes.json()).length
+            : 0,
+          menuItems: itemsRes.ok ? (await itemsRes.json()).length : 0,
+        });
+      } catch (e) {
+        console.error("Failed to load menu counts", e);
+      }
+    };
+    fetchCounts();
+  }, []);
 
   const managementSections = [
     {
@@ -67,7 +53,7 @@ export default function MenuManagementPage() {
       count: stats.menuMasters,
       stats: [
         { label: "Total Masters", value: stats.menuMasters },
-        { label: "Active", value: stats.menuMasters }, // Simplified for now
+        { label: "Active", value: stats.menuMasters },
       ],
     },
     {
@@ -94,30 +80,6 @@ export default function MenuManagementPage() {
         { label: "With Modifiers", value: stats.menuItems },
       ],
     },
-    {
-      title: "Station Groups",
-      description: "Manage kitchen and bar station routing",
-      href: "/dashboard/menu/station-groups",
-      icon: BuildingOfficeIcon,
-      color: "red",
-      count: stats.stationGroups,
-      stats: [
-        { label: "Total Groups", value: stats.stationGroups },
-        { label: "Active", value: stats.stationGroups },
-      ],
-    },
-    {
-      title: "Availability",
-      description: "Set menu availability schedules",
-      href: "/dashboard/menu/availability",
-      icon: ClockIcon,
-      color: "indigo",
-      count: stats.availability,
-      stats: [
-        { label: "Total Schedules", value: stats.availability },
-        { label: "Active", value: stats.availability },
-      ],
-    },
   ];
 
   const getColorClasses = (color: string) => {
@@ -140,37 +102,11 @@ export default function MenuManagementPage() {
         border: "border-purple-200 dark:border-purple-700",
         hover: "hover:border-purple-300 dark:hover:border-purple-600",
       },
-      yellow: {
-        bg: "bg-yellow-50 dark:bg-yellow-900/20",
-        icon: "text-yellow-600 dark:text-yellow-400",
-        border: "border-yellow-200 dark:border-yellow-700",
-        hover: "hover:border-yellow-300 dark:hover:border-yellow-600",
-      },
-      red: {
-        bg: "bg-red-50 dark:bg-red-900/20",
-        icon: "text-red-600 dark:text-red-400",
-        border: "border-red-200 dark:border-red-700",
-        hover: "hover:border-red-300 dark:hover:border-red-600",
-      },
-      indigo: {
-        bg: "bg-indigo-50 dark:bg-indigo-900/20",
-        icon: "text-indigo-600 dark:text-indigo-400",
-        border: "border-indigo-200 dark:border-indigo-700",
-        hover: "hover:border-indigo-300 dark:hover:border-indigo-600",
-      },
     };
     return colors[color as keyof typeof colors] || colors.blue;
   };
 
-  if (loading) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
-      </DashboardLayout>
-    );
-  }
+  // Removed loading gate as we only display counts when available
 
   return (
     <DashboardLayout>
@@ -184,96 +120,6 @@ export default function MenuManagementPage() {
             <p className="text-gray-600 dark:text-gray-400 mt-2">
               Comprehensive menu system management dashboard
             </p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <ChartBarIcon className="w-5 h-5 text-gray-400 dark:text-gray-500" />
-            <span className="text-sm text-gray-500 dark:text-gray-400">
-              {Object.values(stats).reduce((sum, count) => sum + count, 0)}{" "}
-              total items
-            </span>
-          </div>
-        </div>
-
-        {/* Overview Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
-                  <span className="text-blue-600 dark:text-blue-400 font-semibold text-sm">
-                    M
-                  </span>
-                </div>
-              </div>
-              <div className="ml-3">
-                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                  Masters
-                </p>
-                <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {stats.menuMasters}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
-                  <span className="text-green-600 dark:text-green-400 font-semibold text-sm">
-                    C
-                  </span>
-                </div>
-              </div>
-              <div className="ml-3">
-                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                  Categories
-                </p>
-                <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {stats.categories}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center">
-                  <span className="text-purple-600 dark:text-purple-400 font-semibold text-sm">
-                    I
-                  </span>
-                </div>
-              </div>
-              <div className="ml-3">
-                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                  Items
-                </p>
-                <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {stats.menuItems}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-red-100 dark:bg-red-900/20 rounded-lg flex items-center justify-center">
-                  <span className="text-red-600 dark:text-red-400 font-semibold text-sm">
-                    S
-                  </span>
-                </div>
-              </div>
-              <div className="ml-3">
-                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                  Stations
-                </p>
-                <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {stats.stationGroups}
-                </p>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -320,7 +166,7 @@ export default function MenuManagementPage() {
                     <div
                       className={`px-2 py-1 rounded-full text-xs font-medium ${colorClasses.bg} ${colorClasses.icon}`}
                     >
-                      {section.count} total
+                      {section.count} Total
                     </div>
                   </div>
                 </div>

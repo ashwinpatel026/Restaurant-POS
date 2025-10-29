@@ -16,7 +16,13 @@ export async function GET() {
       orderBy: { createdOn: 'desc' }
     })
 
-    return NextResponse.json(printers)
+    // Serialize BigInt to string
+    const serializedPrinters = printers.map(printer => ({
+      ...printer,
+      printerId: printer.printerId.toString()
+    }))
+
+    return NextResponse.json(serializedPrinters)
   } catch (error) {
     console.error('Error fetching printers:', error)
     return NextResponse.json(
@@ -58,7 +64,13 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    return NextResponse.json(printer, { status: 201 })
+    // Serialize BigInt to string
+    const serializedPrinter = {
+      ...printer,
+      printerId: printer.printerId.toString()
+    }
+
+    return NextResponse.json(serializedPrinter, { status: 201 })
   } catch (error: any) {
     console.error('Error creating printer:', error)
     

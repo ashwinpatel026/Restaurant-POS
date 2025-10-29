@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import {
   PlusIcon,
   PencilIcon,
   TrashIcon,
-  EyeIcon,
+  ArrowLeftIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import CRUDModal from "@/components/modals/CRUDModal";
+import { PageSkeleton } from "@/components/ui/SkeletonLoader";
 
 interface MenuCategory {
   tblMenuCategoryId: number;
@@ -24,23 +26,17 @@ interface MenuCategory {
 }
 
 interface MenuMaster {
-  tblMenuMasterId: number;
+  menuMasterId: string;
   name: string;
 }
 
 export default function MenuCategoriesPage() {
+  const router = useRouter();
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [menuMasters, setMenuMasters] = useState<MenuMaster[]>([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    items: 0,
-  });
 
-  // Modal states
-  const [showModal, setShowModal] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<MenuCategory | null>(
-    null
-  );
+  // Delete modal state
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -82,16 +78,17 @@ export default function MenuCategoriesPage() {
 
   // Helper function to get menu master name by ID
   const getMenuMasterName = (menuMasterId: number) => {
-    const master = menuMasters.find((m) => m.tblMenuMasterId === menuMasterId);
+    const master = menuMasters.find(
+      (m) => m.menuMasterId === menuMasterId.toString()
+    );
     return master?.name || "Unknown";
   };
 
   const fetchData = async () => {
     try {
-      const [categoriesRes, mastersRes, itemsRes] = await Promise.all([
+      const [categoriesRes, mastersRes] = await Promise.all([
         fetch("/api/menu/categories"),
         fetch("/api/menu/masters"),
-        fetch("/api/menu/items"),
       ]);
 
       if (categoriesRes.ok) {
@@ -103,11 +100,6 @@ export default function MenuCategoriesPage() {
         const mastersData = await mastersRes.json();
         setMenuMasters(mastersData);
       }
-
-      if (itemsRes.ok) {
-        const itemsData = await itemsRes.json();
-        setStats((prev) => ({ ...prev, items: itemsData.length }));
-      }
     } catch (error) {
       toast.error("Error loading data");
       console.error("Error:", error);
@@ -116,50 +108,13 @@ export default function MenuCategoriesPage() {
     }
   };
 
-  // Modal handlers
+  // Navigation handlers
   const handleAdd = () => {
-    setEditingCategory(null);
-    setShowModal(true);
+    router.push("/dashboard/menu/categories/add");
   };
 
-  const handleEdit = (category: MenuCategory) => {
-    setEditingCategory(category);
-    setShowModal(true);
-  };
-
-  const handleSave = async (formData: any) => {
-    try {
-      const url = editingCategory
-        ? `/api/menu/categories/${editingCategory.tblMenuCategoryId}`
-        : "/api/menu/categories";
-
-      const method = editingCategory ? "PUT" : "POST";
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        toast.success(
-          editingCategory
-            ? "Category updated successfully!"
-            : "Category created successfully!"
-        );
-        setShowModal(false);
-        setEditingCategory(null);
-        fetchData(); // Refresh data
-      } else {
-        throw new Error("Failed to save category");
-      }
-    } catch (error) {
-      toast.error("Error saving category");
-      console.error("Error:", error);
-    }
+  const handleEdit = (categoryId: number) => {
+    router.push(`/dashboard/menu/categories/${categoryId}/edit`);
   };
 
   const handleDelete = (categoryId: number) => {
@@ -198,9 +153,7 @@ export default function MenuCategoriesPage() {
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
+        <PageSkeleton />
       </DashboardLayout>
     );
   }
@@ -208,6 +161,16 @@ export default function MenuCategoriesPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {/* Back Button */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => router.push("/dashboard/menu")}
+            className="inline-flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+          >
+            <ArrowLeftIcon className="w-5 h-5 mr-2" />
+            <span className="text-lg font-medium">Back to Menu Management</span>
+          </button>
+        </div>
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
@@ -256,10 +219,7 @@ export default function MenuCategoriesPage() {
               >
                 <option value="">All Menu Masters</option>
                 {menuMasters.map((master) => (
-                  <option
-                    key={master.tblMenuMasterId}
-                    value={master.tblMenuMasterId}
-                  >
+                  <option key={master.menuMasterId} value={master.menuMasterId}>
                     {master.name}
                   </option>
                 ))}
@@ -278,69 +238,6 @@ export default function MenuCategoriesPage() {
             >
               Clear Filters
             </button>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
-                  <span className="text-blue-600 dark:text-blue-400 font-semibold">
-                    C
-                  </span>
-                </div>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Total Categories
-                </p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {filteredCategories.length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
-                  <span className="text-green-600 dark:text-green-400 font-semibold">
-                    A
-                  </span>
-                </div>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Active
-                </p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {categories.filter((c) => c.isActive === 1).length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center">
-                  <span className="text-purple-600 dark:text-purple-400 font-semibold">
-                    I
-                  </span>
-                </div>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Total Items
-                </p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {stats.items}
-                </p>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -383,6 +280,11 @@ export default function MenuCategoriesPage() {
                   <div
                     key={category.tblMenuCategoryId}
                     className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-shadow bg-white dark:bg-gray-700"
+                    style={
+                      category.colorCode
+                        ? { borderColor: category.colorCode }
+                        : undefined
+                    }
                   >
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center">
@@ -416,13 +318,7 @@ export default function MenuCategoriesPage() {
 
                     <div className="flex justify-end space-x-2">
                       <button
-                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-200"
-                        title="View category details"
-                      >
-                        <EyeIcon className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleEdit(category)}
+                        onClick={() => handleEdit(category.tblMenuCategoryId)}
                         className="p-1 text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors duration-200"
                         title="Edit category"
                       >
@@ -443,27 +339,6 @@ export default function MenuCategoriesPage() {
           </div>
         </div>
       </div>
-
-      {/* Modal */}
-      <CRUDModal
-        isOpen={showModal}
-        onClose={() => {
-          setShowModal(false);
-          setEditingCategory(null);
-        }}
-        title={editingCategory ? "Edit Category" : "Add New Category"}
-        size="md"
-      >
-        <CategoryForm
-          category={editingCategory}
-          menuMasters={menuMasters}
-          onSave={handleSave}
-          onCancel={() => {
-            setShowModal(false);
-            setEditingCategory(null);
-          }}
-        />
-      </CRUDModal>
 
       {/* Confirmation Modal */}
       <CRUDModal
@@ -514,147 +389,5 @@ export default function MenuCategoriesPage() {
         </div>
       </CRUDModal>
     </DashboardLayout>
-  );
-}
-
-// Category Form Component
-function CategoryForm({
-  category,
-  menuMasters,
-  onSave,
-  onCancel,
-}: {
-  category?: MenuCategory | null;
-  menuMasters: MenuMaster[];
-  onSave: (data: any) => void;
-  onCancel: () => void;
-}) {
-  const [formData, setFormData] = useState({
-    name: "",
-    colorCode: "#3B82F6",
-    tblMenuMasterId: "",
-    isActive: 1,
-  });
-
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (category) {
-      setFormData({
-        name: category.name || "",
-        colorCode: category.colorCode || "#3B82F6",
-        tblMenuMasterId: category.tblMenuMasterId?.toString() || "",
-        isActive: category.isActive || 1,
-      });
-    }
-  }, [category]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const submitData = {
-        ...formData,
-        tblMenuMasterId: parseInt(formData.tblMenuMasterId),
-      };
-
-      await onSave(submitData);
-    } catch (error) {
-      console.error("Error:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Name *
-        </label>
-        <input
-          type="text"
-          required
-          value={formData.name}
-          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          placeholder="Enter category name"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Menu Master *
-          </label>
-          <select
-            required
-            value={formData.tblMenuMasterId}
-            onChange={(e) =>
-              setFormData({ ...formData, tblMenuMasterId: e.target.value })
-            }
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">Select Menu Master</option>
-            {menuMasters.map((master) => (
-              <option
-                key={master.tblMenuMasterId}
-                value={master.tblMenuMasterId}
-              >
-                {master.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Color Code
-          </label>
-          <input
-            type="color"
-            value={formData.colorCode}
-            onChange={(e) =>
-              setFormData({ ...formData, colorCode: e.target.value })
-            }
-            className="w-full h-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={formData.isActive === 1}
-            onChange={(e) =>
-              setFormData({ ...formData, isActive: e.target.checked ? 1 : 0 })
-            }
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
-          />
-          <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-            Active
-          </span>
-        </label>
-      </div>
-
-      <div className="flex justify-end space-x-3 pt-4">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={loading}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-        >
-          {loading ? "Saving..." : category ? "Update" : "Create"}
-        </button>
-      </div>
-    </form>
   );
 }

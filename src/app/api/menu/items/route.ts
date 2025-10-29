@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma, checkConnection } from '@/lib/database'
+import { generateUniqueCode } from '@/lib/codeGenerator'
 
 // Helper function to handle database operations with retry
 async function withRetry<T>(operation: () => Promise<T>, maxRetries = 3): Promise<T> {
@@ -41,12 +42,13 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const categoryId = searchParams.get('categoryId')
+    const categoryCode = searchParams.get('categoryCode')
+    const menuCategoryCode = searchParams.get('menuCategoryCode')
     const isActive = searchParams.get('isActive')
 
     const where: any = {}
-    if (categoryId) {
-      where.tblMenuCategoryId = parseInt(categoryId)
+    if (menuCategoryCode || categoryCode) {
+      where.menuCategoryCode = menuCategoryCode || categoryCode
     }
     if (isActive !== null) {
       where.isActive = isActive === 'true' ? 1 : 0
@@ -57,7 +59,14 @@ export async function GET(request: NextRequest) {
       orderBy: { createdOn: 'desc' }
     })
 
-    return NextResponse.json(menuItems)
+    // Convert menuItemId to string for JSON serialization
+    const itemsWithStringIds = (menuItems as any[]).map((item: any) => ({
+      ...item,
+      menuItemId: (item.menuItemId ?? item.tblMenuItemId)?.toString?.() ?? undefined,
+      skuPlu: item.skuPlu ? item.skuPlu.toString() : null,
+    }))
+
+    return NextResponse.json(itemsWithStringIds)
   } catch (error) {
     console.error('Error fetching menu items:', error)
     return NextResponse.json(
@@ -78,18 +87,37 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const {
       name,
+      kitchenName,
       labelName,
       colorCode,
       calories,
-      descrip,
+      description,
+      itemSize,
       skuPlu,
-      isAlcohol,
+      itemContainAlcohol,
       menuImg,
       priceStrategy,
-      price,
-      tblMenuCategoryId,
-      selectedModifiers // Added selectedModifiers
+      basePrice,
+      isPrice,
+      isOutStock,
+      isPosVisible,
+      isKioskOrderPay,
+      isOnlineOrderByApp,
+      isOnlineOrdering,
+      isCustomerInvoice,
+      menuCategoryCode,
+      taxCode,
+      inheritTaxInclusion,
+      isTaxIncluded,
+      inheritDiningTax,
+      diningTaxEffect,
+      disqualifyDiningTaxExemption,
+      isActive,
+      stockinhand
     } = body
+
+    // Generate unique code for menu item
+    const menuItemCode = await generateUniqueCode('menuItem', 'menuItemCode')
 
     // Check if menuImg is too large (base64 string length check)
     if (menuImg && menuImg.length > 2000000) { // ~2MB base64 string for 1MB file
@@ -100,41 +128,51 @@ export async function POST(request: NextRequest) {
     }
 
     const menuItem = await withRetry(async () => {
-      return await prisma.menuItem.create({
+      return await (prisma as any).menuItem.create({
         data: {
-          name,
-          labelName,
-          colorCode,
-          calories,
-          descrip,
-          skuPlu: skuPlu ? parseInt(skuPlu) : null,
-          isAlcohol: isAlcohol ? 1 : 0,
-          menuImg: menuImg || null, // Handle empty strings
-          priceStrategy: parseInt(priceStrategy),
-          price: parseFloat(price),
-          tblMenuCategoryId: parseInt(tblMenuCategoryId),
+          menuItemCode,
+          menuCategoryCode: menuCategoryCode || null,
+          name: name || null,
+          kitchenName: kitchenName || null,
+          labelName: labelName || null,
+          colorCode: colorCode || null,
+          calories: calories || null,
+          description: description || null,
+          itemSize: itemSize || null,
+          skuPlu: skuPlu ? (typeof skuPlu === 'string' ? BigInt(skuPlu) : BigInt(String(skuPlu))) : null,
+          itemContainAlcohol: itemContainAlcohol ? 1 : 0,
+          menuImg: menuImg || null,
+          priceStrategy: priceStrategy ? parseInt(priceStrategy) : null,
+          basePrice: basePrice != null ? parseFloat(basePrice) : null,
+          isPrice: isPrice !== undefined ? (isPrice ? 1 : 0) : 1,
+          isActive: isActive !== undefined ? (isActive ? 1 : 0) : 1,
+          stockinhand: stockinhand ? parseFloat(stockinhand) : null,
+          isOutStock: isOutStock !== undefined ? (isOutStock ? 1 : 0) : null,
+          isPosVisible: isPosVisible !== undefined ? (isPosVisible ? 1 : 0) : null,
+          isKioskOrderPay: isKioskOrderPay !== undefined ? (isKioskOrderPay ? 1 : 0) : null,
+          isOnlineOrderByApp: isOnlineOrderByApp !== undefined ? (isOnlineOrderByApp ? 1 : 0) : null,
+          isOnlineOrdering: isOnlineOrdering !== undefined ? (isOnlineOrdering ? 1 : 0) : null,
+          isCustomerInvoice: isCustomerInvoice !== undefined ? (isCustomerInvoice ? 1 : 0) : null,
+          taxCode: taxCode || null,
+          inheritTaxInclusion: inheritTaxInclusion !== undefined ? inheritTaxInclusion : true,
+          isTaxIncluded: isTaxIncluded !== undefined ? isTaxIncluded : false,
+          inheritDiningTax: inheritDiningTax !== undefined ? inheritDiningTax : true,
+          diningTaxEffect: diningTaxEffect || 'No Effect',
+          disqualifyDiningTaxExemption: disqualifyDiningTaxExemption !== undefined ? disqualifyDiningTaxExemption : false,
           createdBy: parseInt(session.user.id),
           storeCode: process.env.STORE_CODE || null
         }
       })
     })
 
-    // Create modifier assignments if provided
-    if (selectedModifiers && selectedModifiers.length > 0) {
-      await withRetry(async () => {
-        const modifierAssignments = selectedModifiers.map((modifierId: number) => ({
-          tblMenuItemId: menuItem.tblMenuItemId,
-          tblModifierId: modifierId,
-          storeCode: process.env.STORE_CODE || null
-        }))
-
-        await prisma.menuItemModifier.createMany({
-          data: modifierAssignments
-        })
-      })
+    // Convert IDs to strings for JSON response
+    const itemWithStringIds = {
+      ...menuItem,
+      menuItemId: (menuItem as any).menuItemId?.toString?.(),
+      skuPlu: (menuItem as any).skuPlu ? (menuItem as any).skuPlu.toString() : null,
     }
 
-    return NextResponse.json(menuItem, { status: 201 })
+    return NextResponse.json(itemWithStringIds, { status: 201 })
   } catch (error) {
     console.error('Error creating menu item:', error)
     return NextResponse.json(

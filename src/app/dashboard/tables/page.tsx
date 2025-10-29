@@ -7,6 +7,7 @@ import { getStatusColor } from "@/lib/utils";
 import toast from "react-hot-toast";
 import TableModal from "@/components/tables/TableModal";
 import QRCodeModal from "@/components/tables/QRCodeModal";
+import { PageSkeleton } from "@/components/ui/SkeletonLoader";
 
 interface Table {
   id: string;
@@ -90,9 +91,7 @@ export default function TablesPage() {
 
         {/* Tables Grid */}
         {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          </div>
+          <PageSkeleton />
         ) : tables.length === 0 ? (
           <div className="card text-center py-12">
             <p className="text-gray-600">

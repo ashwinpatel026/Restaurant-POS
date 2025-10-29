@@ -5,6 +5,7 @@ import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { PlusIcon } from "@heroicons/react/24/outline";
 import { formatDate, getStatusColor } from "@/lib/utils";
 import toast from "react-hot-toast";
+import { PageSkeleton } from "@/components/ui/SkeletonLoader";
 
 interface SupplyOrder {
   id: string;
@@ -117,9 +118,7 @@ export default function CentralKitchenPage() {
 
         {/* Orders List */}
         {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          </div>
+          <PageSkeleton />
         ) : orders.length === 0 ? (
           <div className="card text-center py-12">
             <p className="text-gray-600">No supply orders found</p>

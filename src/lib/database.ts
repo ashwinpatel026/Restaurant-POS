@@ -14,7 +14,7 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
 export async function connectDB() {
   try {
     await prisma.$connect()
-    console.log('✅ MySQL database connected successfully')
+    console.log('✅ PostgreSQL database connected successfully')
   } catch (error) {
     console.error('❌ Database connection failed:', error)
     throw error
@@ -35,7 +35,7 @@ export async function checkConnection() {
 // Disconnect function
 export async function disconnectDB() {
   await prisma.$disconnect()
-  console.log('✅ MySQL database disconnected')
+  console.log('✅ PostgreSQL database disconnected')
 }
 
 export default prisma

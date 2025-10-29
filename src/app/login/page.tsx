@@ -5,9 +5,11 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import Image from "next/image";
+import { useTheme } from "@/contexts/ThemeContext";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { theme } = useTheme();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
@@ -39,27 +41,39 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-500 to-secondary-600 p-4">
+    <div
+      className={`min-h-screen flex items-center justify-center p-4 ${
+        theme === "dark"
+          ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900"
+          : "bg-gradient-to-br"
+      }`}
+      style={{
+        background:
+          theme === "dark"
+            ? undefined
+            : "linear-gradient(145deg, #193E72 0%, #FEB203 100%)",
+      }}
+    >
       <div className="max-w-md w-full">
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-primary-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg
-                className="w-10 h-10 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                />
-              </svg>
+            <div className="mx-auto mb-8 mt-8 flex items-center justify-center">
+              <Image
+                src={
+                  theme === "dark"
+                    ? "/assets/image/logo-light.png"
+                    : "/assets/image/logo.png"
+                }
+                alt="Restaurant POS Logo"
+                width={280}
+                height={280}
+                className="object-contain"
+                priority
+              />
             </div>
-            <h2 className="text-3xl font-bold text-gray-900">Restaurant POS</h2>
-            <p className="text-gray-600 mt-2">Sign in to your account</p>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">
+              Sign in to your account
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -100,7 +114,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-gray-600">
+          <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
             <p>Demo Credentials:</p>
             <p className="font-mono text-xs mt-2">
               admin@restaurant.com / admin123

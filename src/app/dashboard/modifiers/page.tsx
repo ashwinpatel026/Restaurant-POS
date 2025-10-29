@@ -5,6 +5,7 @@ import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { CogIcon, TagIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { PageSkeleton } from "@/components/ui/SkeletonLoader";
 
 export default function ModifiersDashboardPage() {
   const [stats, setStats] = useState({
@@ -20,8 +21,8 @@ export default function ModifiersDashboardPage() {
   const fetchStats = async () => {
     try {
       const [modifiersRes, modifierItemsRes] = await Promise.all([
-        fetch("/api/menu/modifiers"),
-        fetch("/api/menu/modifier-items"),
+        fetch("/api/modifier-groups"),
+        fetch("/api/modifier-items"),
       ]);
 
       const newStats = {
@@ -85,9 +86,7 @@ export default function ModifiersDashboardPage() {
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
+        <PageSkeleton />
       </DashboardLayout>
     );
   }
@@ -103,49 +102,6 @@ export default function ModifiersDashboardPage() {
           <p className="text-gray-600 dark:text-gray-400 mt-2">
             Manage modifiers and modifier items for your restaurant
           </p>
-        </div>
-
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
-                  <span className="text-blue-600 dark:text-blue-400 font-semibold text-sm">
-                    M
-                  </span>
-                </div>
-              </div>
-              <div className="ml-3">
-                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                  Modifiers
-                </p>
-                <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {stats.modifiers}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
-                  <span className="text-green-600 dark:text-green-400 font-semibold text-sm">
-                    I
-                  </span>
-                </div>
-              </div>
-              <div className="ml-3">
-                <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
-                  Modifier Items
-                </p>
-                <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {stats.modifierItems}
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Management Cards */}

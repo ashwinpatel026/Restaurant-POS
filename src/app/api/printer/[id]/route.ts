@@ -15,7 +15,7 @@ export async function GET(
     }
 
     const resolvedParams = await params
-    const printerId = parseInt(resolvedParams.id)
+    const printerId = BigInt(resolvedParams.id)
 
     const printer = await prisma.printer.findUnique({
       where: { printerId }
@@ -25,7 +25,13 @@ export async function GET(
       return NextResponse.json({ error: 'Printer not found' }, { status: 404 })
     }
 
-    return NextResponse.json(printer)
+    // Serialize BigInt to string
+    const serializedPrinter = {
+      ...printer,
+      printerId: printer.printerId.toString()
+    }
+
+    return NextResponse.json(serializedPrinter)
   } catch (error) {
     console.error('Error fetching printer:', error)
     return NextResponse.json(
@@ -47,7 +53,7 @@ export async function PUT(
     }
 
     const resolvedParams = await params
-    const printerId = parseInt(resolvedParams.id)
+    const printerId = BigInt(resolvedParams.id)
     const body = await request.json()
 
     const { printerName, isActive } = body
@@ -70,7 +76,13 @@ export async function PUT(
       }
     })
 
-    return NextResponse.json(printer)
+    // Serialize BigInt to string
+    const serializedPrinter = {
+      ...printer,
+      printerId: printer.printerId.toString()
+    }
+
+    return NextResponse.json(serializedPrinter)
   } catch (error: any) {
     console.error('Error updating printer:', error)
 
@@ -93,7 +105,7 @@ export async function DELETE(
     }
 
     const resolvedParams = await params
-    const printerId = parseInt(resolvedParams.id)
+    const printerId = BigInt(resolvedParams.id)
 
     await prisma.printer.delete({
       where: { printerId }

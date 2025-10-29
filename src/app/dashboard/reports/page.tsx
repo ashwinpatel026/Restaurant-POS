@@ -10,6 +10,7 @@ import {
   UserGroupIcon,
   ChartBarIcon,
 } from "@heroicons/react/24/outline";
+import { PageSkeleton } from "@/components/ui/SkeletonLoader";
 
 interface ReportData {
   totalSales: number;
@@ -130,9 +131,7 @@ export default function ReportsPage() {
         </div>
 
         {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          </div>
+          <PageSkeleton />
         ) : reportData ? (
           <>
             {/* Key Metrics */}

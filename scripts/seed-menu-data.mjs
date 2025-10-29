@@ -21,42 +21,8 @@ async function seedMenuData() {
     await prisma.menuItem.deleteMany({})
     await prisma.menuCategory.deleteMany({})
     await prisma.menuMaster.deleteMany({})
-    await prisma.stationGroupList.deleteMany({})
-    await prisma.stationGroup.deleteMany({})
-    await prisma.availability.deleteMany({})
     
     console.log('🗑️  Cleared existing menu data\n')
-
-    // Create Availability
-    const availability = await prisma.availability.create({
-      data: {
-        avaiDays: '1,2,3,4,5,6,7', // All days
-        avilTime: '09:00-23:00',
-        createdBy: 1,
-        storeCode: 'MAIN'
-      }
-    })
-    console.log('✓ Availability created')
-
-    // Create Station Groups
-    const kitchenGroup = await prisma.stationGroup.create({
-      data: {
-        groupName: 'Kitchen',
-        isActive: 1,
-        createdBy: 1,
-        storeCode: 'MAIN'
-      }
-    })
-
-    const barGroup = await prisma.stationGroup.create({
-      data: {
-        groupName: 'Bar',
-        isActive: 1,
-        createdBy: 1,
-        storeCode: 'MAIN'
-      }
-    })
-    console.log('✓ Station groups created')
 
     // Create Menu Master
     const mainMenuMaster = await prisma.menuMaster.create({
@@ -65,8 +31,6 @@ async function seedMenuData() {
         labelName: 'Main Menu',
         colorCode: '#3B82F6',
         taxId: 1, // Assuming tax ID 1 exists
-        stationGroupId: kitchenGroup.stationGroupId,
-        availabilityId: availability.availabilityId,
         isActive: 1,
         createdBy: 1,
         storeCode: 'MAIN'
@@ -245,8 +209,6 @@ async function seedMenuData() {
 
     console.log('\n✅ Menu data seed completed successfully! 🎉\n')
     console.log('📊 Summary:')
-    console.log('   • 1 Availability record')
-    console.log('   • 2 Station groups')
     console.log('   • 1 Menu master')
     console.log('   • 3 Menu categories')
     console.log('   • 3 Menu items')

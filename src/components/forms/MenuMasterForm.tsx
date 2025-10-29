@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 
 interface MenuMasterFormProps {
   menuMaster?: any;
-  stationGroups: any[];
+  prepZones: any[];
   availability: any[];
   taxes: any[];
   onSave: (data: any) => void;
@@ -14,7 +14,7 @@ interface MenuMasterFormProps {
 
 export default function MenuMasterForm({
   menuMaster,
-  stationGroups,
+  prepZones,
   availability,
   taxes,
   onSave,
@@ -168,7 +168,7 @@ export default function MenuMasterForm({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Station Group
+            Prep Zone
           </label>
           <select
             value={formData.stationGroupId}
@@ -177,10 +177,10 @@ export default function MenuMasterForm({
             }
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
-            <option value="">Select Station Group</option>
-            {stationGroups.map((group) => (
-              <option key={group.stationGroupId} value={group.stationGroupId}>
-                {group.groupName}
+            <option value="">Select Prep Zone</option>
+            {prepZones.map((zone) => (
+              <option key={zone.prepZoneId} value={parseInt(zone.prepZoneId)}>
+                {zone.prepZoneName}
               </option>
             ))}
           </select>

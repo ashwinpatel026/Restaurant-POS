@@ -44,17 +44,24 @@ export async function GET(
     }
 
     const resolvedParams = await params
-    const itemId = parseInt(resolvedParams.id)
+    const itemId = BigInt(resolvedParams.id)
 
-    const menuItem = await prisma.menuItem.findUnique({
-      where: { tblMenuItemId: itemId }
+    const menuItem = await (prisma as any).menuItem.findUnique({
+      where: { menuItemId: itemId } as any
     })
 
     if (!menuItem) {
       return NextResponse.json({ error: 'Menu item not found' }, { status: 404 })
     }
 
-    return NextResponse.json(menuItem)
+    // Convert IDs to strings for JSON response
+    const itemWithStringIds = {
+      ...menuItem,
+      menuItemId: (menuItem as any).menuItemId?.toString?.(),
+      skuPlu: (menuItem as any).skuPlu ? (menuItem as any).skuPlu.toString() : null,
+    }
+
+    return NextResponse.json(itemWithStringIds)
   } catch (error) {
     console.error('Error fetching menu item:', error)
     return NextResponse.json(
@@ -76,23 +83,38 @@ export async function PUT(
     }
 
     const resolvedParams = await params
-    const itemId = parseInt(resolvedParams.id)
+    const itemId = BigInt(resolvedParams.id)
     const body = await request.json()
 
     const {
       name,
+      kitchenName,
       labelName,
       colorCode,
       calories,
-      descrip,
+      description,
+      itemSize,
       skuPlu,
-      isAlcohol,
+      itemContainAlcohol,
       menuImg,
       priceStrategy,
-      price,
+      basePrice,
+      isPrice,
+      isOutStock,
+      isPosVisible,
+      isKioskOrderPay,
+      isOnlineOrderByApp,
+      isOnlineOrdering,
+      isCustomerInvoice,
+      menuCategoryCode,
+      taxCode,
+      inheritTaxInclusion,
+      isTaxIncluded,
+      inheritDiningTax,
+      diningTaxEffect,
+      disqualifyDiningTaxExemption,
       isActive,
-      tblMenuCategoryId,
-      selectedModifiers // Added selectedModifiers
+      stockinhand
     } = body
 
     // Check if menuImg is too large (base64 string length check)
@@ -104,49 +126,49 @@ export async function PUT(
     }
 
     const menuItem = await withRetry(async () => {
-      return await prisma.menuItem.update({
-        where: { tblMenuItemId: itemId },
+      return await (prisma as any).menuItem.update({
+        where: { menuItemId: itemId } as any,
         data: {
-          name,
-          labelName,
-          colorCode,
-          calories,
-          descrip,
-          skuPlu: skuPlu ? parseInt(skuPlu) : null,
-          isAlcohol: isAlcohol ? 1 : 0,
-          menuImg: menuImg || null, // Handle empty strings
-          priceStrategy: parseInt(priceStrategy),
-          price: parseFloat(price),
-          isActive,
-          tblMenuCategoryId: parseInt(tblMenuCategoryId)
+          name: name || null,
+          kitchenName: kitchenName || null,
+          labelName: labelName || null,
+          colorCode: colorCode || null,
+          calories: calories || null,
+          description: description || null,
+          itemSize: itemSize || null,
+          skuPlu: skuPlu ? BigInt(skuPlu) : null,
+          itemContainAlcohol: itemContainAlcohol !== undefined ? (itemContainAlcohol ? 1 : 0) : undefined,
+          menuImg: menuImg || null,
+          priceStrategy: priceStrategy ? parseInt(priceStrategy) : null,
+          basePrice: basePrice ? parseFloat(basePrice) : null,
+          isPrice: isPrice !== undefined ? (isPrice ? 1 : 0) : undefined,
+          isActive: isActive !== undefined ? (isActive ? 1 : 0) : undefined,
+          stockinhand: stockinhand ? parseFloat(stockinhand) : null,
+          isOutStock: isOutStock !== undefined ? (isOutStock ? 1 : 0) : null,
+          isPosVisible: isPosVisible !== undefined ? (isPosVisible ? 1 : 0) : null,
+          isKioskOrderPay: isKioskOrderPay !== undefined ? (isKioskOrderPay ? 1 : 0) : null,
+          isOnlineOrderByApp: isOnlineOrderByApp !== undefined ? (isOnlineOrderByApp ? 1 : 0) : null,
+          isOnlineOrdering: isOnlineOrdering !== undefined ? (isOnlineOrdering ? 1 : 0) : null,
+          isCustomerInvoice: isCustomerInvoice !== undefined ? (isCustomerInvoice ? 1 : 0) : null,
+          taxCode: taxCode || null,
+          inheritTaxInclusion: inheritTaxInclusion !== undefined ? inheritTaxInclusion : undefined,
+          isTaxIncluded: isTaxIncluded !== undefined ? isTaxIncluded : undefined,
+          inheritDiningTax: inheritDiningTax !== undefined ? inheritDiningTax : undefined,
+          diningTaxEffect: diningTaxEffect || null,
+          disqualifyDiningTaxExemption: disqualifyDiningTaxExemption !== undefined ? disqualifyDiningTaxExemption : undefined,
+          menuCategoryCode: menuCategoryCode || null
         }
       })
     })
 
-    // Update modifier assignments if provided
-    if (selectedModifiers !== undefined) {
-      await withRetry(async () => {
-        // Delete existing modifier assignments
-        await prisma.menuItemModifier.deleteMany({
-          where: { tblMenuItemId: itemId }
-        })
-
-        // Create new modifier assignments
-        if (selectedModifiers.length > 0) {
-          const modifierAssignments = selectedModifiers.map((modifierId: number) => ({
-            tblMenuItemId: itemId,
-            tblModifierId: modifierId,
-            storeCode: process.env.STORE_CODE || null
-          }))
-
-          await prisma.menuItemModifier.createMany({
-            data: modifierAssignments
-          })
-        }
-      })
+    // Convert IDs to strings for JSON response
+    const itemWithStringIds = {
+      ...menuItem,
+      menuItemId: (menuItem as any).menuItemId?.toString?.(),
+      skuPlu: (menuItem as any).skuPlu ? (menuItem as any).skuPlu.toString() : null,
     }
 
-    return NextResponse.json(menuItem)
+    return NextResponse.json(itemWithStringIds)
   } catch (error) {
     console.error('Error updating menu item:', error)
     return NextResponse.json(
@@ -168,38 +190,22 @@ export async function DELETE(
     }
 
     const resolvedParams = await params
-    const itemId = parseInt(resolvedParams.id)
+    const itemId = BigInt(resolvedParams.id)
 
     // Check if menu item exists
-    const menuItem = await prisma.menuItem.findUnique({
-      where: { tblMenuItemId: itemId }
+    const menuItem = await (prisma as any).menuItem.findUnique({
+      where: { menuItemId: itemId } as any
     })
 
     if (!menuItem) {
       return NextResponse.json({ error: 'Menu item not found' }, { status: 404 })
     }
 
-    // Check for related modifiers
-    const modifiersCount = await prisma.modifier.count({
-      where: { tblMenuItemId: itemId }
-    })
-
-    const menuItemModifiersCount = await prisma.menuItemModifier.count({
-      where: { tblMenuItemId: itemId }
-    })
-
-    const totalModifiers = modifiersCount + menuItemModifiersCount
-
-    // If menu item has modifiers, prevent deletion
-    if (totalModifiers > 0) {
-      return NextResponse.json({ 
-        error: `Cannot delete menu item "${menuItem.name}" because it has ${totalModifiers} modifier(s) associated with it. Please remove all modifiers first.` 
-      }, { status: 400 })
-    }
-
-    // Safe to delete the menu item
-    await prisma.menuItem.delete({
-      where: { tblMenuItemId: itemId }
+    // Now safe to delete the menu item
+    await withRetry(async () => {
+      await (prisma as any).menuItem.delete({
+        where: { menuItemId: itemId } as any
+      })
     })
 
     return NextResponse.json({ message: 'Menu item deleted successfully' })
@@ -209,7 +215,7 @@ export async function DELETE(
     // Handle foreign key constraint error specifically
     if (error instanceof Error && error.message.includes('Foreign key constraint')) {
       return NextResponse.json({ 
-        error: 'Cannot delete this menu item because it has related modifiers or orders. Please remove all related data first.' 
+        error: 'Cannot delete this menu item because it has related orders. Please remove all related data first.' 
       }, { status: 400 })
     }
     

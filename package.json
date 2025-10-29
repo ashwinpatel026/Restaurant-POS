@@ -18,7 +18,7 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
-    "@headlessui/react": "^2.1.2",
+    "@headlessui/react": "^2.2.9",
     "@heroicons/react": "^2.1.4",
     "@prisma/client": "^6.16.3",
     "bcryptjs": "^2.4.3",
@@ -30,6 +30,7 @@
     "mysql2": "^3.15.1",
     "next": "^15.5.4",
     "next-auth": "^4.24.7",
+    "pg": "^8.16.3",
     "prisma": "^6.16.3",
     "qrcode": "^1.5.3",
     "react": "^18.3.1",

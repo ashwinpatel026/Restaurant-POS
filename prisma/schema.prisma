@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -46,201 +46,307 @@ model Outlet {
   @@map("outlets")
 }
 
-model Availability {
-  availabilityId Int       @id @default(autoincrement()) @map("availability_id")
-  avaiCode       String    @unique @map("avai_code") @db.VarChar(100)
-  avaiName       String    @unique @map("avai_name") @db.VarChar(100)
-  isActive       Int       @default(1) @map("is_active")
-  createdBy      Int?      @map("createdby")
-  createdOn      DateTime  @default(now()) @map("createdon")
-  isSyncMysql    Int?      @map("is_sync_mysql")
-  storeCode      String?   @map("Store_code") @db.VarChar(100)
+model TimeEvent {
+  id                     BigInt    @id @default(autoincrement())
+  eventCode              String    @unique @map("Event_code") @db.VarChar(100)
+  eventName              String    @map("EventName") @db.VarChar(100)
+  globalPriceAmountAdd   Decimal?  @map("GlobalPrice_Amount_Add") @db.Decimal(18, 2)
+  globalPriceAmountDisc  Decimal?  @map("GlobalPrice_Amount_Disc") @db.Decimal(18, 2)
+  globalPricePerAdd      Decimal?  @map("GlobalPrice_Per_Add") @db.Decimal(18, 2)
+  globalPricePerDisc     Decimal?  @map("GlobalPrice_Per_Disc") @db.Decimal(18, 2)
+  monday                 String?   @map("Monday") @db.VarChar(50)
+  monStartTime           String?   @map("Mon_StartTime") @db.VarChar(10)
+  monEndTime             String?   @map("Mon_EndTime") @db.VarChar(10)
+  tuesday                String?   @map("Tuesday") @db.VarChar(50)
+  tueStartTime           String?   @map("Tue_StartTime") @db.VarChar(10)
+  tueEndTime             String?   @map("Tue_EndTime") @db.VarChar(10)
+  wednesday              String?   @map("Wednesday") @db.VarChar(50)
+  wedStartTime           String?   @map("Wed_StartTime") @db.VarChar(10)
+  wedEndTime             String?   @map("Wed_EndTime") @db.VarChar(10)
+  thursday               String?   @map("Thursday") @db.VarChar(50)
+  thuStartTime           String?   @map("Thu_StartTime") @db.VarChar(10)
+  thuEndTime             String?   @map("Thu_EndTime") @db.VarChar(10)
+  friday                 String?   @map("FriDay") @db.VarChar(50)
+  friStartTime           String?   @map("Fri_StartTime") @db.VarChar(10)
+  friEndTime             String?   @map("Fri_EndTime") @db.VarChar(10)
+  saturday               String?   @map("Saturday") @db.VarChar(50)
+  satStartTime           String?   @map("Sat_StartTime") @db.VarChar(10)
+  satEndTime             String?   @map("Sat_EndTime") @db.VarChar(10)
+  sunday                 String?   @map("SunDay") @db.VarChar(50)
+  sunStartTime           String?   @map("Sun_StartTime") @db.VarChar(10)
+  sunEndTime             String?   @map("Sun_EndTime") @db.VarChar(10)
+  eventStartDate         DateTime? @map("Event_Start_Date") @db.Date
+  eventEndDate           DateTime? @map("Event_End_Date") @db.Date
+  isActive               Int?      @map("is_active")
+  createdDate            DateTime? @map("Created_date")
+  createdBy              Int?      @map("Created_by")
+  storeCode              String?   @map("Store_code") @db.VarChar(30)
+  isSyncToWeb            Int?      @map("is_sync_to_web")
+  isSyncToLocal          Int?      @map("is_sync_to_local")
 
-  // Relationship to schedules
-  schedules AvailabilitySchedule[]
+  // Relationships
+  menuMasterEvents       MenuMasterEvent[]
 
-  @@map("tbl_availability")
+  @@map("tbl_Time_Events")
 }
 
-model AvailabilitySchedule {
-  id          Int       @id @default(autoincrement())
-  avaiCode    String    @map("avai_code") @db.VarChar(100)
-  dayName     DayName   @map("day_name")
-  startTime   DateTime  @map("start_time") @db.Time()
-  endTime     DateTime  @map("end_time") @db.Time()
-  createdBy   Int?      @map("createdby")
-  createdOn   DateTime  @default(now()) @map("createdon")
-  isSyncMysql Int?      @map("is_sync_mysql")
-  storeCode   String?   @map("Store_code") @db.VarChar(100)
-
-  // Relationship to Availability
-  availability Availability @relation(fields: [avaiCode], references: [avaiCode], onDelete: Cascade)
-
-  @@index([avaiCode])
-  @@map("tbl_availability_schedule")
-}
-
-model PrepStation {
-  prepStationId      Int       @id @default(autoincrement()) @map("prep_station_id")
-  prepStationCode    String?   @unique @map("prep_station_code") @db.VarChar(100)
-  prepStationName    String?   @map("prep_station_name") @db.VarChar(500)
-  stationId          Int?      @map("stationid")
+model PrepZone {
+  prepZoneId         BigInt    @id @default(autoincrement()) @map("prep_zone_id")
+  prepZoneCode       String    @unique @map("prep_zone_code") @db.VarChar(100)
+  prepZoneName       String?   @map("prep_zone_name") @db.VarChar(500)
+  stationCode        String?   @map("station_code") @db.VarChar(100)
   isActive           Int       @default(1) @map("is_active")
   sendToExpediter    Int?      @map("send_to_expediter")
   alwaysPrintTicket  Int?      @map("always_print_ticket")
   printerCode        String?   @map("printer_code") @db.VarChar(100)
+  backupPrinterCode  String?   @map("backup_printer_code") @db.VarChar(100)
   createdBy          Int?      @map("createdby")
   createdOn          DateTime  @default(now()) @map("createdon")
   updatedBy          Int?      @map("updatedby")
   updatedOn          DateTime? @map("updatedon")
-  isSyncMysql        Int?      @map("is_sync_mysql")
-  storeCode          String?   @map("Store_code") @db.VarChar(100)
+  isSyncToWeb        Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal      Int       @default(0) @map("is_sync_to_local")
+  storeCode          String?   @map("store_code") @db.VarChar(100)
 
-  @@map("tbl_prep_station")
+  // Relationships
+  printer Printer? @relation(fields: [printerCode], references: [printerCode])
+  menuMasters MenuMaster[]
+
+  @@map("tbl_prep_zone")
 }
 
 model MenuMaster {
-  tblMenuMasterId   Int       @id @default(autoincrement()) @map("tbl_Menu_Master_Id")
-  name              String    @map("Name")
-  labelName         String?   @map("label_name")
-  colorCode         String?   @map("color_code")
-  taxId             Int       @map("tax_id")
-  stationGroupId    Int?      @map("station_group_id")
-  availabilityId    Int?      @map("availibility_id")
-  isActive          Int       @default(1) @map("Is_Active")
+  menuMasterId      BigInt    @id @default(autoincrement()) @map("menu_master_id")
+  menuMasterCode    String    @unique @map("menu_master_code") @db.VarChar(100)
+  name              String?   @map("name") @db.VarChar(500)
+  labelName         String?   @map("label_name") @db.VarChar(500)
+  colorCode         String?   @map("color_code") @db.VarChar(100)
+  prepZoneCode      String?   @map("prep_zone_code") @db.VarChar(100)
+  isEventMenu       Int?      @map("is_event_menu")
+  isActive          Int       @default(1) @map("is_active")
   createdBy         Int?      @map("createdby")
   createdOn         DateTime  @default(now()) @map("createdon")
   updatedBy         Int?      @map("updatedby")
   updatedOn         DateTime? @map("updatedon")
-  isSyncSqlserver   Int?      @map("is_sync_sqlserver")
-  storeCode         String?   @map("Store_code")
+  globalCode        String?   @map("global_code") @db.VarChar(30)
+  isSyncToWeb       Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal     Int       @default(0) @map("is_sync_to_local")
+  storeCode         String?   @map("store_code") @db.VarChar(100)
 
-  @@map("tbl_Menu_Master")
+  // Relationships
+  prepZone          PrepZone? @relation(fields: [prepZoneCode], references: [prepZoneCode])
+  menuMasterEvents  MenuMasterEvent[]
+  menuCategories    MenuCategory[]
+
+  @@map("tbl_menu_master")
+}
+
+model MenuMasterEvent {
+  id              BigInt    @id @default(autoincrement())
+  menuMasterCode  String    @map("menu_master_code") @db.VarChar(100)
+  eventCode       String    @map("event_code") @db.VarChar(100)
+  createdBy       Int?      @map("createdby")
+  createdOn       DateTime  @default(now()) @map("createdon")
+  globalCode      String?   @map("global_code") @db.VarChar(30)
+  isSyncToWeb     Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal   Int       @default(0) @map("is_sync_to_local")
+  storeCode       String?   @map("store_code") @db.VarChar(100)
+
+  // Relationships
+  menuMaster      MenuMaster @relation(fields: [menuMasterCode], references: [menuMasterCode])
+  timeEvent       TimeEvent  @relation(fields: [eventCode], references: [eventCode])
+
+  @@map("tbl_menu_master_event")
 }
 
 model MenuCategory {
-  tblMenuCategoryId Int       @id @default(autoincrement()) @map("tbl_Menu_Category_Id")
-  tblMenuMasterId   Int       @map("tbl_Menu_Master_Id")
-  name              String    @map("Name")
-  colorCode         String?   @map("color_code")
+  menuCategoryId    BigInt    @id @default(autoincrement()) @map("menu_category_id")
+  menuMasterCode    String    @map("menu_master_code") @db.VarChar(100)
+  menuCategoryCode  String    @unique @map("menu_category_code") @db.VarChar(100)
+  name              String?   @map("name") @db.VarChar(200)
+  colorCode         String?   @map("color_code") @db.VarChar(100)
   isActive          Int       @default(1) @map("is_active")
   createdBy         Int?      @map("createdby")
   createdOn         DateTime  @default(now()) @map("createdon")
-  isSyncSqlserver   Int?      @map("is_sync_sqlserver")
-  storeCode         String?   @map("Store_code")
+  globalCode        String?   @map("global_code") @db.VarChar(30)
+  isSyncToWeb       Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal     Int       @default(0) @map("is_sync_to_local")
+  storeCode         String?   @map("store_code") @db.VarChar(100)
 
-  @@map("tbl_Menu_Category")
+  // Relationship
+  menuMaster        MenuMaster @relation(fields: [menuMasterCode], references: [menuMasterCode])
+
+  @@map("tbl_menu_category")
 }
 
 model MenuItem {
-  tblMenuItemId     Int       @id @default(autoincrement()) @map("tbl_Menu_Item_Id")
-  tblMenuCategoryId Int       @map("tbl_Menu_Category_Id")
-  name              String    @map("Name")
-  labelName         String    @map("label_name")
-  colorCode         String?   @map("color_code")
-  calories          String?   @map("calories")
-  descrip           String?   @map("descrip")
-  skuPlu            Int?      @map("sku_plu")
-  isAlcohol         Int       @default(0) @map("is_alcohol")
-  menuImg           String?   @map("menu_img") // longtext for base64 images
-  priceStrategy     Int       @map("price_strategy")
-  price             Decimal   @map("Price")
-  isActive          Int       @default(1) @map("is_active")
-  createdBy         Int?      @map("createdby")
-  createdOn         DateTime  @default(now()) @map("createdon")
-  isSyncSqlserver   Int?      @map("is_sync_sqlserver")
-  storeCode         String?   @map("Store_code")
+  menuItemId                     BigInt    @id @default(autoincrement()) @map("menu_item_id")
+  menuItemCode                   String?   @map("menu_item_code") @db.VarChar(100)
+  menuCategoryCode               String?   @map("menu_category_code") @db.VarChar(100)
+  name                           String?   @map("name") @db.VarChar(500)
+  kitchenName                    String?   @map("kitchen_name") @db.VarChar(150)
+  labelName                      String?   @map("label_name") @db.VarChar(500)
+  colorCode                      String?   @map("color_code") @db.VarChar(100)
+  calories                       String?   @map("calories") @db.VarChar(100)
+  description                    String?   @map("description")
+  itemSize                       String?   @map("item_size") @db.VarChar(50)
+  skuPlu                         BigInt?   @map("sku_plu")
+  isAlcohol                      Int       @default(0) @map("is_alcohol")
+  menuImg                        String?   @map("menu_img")
+  priceStrategy                  Int?      @map("price_strategy")
+  basePrice                      Decimal?  @map("base_price") @db.Decimal(10, 2)
+  isPrice                        Int       @default(1) @map("is_price")
+  isActive                       Int       @default(1) @map("is_active")
+  stockinhand                    Decimal?  @map("stockinhand") @db.Decimal(18, 2)
+  isOutStock                     Int?      @map("is_out_stock")
+  itemContainAlcohol             Int?      @map("item_contain_alcohol")
+  isPosVisible                   Int?      @map("is_pos_visible")
+  isKioskOrderPay                Int?      @map("is_kiosk_order_pay")
+  isOnlineOrderByApp             Int?      @map("is_online_order_by_app")
+  isOnlineOrdering               Int?      @map("is_online_ordering")
+  isCustomerInvoice              Int?      @map("is_customer_invoice")
+  taxCode                        String?   @map("tax_code") @db.VarChar(50)
+  inheritTaxInclusion            Boolean   @default(true) @map("inherit_tax_inclusion")
+  isTaxIncluded                  Boolean   @default(false) @map("is_tax_included")
+  inheritDiningTax               Boolean   @default(true) @map("inherit_dining_tax")
+  diningTaxEffect                String?   @default("No Effect") @map("dining_tax_effect") @db.VarChar(50)
+  disqualifyDiningTaxExemption   Boolean   @default(false) @map("disqualify_dining_tax_exemption")
+  createdBy                      Int?      @map("createdby")
+  createdOn                      DateTime  @default(now()) @map("createdon")
+  isSyncToWeb                    Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal                  Int       @default(0) @map("is_sync_to_local")
+  storeCode                      String?   @map("store_code") @db.VarChar(100)
 
-  @@map("tbl_Menu_Item")
-}
-
-model Modifier {
-  tblModifierId     Int       @id @default(autoincrement()) @map("tbl_Modifier_Id")
-  tblMenuItemId     Int?      @map("tbl_Menu_Item_Id")
-  name              String    @map("Name")
-  labelName         String    @map("label_name")
-  colorCode         String?   @map("color_code")
-  priceStrategy     Int       @map("price_strategy")
-  price             Decimal?  @map("price")
-  required          Int       @map("required")
-  isMultiselect     Int       @map("is_multiselect")
-  minSelection      Int       @map("min_selection")
-  maxSelection      Int       @map("max_selection")
-  createdBy         Int?      @map("createdby")
-  createdOn         DateTime  @default(now()) @map("createdon")
-  isSyncSqlserver   Int?      @map("is_sync_sqlserver")
-  storeCode         String?   @map("Store_code")
-
-  // Relationship to ModifierItems
-  modifierItems ModifierItem[]
-
-  @@map("tbl_Modifier")
-}
-
-model ModifierItem {
-  tblModifierItemId Int       @id @default(autoincrement()) @map("tbl_Modifier_Item_Id")
-  tblModifierId     Int       @map("tbl_Modifier_Id")
-  name              String    @map("Name")
-  labelName         String    @map("label_name")
-  colorCode         String?   @map("color_code")
-  price             Decimal   @map("Price")
-  isSyncSqlserver   Int?      @map("is_sync_sqlserver")
-  storeCode         String?   @map("Store_code")
-
-  // Relationship to Modifier
-  modifier Modifier @relation(fields: [tblModifierId], references: [tblModifierId])
-
-  @@map("tbl_Modifier_Item")
-}
-
-model MenuItemModifier {
-  menuItemModifierId Int       @id @default(autoincrement()) @map("menu_item_modifier_id")
-  tblMenuItemId      Int       @map("tbl_Menu_Item_Id")
-  tblModifierId      Int       @map("tbl_Modifier_Id")
-  isSyncSqlserver    Int?      @map("is_sync_sqlserver")
-  storeCode          String?   @map("Store_code")
-
-  @@map("tbl_menu_item_modifier")
+  @@map("tbl_menu_item")
 }
 
 model Tax {
-  tblTaxId        Int      @id @default(autoincrement()) @map("tbl_tax_id")
-  taxname         String   @map("taxname") @db.VarChar(30)
-  taxrate         Decimal  @map("taxrate") @db.Decimal(22, 2) @default(0.00)
-  createdBy       Int?     @map("created_by")
-  createdDate     DateTime @default(now()) @map("created_date")
-  isSyncSqlserver Int      @default(0) @map("is_sync_sqlserver")
-  storeCode       String?  @map("Store_code") @db.VarChar(100)
+  tblTaxId      Int      @id @default(autoincrement()) @map("tbl_tax_id")
+  taxCode       String   @unique @map("tax_code") @db.VarChar(100)
+  taxname       String   @map("taxname") @db.VarChar(30)
+  taxrate       Decimal  @map("taxrate") @db.Decimal(22, 2) @default(0.00)
+  createdBy     Int?     @map("created_by")
+  createdDate   DateTime @default(now()) @map("created_date")
+  isSyncToWeb   Int      @default(0) @map("is_sync_to_web")
+  isSyncToLocal Int      @default(0) @map("is_sync_to_local")
+  storeCode     String?  @map("store_code") @db.VarChar(100)
 
   @@map("tbl_tax")
 }
 
+model ModifierGroup {
+  id                      BigInt   @id @default(autoincrement()) @map("id")
+  modifierGroupCode       String?  @map("modifier_group_code") @db.VarChar(100)
+  groupName               String?  @map("group_name") @db.VarChar(200)
+  labelName               String?  @map("label_name") @db.VarChar(100)
+  isRequired              Int      @default(0) @map("is_required")
+  isMultiselect           Int      @default(0) @map("is_multiselect")
+  minSelection            Int?     @map("min_selection")
+  maxSelection            Int?     @map("max_selection")
+  showDefaultTop          Int      @default(0) @map("show_default_top")
+  inheritFromMenuGroup    Int      @default(0) @map("inherit_from_menu_group")
+  menuCategoryCode        String?  @map("menu_category_code") @db.VarChar(100)
+  priceStrategy           Int      @default(1) @map("price_strategy")
+  price                   Decimal? @map("price") @db.Decimal(10, 2)
+  isActive                Int      @default(1) @map("is_active")
+  createdBy               Int?     @map("createdby")
+  createdOn               DateTime @default(now()) @map("createdon")
+  isSyncToWeb             Int      @default(0) @map("is_sync_to_web")
+  isSyncToLocal           Int      @default(0) @map("is_sync_to_local")
+  storeCode               String?  @map("store_code") @db.VarChar(100)
+
+  // Items in this group (by code)
+  // Note: Relation is via code; Prisma cannot enforce without FK. Use manual joins in API.
+
+  @@map("tbl_modifier_group")
+}
+
+/// New modifier item table mapping to tbl_modifier_item
+model ModifierItem {
+  id                 BigInt   @id @default(autoincrement()) @map("id")
+  modifierItemCode   String?  @map("modifier_item_code") @db.VarChar(100)
+  modifierGroupCode  String?  @map("modifier_group_code") @db.VarChar(100)
+  name               String?  @map("name") @db.VarChar(500)
+  labelName          String?  @map("label_name") @db.VarChar(100)
+  colorCode          String?  @map("color_code") @db.VarChar(100)
+  price              Decimal? @map("price") @db.Decimal(10, 2)
+  isDefault          Int      @default(0) @map("is_default")
+  displayOrder       Int?     @map("display_order")
+  isActive           Int      @default(1) @map("is_active")
+  createdBy          Int?     @map("createdby")
+  createdOn          DateTime @default(now()) @map("createdon")
+  isSyncToWeb        Int      @default(0) @map("is_sync_to_web")
+  isSyncToLocal      Int      @default(0) @map("is_sync_to_local")
+  storeCode          String?  @map("store_code") @db.VarChar(100)
+
+  @@map("tbl_modifier_item")
+}
+
+model Station {
+  tblStationId  BigInt  @id @default(autoincrement()) @map("tbl_station_id")
+  stationCode   String  @unique @map("station_code") @db.VarChar(100)
+  stationname   String? @map("stationname") @db.VarChar(100)
+  isActive      Int?    @map("is_active")
+  isSyncToWeb   Int     @default(0) @map("is_sync_to_web")
+  isSyncToLocal Int     @default(0) @map("is_sync_to_local")
+  storeCode     String? @map("store_code") @db.VarChar(100)
+
+  // Relationship
+  shifts Shift[]
+
+  @@map("tbl_station")
+}
+
+model Batch {
+  batchId       BigInt    @id @default(autoincrement()) @map("batch_id")
+  batchCode     String    @unique @map("batch_code") @db.VarChar(100)
+  batchstart    DateTime? @map("batchstart")
+  batchend      DateTime? @default(dbgenerated("NULL")) @map("batchend")
+  isactive      Int       @default(1) @map("isactive")
+  isbatchclose  Int       @default(0) @map("isbatchclose")
+  isSyncToWeb   Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal Int       @default(0) @map("is_sync_to_local")
+  storeCode     String?   @map("store_code") @db.VarChar(100)
+
+  @@map("tbl_batch")
+}
+
 model Shift {
-  tblShiftId     Int       @id @default(autoincrement()) @map("tbl_shift_id")
-  shiftId        Int?      @map("Shiftid")
-  batchId        Int?      @map("batchid")
-  shiftStart     DateTime? @map("ShiftStart")
-  shiftEnd       DateTime? @map("ShiftEnd")
-  shiftNumber    Int?      @map("shiftnumber")
-  employeeId     Int?      @map("employeeid")
-  isOpen         Int       @default(1) @map("isopen")
-  stationId      Int?      @map("stationid")
-  employeeUserId String?   @map("EmployeeUserID") @db.VarChar(20)
-  isSyncMysql    Int?      @map("is_sync_mysql")
-  storeCode      String?   @map("Store_code") @db.VarChar(100)
+  shiftid        BigInt    @id @default(autoincrement()) @map("shiftid")
+  shiftCode      String    @unique @map("shift_code") @db.VarChar(100)
+  batchid        BigInt?   @map("batchid")
+  batchCode      String?   @map("batch_code") @db.VarChar(100)
+  shiftstart     DateTime? @map("shiftstart")
+  shiftend       DateTime? @map("shiftend")
+  shiftnumber    BigInt?   @map("shiftnumber")
+  employeeid     BigInt?   @map("employeeid")
+  isopen         Int       @default(1) @map("isopen")
+  stationid      BigInt?   @map("stationid")
+  stationCode    String?   @map("station_code") @db.VarChar(100)
+  employeeuserid String?   @map("employeeuserid") @db.VarChar(20)
+  isSyncToWeb    Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal  Int       @default(0) @map("is_sync_to_local")
+  storeCode      String?   @map("store_code") @db.VarChar(100)
+
+  // Relationship
+  station Station? @relation(fields: [stationid], references: [tblStationId])
 
   @@map("tbl_shift")
 }
 
 model Printer {
-  printerId     Int       @id @default(autoincrement()) @map("printer_id")
-  printerCode   String?   @unique @map("printer_code") @db.VarChar(100)
+  printerId     BigInt    @id @default(autoincrement()) @map("printer_id")
+  printerCode   String    @unique @map("printer_code") @db.VarChar(100)
   printerName   String?   @map("printer_name") @db.VarChar(200)
   isActive      Int?      @map("is_active")
   createdBy     Int?      @map("createdby")
   createdOn     DateTime  @default(now()) @map("createdon")
-  isSyncMysql   Int?      @map("is_sync_mysql")
-  storeCode     String?   @map("Store_code") @db.VarChar(100)
+  isSyncToWeb   Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal Int       @default(0) @map("is_sync_to_local")
+  storeCode     String?   @map("store_code") @db.VarChar(100)
+
+  // Relationships
+  prepZones PrepZone[]
 
   @@map("tbl_printer")
 }
@@ -254,13 +360,3 @@ enum UserRole {
   KITCHEN_STAFF
 }
 
-enum DayName {
-  Monday
-  Tuesday
-  Wednesday
-  Thursday
-  Friday
-  Saturday
-  Sunday
-  AllDays
-}

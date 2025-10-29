@@ -15,17 +15,23 @@ export async function GET(
     }
 
     const resolvedParams = await params
-    const masterId = parseInt(resolvedParams.id)
+    const masterId = BigInt(resolvedParams.id)
 
     const menuMaster = await prisma.menuMaster.findUnique({
-      where: { tblMenuMasterId: masterId }
+      where: { menuMasterId: masterId }
     })
 
     if (!menuMaster) {
       return NextResponse.json({ error: 'Menu master not found' }, { status: 404 })
     }
 
-    return NextResponse.json(menuMaster)
+    // Convert BigInt to string for JSON serialization
+    const menuWithStringId = {
+      ...menuMaster,
+      menuMasterId: menuMaster.menuMasterId.toString()
+    }
+
+    return NextResponse.json(menuWithStringId)
   } catch (error) {
     console.error('Error fetching menu master:', error)
     return NextResponse.json(
@@ -47,19 +53,91 @@ export async function PUT(
     }
 
     const resolvedParams = await params
-    const masterId = parseInt(resolvedParams.id)
+    const masterId = BigInt(resolvedParams.id)
     const body = await request.json()
 
+    const {
+      name,
+      labelName,
+      colorCode,
+      prepZoneCode,
+      eventCode,
+      currentEventCode,
+      isEventMenu,
+      isActive
+    } = body
+
+    // Get the menu master to get its code
+    const existingMaster = await prisma.menuMaster.findUnique({
+      where: { menuMasterId: masterId }
+    })
+
+    if (!existingMaster) {
+      return NextResponse.json({ error: 'Menu master not found' }, { status: 404 })
+    }
+
+    // Update menu master
     const menuMaster = await prisma.menuMaster.update({
-      where: { tblMenuMasterId: masterId },
+      where: { menuMasterId: masterId },
       data: {
-        ...body,
+        name,
+        labelName: labelName || null,
+        colorCode: colorCode || null,
+        prepZoneCode: prepZoneCode || null,
+        isEventMenu: isEventMenu || 0,
+        isActive: isActive ?? 1,
         updatedBy: parseInt(session.user.id),
         updatedOn: new Date()
       }
     })
 
-    return NextResponse.json(menuMaster)
+    // Handle event associations
+    if (currentEventCode && currentEventCode !== eventCode) {
+      // Remove old event association
+      await prisma.menuMasterEvent.deleteMany({
+        where: {
+          menuMasterCode: existingMaster.menuMasterCode,
+          eventCode: currentEventCode
+        }
+      })
+    }
+
+    if (eventCode && isEventMenu === 1) {
+      // Check if association already exists
+      const existingAssoc = await prisma.menuMasterEvent.findFirst({
+        where: {
+          menuMasterCode: existingMaster.menuMasterCode,
+          eventCode: eventCode
+        }
+      })
+
+      // Create new association if it doesn't exist
+      if (!existingAssoc) {
+        await prisma.menuMasterEvent.create({
+          data: {
+            menuMasterCode: existingMaster.menuMasterCode,
+            eventCode: eventCode,
+            createdBy: parseInt(session.user.id),
+            storeCode: process.env.STORE_CODE || null
+          }
+        })
+      }
+    } else if (!eventCode && currentEventCode) {
+      // Remove all event associations if no event is selected
+      await prisma.menuMasterEvent.deleteMany({
+        where: {
+          menuMasterCode: existingMaster.menuMasterCode
+        }
+      })
+    }
+
+    // Convert BigInt to string for JSON serialization
+    const menuWithStringId = {
+      ...menuMaster,
+      menuMasterId: menuMaster.menuMasterId.toString()
+    }
+
+    return NextResponse.json(menuWithStringId)
   } catch (error) {
     console.error('Error updating menu master:', error)
     return NextResponse.json(
@@ -81,11 +159,11 @@ export async function DELETE(
     }
 
     const resolvedParams = await params
-    const masterId = parseInt(resolvedParams.id)
+    const masterId = BigInt(resolvedParams.id)
 
     // Check if menu master exists
     const menuMaster = await prisma.menuMaster.findUnique({
-      where: { tblMenuMasterId: masterId }
+      where: { menuMasterId: masterId }
     })
 
     if (!menuMaster) {
@@ -94,7 +172,7 @@ export async function DELETE(
 
     // Check if menu master has any categories
     const categoriesCount = await prisma.menuCategory.count({
-      where: { tblMenuMasterId: masterId }
+      where: { menuMasterCode: menuMaster.menuMasterCode }
     })
 
     // If menu master has categories, prevent deletion
@@ -104,9 +182,14 @@ export async function DELETE(
       }, { status: 400 })
     }
 
+    // Delete associated menu master events first
+    await prisma.menuMasterEvent.deleteMany({
+      where: { menuMasterCode: menuMaster.menuMasterCode }
+    })
+
     // Safe to delete the menu master
     await prisma.menuMaster.delete({
-      where: { tblMenuMasterId: masterId }
+      where: { menuMasterId: masterId }
     })
 
     return NextResponse.json({ message: 'Menu master deleted successfully' })

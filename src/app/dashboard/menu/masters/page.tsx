@@ -1,67 +1,50 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import {
   PlusIcon,
   PencilIcon,
   TrashIcon,
-  EyeIcon,
+  ArrowLeftIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import CRUDModal from "@/components/modals/CRUDModal";
-import MenuMasterForm from "@/components/forms/MenuMasterForm";
+import { PageSkeleton } from "@/components/ui/SkeletonLoader";
 
 interface MenuMaster {
-  tblMenuMasterId: number;
+  menuMasterId: string;
+  menuMasterCode: string;
   name: string;
   labelName?: string;
   colorCode?: string;
   isActive: number;
-  stationGroupId?: number;
-  taxId?: number;
-  availabilityId?: number;
+  prepZoneCode?: string;
+  isEventMenu?: number;
 }
 
-interface StationGroup {
-  stationGroupId: number;
-  groupName: string;
+interface PrepZone {
+  prepZoneId: string;
+  prepZoneName: string | null;
+  prepZoneCode: string;
   isActive: number;
 }
 
-interface Availability {
-  availabilityId: number;
-  avaiDays?: string;
-  avilTime?: string;
-}
-
-interface Tax {
-  tblTaxId: number;
-  taxname: string;
-  taxrate: number;
-}
-
 export default function MenuMastersPage() {
+  const router = useRouter();
   const [menuMasters, setMenuMasters] = useState<MenuMaster[]>([]);
-  const [stationGroups, setStationGroups] = useState<StationGroup[]>([]);
-  const [availability, setAvailability] = useState<Availability[]>([]);
-  const [taxes, setTaxes] = useState<Tax[]>([]);
+  const [prepZones, setPrepZones] = useState<PrepZone[]>([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    categories: 0,
-    items: 0,
-  });
 
   // Modal states
-  const [showModal, setShowModal] = useState(false);
-  const [editingMaster, setEditingMaster] = useState<MenuMaster | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedStationGroup, setSelectedStationGroup] = useState("");
-  const [selectedTax, setSelectedTax] = useState("");
+  const [selectedPrepZone, setSelectedPrepZone] = useState("");
+  const [selectedEventMenu, setSelectedEventMenu] = useState("");
   const [filteredMasters, setFilteredMasters] = useState<MenuMaster[]>([]);
 
   useEffect(() => {
@@ -71,7 +54,7 @@ export default function MenuMastersPage() {
   // Filter effect
   useEffect(() => {
     applyFilters();
-  }, [menuMasters, searchTerm, selectedStationGroup, selectedTax]);
+  }, [menuMasters, searchTerm, selectedPrepZone, selectedEventMenu]);
 
   const applyFilters = () => {
     let filtered = [...menuMasters];
@@ -83,66 +66,36 @@ export default function MenuMastersPage() {
       );
     }
 
-    // Filter by station group
-    if (selectedStationGroup) {
+    // Filter by prep zone
+    if (selectedPrepZone) {
       filtered = filtered.filter(
-        (master) => master.stationGroupId === parseInt(selectedStationGroup)
+        (master) => master.prepZoneCode === selectedPrepZone
       );
     }
 
-    // Filter by tax
-    if (selectedTax) {
+    // Filter by event menu
+    if (selectedEventMenu) {
+      const isEvent = selectedEventMenu === "event";
       filtered = filtered.filter(
-        (master) => master.taxId === parseInt(selectedTax)
+        (master) => master.isEventMenu === (isEvent ? 1 : 0)
       );
     }
 
     setFilteredMasters(filtered);
   };
 
-  // Helper function to get station group name by ID
-  const getStationGroupName = (stationGroupId?: number) => {
-    if (!stationGroupId) return "None";
-    const group = stationGroups.find(
-      (g) => g.stationGroupId === stationGroupId
-    );
-    return group?.groupName || "Unknown";
-  };
-
-  // Helper function to get tax name by ID
-  const getTaxName = (taxId?: number) => {
-    if (!taxId) return "None";
-    const tax = taxes.find((t) => t.tblTaxId === taxId);
-    return tax?.taxname || "Unknown";
-  };
-
-  // Helper function to get availability details by ID
-  const getAvailabilityDetails = (availabilityId?: number) => {
-    if (!availabilityId) return "None";
-    const avail = availability.find((a) => a.availabilityId === availabilityId);
-    if (!avail) return "Unknown";
-
-    const days = avail.avaiDays || "All Days";
-    const time = avail.avilTime || "All Times";
-    return `${days} - ${time}`;
+  // Helper function to get prep zone name by code
+  const getPrepZoneName = (prepZoneCode?: string) => {
+    if (!prepZoneCode) return "None";
+    const zone = prepZones.find((g) => g.prepZoneCode === prepZoneCode);
+    return zone?.prepZoneName || "Unknown";
   };
 
   const fetchData = async () => {
     try {
-      const [
-        mastersRes,
-        groupsRes,
-        availRes,
-        taxesRes,
-        categoriesRes,
-        itemsRes,
-      ] = await Promise.all([
+      const [mastersRes, prepZonesRes] = await Promise.all([
         fetch("/api/menu/masters"),
-        fetch("/api/menu/station-groups"),
-        fetch("/api/menu/availability"),
-        fetch("/api/tax"),
-        fetch("/api/menu/categories"),
-        fetch("/api/menu/items"),
+        fetch("/api/menu/prep-zone"),
       ]);
 
       if (mastersRes.ok) {
@@ -150,29 +103,9 @@ export default function MenuMastersPage() {
         setMenuMasters(mastersData);
       }
 
-      if (groupsRes.ok) {
-        const groupsData = await groupsRes.json();
-        setStationGroups(groupsData);
-      }
-
-      if (availRes.ok) {
-        const availData = await availRes.json();
-        setAvailability(availData);
-      }
-
-      if (taxesRes.ok) {
-        const taxesData = await taxesRes.json();
-        setTaxes(taxesData);
-      }
-
-      if (categoriesRes.ok) {
-        const categoriesData = await categoriesRes.json();
-        setStats((prev) => ({ ...prev, categories: categoriesData.length }));
-      }
-
-      if (itemsRes.ok) {
-        const itemsData = await itemsRes.json();
-        setStats((prev) => ({ ...prev, items: itemsData.length }));
+      if (prepZonesRes.ok) {
+        const prepZonesData = await prepZonesRes.json();
+        setPrepZones(prepZonesData);
       }
     } catch (error) {
       toast.error("Error loading data");
@@ -182,35 +115,16 @@ export default function MenuMastersPage() {
     }
   };
 
-  // Modal handlers
+  // Navigation handlers
   const handleAdd = () => {
-    setEditingMaster(null);
-    setShowModal(true);
+    router.push("/dashboard/menu/masters/add");
   };
 
-  const handleEdit = (master: MenuMaster) => {
-    setEditingMaster(master);
-    setShowModal(true);
+  const handleEdit = (masterId: string) => {
+    router.push(`/dashboard/menu/masters/${masterId}/edit`);
   };
 
-  const handleSave = (savedMaster: MenuMaster) => {
-    if (editingMaster) {
-      setMenuMasters(
-        menuMasters.map((master) =>
-          master.tblMenuMasterId === savedMaster.tblMenuMasterId
-            ? savedMaster
-            : master
-        )
-      );
-    } else {
-      setMenuMasters([savedMaster, ...menuMasters]);
-    }
-    setShowModal(false);
-    setEditingMaster(null);
-    fetchData(); // Refresh data
-  };
-
-  const handleDelete = (masterId: number) => {
+  const handleDelete = (masterId: string) => {
     setDeletingId(masterId);
     setShowConfirmModal(true);
   };
@@ -225,14 +139,16 @@ export default function MenuMastersPage() {
 
       if (response.ok) {
         setMenuMasters(
-          menuMasters.filter((master) => master.tblMenuMasterId !== deletingId)
+          menuMasters.filter((master) => master.menuMasterId !== deletingId)
         );
         toast.success("Menu master deleted successfully");
+        fetchData(); // Refresh data
       } else {
-        throw new Error("Failed to delete menu master");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete menu master");
       }
-    } catch (error) {
-      toast.error("Error deleting menu master");
+    } catch (error: any) {
+      toast.error(error.message || "Error deleting menu master");
       console.error("Error:", error);
     } finally {
       setShowConfirmModal(false);
@@ -243,9 +159,7 @@ export default function MenuMastersPage() {
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
+        <PageSkeleton />
       </DashboardLayout>
     );
   }
@@ -253,6 +167,16 @@ export default function MenuMastersPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {/* Back Button */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => router.push("/dashboard/menu")}
+            className="inline-flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+          >
+            <ArrowLeftIcon className="w-5 h-5 mr-2" />
+            <span className="text-lg font-medium">Back to Menu Management</span>
+          </button>
+        </div>
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
@@ -289,44 +213,38 @@ export default function MenuMastersPage() {
               />
             </div>
 
-            {/* Station Group Filter */}
+            {/* Prep Zone Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Station Group
+                Prep Zone
               </label>
               <select
-                value={selectedStationGroup}
-                onChange={(e) => setSelectedStationGroup(e.target.value)}
+                value={selectedPrepZone}
+                onChange={(e) => setSelectedPrepZone(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="">All Station Groups</option>
-                {stationGroups.map((group) => (
-                  <option
-                    key={group.stationGroupId}
-                    value={group.stationGroupId}
-                  >
-                    {group.groupName}
+                <option value="">All Prep Zones</option>
+                {prepZones.map((zone) => (
+                  <option key={zone.prepZoneId} value={zone.prepZoneCode}>
+                    {zone.prepZoneName}
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* Tax Filter */}
+            {/* Event Menu Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Tax
+                Menu Type
               </label>
               <select
-                value={selectedTax}
-                onChange={(e) => setSelectedTax(e.target.value)}
+                value={selectedEventMenu}
+                onChange={(e) => setSelectedEventMenu(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="">All Taxes</option>
-                {taxes.map((tax) => (
-                  <option key={tax.tblTaxId} value={tax.tblTaxId}>
-                    {tax.taxname}
-                  </option>
-                ))}
+                <option value="">All Menus</option>
+                <option value="regular">Regular Menu</option>
+                <option value="event">Event Menu</option>
               </select>
             </div>
           </div>
@@ -336,96 +254,13 @@ export default function MenuMastersPage() {
             <button
               onClick={() => {
                 setSearchTerm("");
-                setSelectedStationGroup("");
-                setSelectedTax("");
+                setSelectedPrepZone("");
+                setSelectedEventMenu("");
               }}
               className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
             >
               Clear Filters
             </button>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
-                  <span className="text-blue-600 dark:text-blue-400 font-semibold">
-                    M
-                  </span>
-                </div>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Total Masters
-                </p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {filteredMasters.length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
-                  <span className="text-green-600 dark:text-green-400 font-semibold">
-                    A
-                  </span>
-                </div>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Active
-                </p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {filteredMasters.filter((m) => m.isActive === 1).length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg flex items-center justify-center">
-                  <span className="text-yellow-600 dark:text-yellow-400 font-semibold">
-                    C
-                  </span>
-                </div>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Categories
-                </p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {stats.categories}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center">
-                  <span className="text-purple-600 dark:text-purple-400 font-semibold">
-                    I
-                  </span>
-                </div>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Items
-                </p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {stats.items}
-                </p>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -466,8 +301,13 @@ export default function MenuMastersPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredMasters.map((master) => (
                   <div
-                    key={master.tblMenuMasterId}
+                    key={master.menuMasterId}
                     className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-shadow bg-white dark:bg-gray-700"
+                    style={
+                      master.colorCode
+                        ? { borderColor: master.colorCode }
+                        : undefined
+                    }
                   >
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center">
@@ -497,36 +337,28 @@ export default function MenuMastersPage() {
                         <strong>Label:</strong> {master.labelName || "N/A"}
                       </p>
                       <p>
-                        <strong>Station Group:</strong>{" "}
-                        {getStationGroupName(master.stationGroupId)}
+                        <strong>Prep Zone:</strong>{" "}
+                        {getPrepZoneName(master.prepZoneCode)}
                       </p>
-                      <p>
-                        <strong>Tax:</strong> {getTaxName(master.taxId)}
-                      </p>
-                      {master.availabilityId && (
+                      {master.isEventMenu === 1 && (
                         <p>
-                          <strong>Availability:</strong>{" "}
-                          {getAvailabilityDetails(master.availabilityId)}
+                          <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-400">
+                            Event Menu
+                          </span>
                         </p>
                       )}
                     </div>
 
                     <div className="flex justify-end space-x-2">
                       <button
-                        className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-200"
-                        title="View menu master details"
-                      >
-                        <EyeIcon className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleEdit(master)}
+                        onClick={() => handleEdit(master.menuMasterId)}
                         className="p-1 text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors duration-200"
                         title="Edit menu master"
                       >
                         <PencilIcon className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleDelete(master.tblMenuMasterId)}
+                        onClick={() => handleDelete(master.menuMasterId)}
                         className="p-1 text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors duration-200"
                         title="Delete menu master"
                       >
@@ -540,29 +372,6 @@ export default function MenuMastersPage() {
           </div>
         </div>
       </div>
-
-      {/* Modal */}
-      <CRUDModal
-        isOpen={showModal}
-        onClose={() => {
-          setShowModal(false);
-          setEditingMaster(null);
-        }}
-        title={editingMaster ? "Edit Menu Master" : "Add New Menu Master"}
-        size="lg"
-      >
-        <MenuMasterForm
-          menuMaster={editingMaster}
-          stationGroups={stationGroups}
-          availability={availability}
-          taxes={taxes}
-          onSave={handleSave}
-          onCancel={() => {
-            setShowModal(false);
-            setEditingMaster(null);
-          }}
-        />
-      </CRUDModal>
 
       {/* Confirmation Modal */}
       <CRUDModal

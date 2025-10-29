@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/database'
+import { generateUniqueCode } from '@/lib/codeGenerator'
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,7 +16,13 @@ export async function GET(request: NextRequest) {
       orderBy: { createdOn: 'desc' }
     })
 
-    return NextResponse.json(menuMasters)
+    // Convert BigInt to string for JSON serialization
+    const menusWithStringId = menuMasters.map((menu: any) => ({
+      ...menu,
+      menuMasterId: menu.menuMasterId.toString()
+    }))
+
+    return NextResponse.json(menusWithStringId)
   } catch (error) {
     console.error('Error fetching menu masters:', error)
     return NextResponse.json(
@@ -38,25 +45,49 @@ export async function POST(request: NextRequest) {
       name,
       labelName,
       colorCode,
-      taxId,
-      stationGroupId,
-      availabilityId
+      prepZoneCode,
+      eventCode,
+      isEventMenu,
+      isActive
     } = body
 
+    // Generate unique menu master code
+    const menuMasterCode = await generateUniqueCode('menuMaster', 'menuMasterCode')
+
+    // Create menu master
     const menuMaster = await prisma.menuMaster.create({
       data: {
+        menuMasterCode,
         name,
-        labelName,
-        colorCode,
-        taxId: parseInt(taxId),
-        stationGroupId: stationGroupId ? parseInt(stationGroupId) : null,
-        availabilityId: availabilityId ? parseInt(availabilityId) : null,
+        labelName: labelName || null,
+        colorCode: colorCode || null,
+        prepZoneCode: prepZoneCode || null,
+        isEventMenu: isEventMenu || 0,
+        isActive: isActive ?? 1,
         createdBy: parseInt(session.user.id),
         storeCode: process.env.STORE_CODE || null
       }
     })
 
-    return NextResponse.json(menuMaster, { status: 201 })
+    // If this is an event menu, create the association
+    if (eventCode && isEventMenu === 1) {
+      await prisma.menuMasterEvent.create({
+        data: {
+          menuMasterCode: menuMasterCode,
+          eventCode: eventCode,
+          createdBy: parseInt(session.user.id),
+          storeCode: process.env.STORE_CODE || null
+        }
+      })
+    }
+
+    // Convert BigInt to string for JSON serialization
+    const menuWithStringId = {
+      ...menuMaster,
+      menuMasterId: menuMaster.menuMasterId.toString()
+    }
+
+    return NextResponse.json(menuWithStringId, { status: 201 })
   } catch (error) {
     console.error('Error creating menu master:', error)
     return NextResponse.json(

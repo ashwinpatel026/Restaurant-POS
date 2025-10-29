@@ -15,17 +15,28 @@ export async function GET(
     }
 
     const resolvedParams = await params
-    const modifierId = parseInt(resolvedParams.id)
+    const groupId = BigInt(resolvedParams.id)
 
-    const modifier = await prisma.modifier.findUnique({
-      where: { tblModifierId: modifierId }
+    const group = await (prisma as any).modifierGroup.findUnique({
+      where: { id: groupId }
     })
 
-    if (!modifier) {
-      return NextResponse.json({ error: 'Modifier not found' }, { status: 404 })
+    if (!group) {
+      return NextResponse.json({ error: 'Modifier group not found' }, { status: 404 })
     }
 
-    return NextResponse.json(modifier)
+    // Load items by group code if available
+    let items: any[] = []
+    if (group.modifierGroupCode) {
+      const found = await (prisma as any).modifierItem.findMany({
+        where: { modifierGroupCode: group.modifierGroupCode },
+        orderBy: [{ displayOrder: 'asc' }, { createdOn: 'desc' }]
+      })
+      items = found.map((i: any) => ({ ...i, id: i.id.toString() }))
+    }
+
+    const data: any = { ...group, id: group.id.toString(), items }
+    return NextResponse.json(data)
   } catch (error) {
     console.error('Error fetching modifier:', error)
     return NextResponse.json(
@@ -47,61 +58,44 @@ export async function PUT(
     }
 
     const resolvedParams = await params
-    const modifierId = parseInt(resolvedParams.id)
+    const groupId = BigInt(resolvedParams.id)
     const body = await request.json()
-    
+
     const {
-      name,
+      groupName,
       labelName,
-      colorCode,
-      priceStrategy,
-      price,
-      required,
+      isRequired,
       isMultiselect,
       minSelection,
       maxSelection,
-      modifierItems
+      showDefaultTop,
+      inheritFromMenuGroup,
+      menuCategoryCode,
+      priceStrategy,
+      price,
+      isActive
     } = body
 
-    // Update the modifier
-    const modifier = await prisma.modifier.update({
-      where: { tblModifierId: modifierId },
+    const updated = await (prisma as any).modifierGroup.update({
+      where: { id: groupId },
       data: {
-        name,
-        labelName,
-        colorCode,
-        priceStrategy: parseInt(priceStrategy),
-        price: parseFloat(price || 0),
-        required: parseInt(required),
-        isMultiselect: parseInt(isMultiselect),
-        minSelection: parseInt(minSelection),
-        maxSelection: parseInt(maxSelection)
+        groupName: groupName ?? null,
+        labelName: labelName ?? null,
+        isRequired: typeof isRequired === 'number' ? isRequired : undefined,
+        isMultiselect: typeof isMultiselect === 'number' ? isMultiselect : undefined,
+        minSelection: typeof minSelection === 'number' ? minSelection : null,
+        maxSelection: typeof maxSelection === 'number' ? maxSelection : null,
+        showDefaultTop: typeof showDefaultTop === 'number' ? showDefaultTop : undefined,
+        inheritFromMenuGroup: typeof inheritFromMenuGroup === 'number' ? inheritFromMenuGroup : undefined,
+        menuCategoryCode: menuCategoryCode ?? null,
+        priceStrategy: typeof priceStrategy === 'number' ? priceStrategy : undefined,
+        price: typeof price === 'number' ? price : null,
+        isActive: typeof isActive === 'number' ? isActive : undefined,
       }
     })
 
-    // Update modifier items if provided
-    if (modifierItems && modifierItems.length > 0) {
-      // Delete existing modifier items
-      await prisma.modifierItem.deleteMany({
-        where: { tblModifierId: modifierId }
-      })
-
-      // Create new modifier items
-      const modifierItemsData = modifierItems.map((item: any) => ({
-        name: item.name,
-        labelName: item.labelName || item.name,
-        colorCode: item.colorCode || '#3B82F6',
-        price: item.price || 0,
-        tblModifierId: modifier.tblModifierId,
-        storeCode: process.env.STORE_CODE || null
-      }))
-
-      await prisma.modifierItem.createMany({
-        data: modifierItemsData
-      })
-    }
-
-    return NextResponse.json(modifier)
+    const data: any = { ...updated, id: updated.id.toString() }
+    return NextResponse.json(data)
   } catch (error) {
     console.error('Error updating modifier:', error)
     return NextResponse.json(
@@ -123,13 +117,13 @@ export async function DELETE(
     }
 
     const resolvedParams = await params
-    const modifierId = parseInt(resolvedParams.id)
+    const groupId = BigInt(resolvedParams.id)
 
-    await prisma.modifier.delete({
-      where: { tblModifierId: modifierId }
+    await (prisma as any).modifierGroup.delete({
+      where: { id: groupId }
     })
 
-    return NextResponse.json({ message: 'Modifier deleted successfully' })
+    return NextResponse.json({ message: 'Modifier group deleted successfully' })
   } catch (error) {
     console.error('Error deleting modifier:', error)
     return NextResponse.json(

@@ -13,18 +13,47 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const menuItemId = searchParams.get('menuItemId')
+    const categoryId = searchParams.get('categoryId')
+    const includeItems = searchParams.get('includeItems') === 'true'
 
     const where: any = {}
     if (menuItemId) {
       where.tblMenuItemId = parseInt(menuItemId)
     }
+    if (categoryId) {
+      where.tblMenuCategoryId = parseInt(categoryId)
+    }
 
     const modifiers = await prisma.modifier.findMany({
       where,
-      orderBy: { createdOn: 'desc' }
+      include: {
+        modifierItems: includeItems ? {
+          where: { isActive: 1 },
+          orderBy: { tblModifierItemId: 'asc' }
+        } : false
+      },
+      orderBy: { name: 'asc' }
     })
 
-    return NextResponse.json(modifiers)
+    // Add item count for each modifier
+    const modifiersWithCount = await Promise.all(
+      modifiers.map(async (modifier) => {
+        const itemCount = await prisma.modifierItem.count({
+          where: { 
+            tblModifierId: modifier.tblModifierId,
+            isActive: 1
+          }
+        })
+        
+        return {
+          ...modifier,
+          itemCount,
+          sampleItems: modifier.modifierItems?.slice(0, 3).map(item => item.name) || []
+        }
+      })
+    )
+
+    return NextResponse.json(modifiersWithCount)
   } catch (error) {
     console.error('Error fetching modifiers:', error)
     return NextResponse.json(
@@ -46,6 +75,7 @@ export async function POST(request: NextRequest) {
     const {
       name,
       labelName,
+      posName,
       colorCode,
       priceStrategy,
       price,
@@ -53,6 +83,8 @@ export async function POST(request: NextRequest) {
       isMultiselect,
       minSelection,
       maxSelection,
+      additionalChargeType,
+      tblMenuCategoryId,
       modifierItems
     } = body
 
@@ -60,13 +92,16 @@ export async function POST(request: NextRequest) {
       data: {
         name,
         labelName,
+        posName: posName || name,
         colorCode,
         priceStrategy: parseInt(priceStrategy),
         price: parseFloat(price || 0),
         required: parseInt(required),
         isMultiselect: parseInt(isMultiselect),
-        minSelection: parseInt(minSelection),
-        maxSelection: parseInt(maxSelection),
+        minSelection: minSelection ? parseInt(minSelection) : null,
+        maxSelection: maxSelection ? parseInt(maxSelection) : null,
+        additionalChargeType: additionalChargeType || 'price_set_on_individual_modifiers',
+        tblMenuCategoryId: tblMenuCategoryId ? parseInt(tblMenuCategoryId) : null,
         createdBy: parseInt(session.user.id),
         storeCode: process.env.STORE_CODE || null
       }
@@ -77,8 +112,9 @@ export async function POST(request: NextRequest) {
       const modifierItemsData = modifierItems.map((item: any) => ({
         name: item.name,
         labelName: item.labelName || item.name,
+        posName: item.posName || item.name,
         colorCode: item.colorCode || '#3B82F6',
-        price: item.price || 0, // Keep as number, Prisma will handle Decimal conversion
+        price: item.price || 0,
         tblModifierId: modifier.tblModifierId,
         storeCode: process.env.STORE_CODE || null
       }))

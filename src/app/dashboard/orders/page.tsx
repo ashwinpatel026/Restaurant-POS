@@ -7,6 +7,7 @@ import { formatCurrency, formatDate, getStatusColor } from "@/lib/utils";
 import toast from "react-hot-toast";
 import CreateOrderModal from "@/components/orders/CreateOrderModal";
 import OrderDetailsModal from "@/components/orders/OrderDetailsModal";
+import { PageSkeleton } from "@/components/ui/SkeletonLoader";
 
 interface Order {
   id: string;
@@ -113,9 +114,7 @@ export default function OrdersPage() {
 
         {/* Orders Grid */}
         {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          </div>
+          <PageSkeleton />
         ) : orders.length === 0 ? (
           <div className="card text-center py-12">
             <p className="text-gray-600">No orders found</p>

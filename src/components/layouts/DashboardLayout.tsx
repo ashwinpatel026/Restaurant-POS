@@ -3,6 +3,7 @@
 import { ReactNode, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   HomeIcon,
@@ -49,9 +50,6 @@ const navigation: MenuItem[] = [
     icon: TagIcon,
     roles: ["SUPER_ADMIN", "ADMIN", "OUTLET_MANAGER"],
   },
-  { name: "Tables", href: "/dashboard/tables", icon: TableCellsIcon },
-  { name: "QR Ordering", href: "/dashboard/qr-orders", icon: QrCodeIcon },
-  { name: "Inventory", href: "/dashboard/inventory", icon: CubeIcon },
   {
     name: "Tax Management",
     href: "/dashboard/tax",
@@ -65,17 +63,26 @@ const navigation: MenuItem[] = [
     roles: ["SUPER_ADMIN", "ADMIN", "OUTLET_MANAGER"],
   },
   {
-    name: "Prep Station",
-    href: "/dashboard/menu/station-groups",
+    name: "Prep Zone",
+    href: "/dashboard/prep-zone",
     icon: CubeIcon,
     roles: ["SUPER_ADMIN", "ADMIN", "OUTLET_MANAGER"],
   },
   {
-    name: "Availability",
-    href: "/dashboard/availability",
+    name: "Station",
+    href: "/dashboard/station",
+    icon: CubeIcon,
+    roles: ["SUPER_ADMIN", "ADMIN", "OUTLET_MANAGER"],
+  },
+  {
+    name: "Time Events",
+    href: "/dashboard/events",
     icon: ClockIcon,
     roles: ["SUPER_ADMIN", "ADMIN", "OUTLET_MANAGER"],
   },
+  { name: "Tables", href: "/dashboard/tables", icon: TableCellsIcon },
+  { name: "QR Ordering", href: "/dashboard/qr-orders", icon: QrCodeIcon },
+  { name: "Inventory", href: "/dashboard/inventory", icon: CubeIcon },
   {
     name: "Central Kitchen",
     href: "/dashboard/central-kitchen",
@@ -135,12 +142,22 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xl">R</span>
-              </div>
-              <span className="text-xl font-bold text-gray-900 dark:text-white">
-                POS
-              </span>
+              <Link href="/dashboard" className="flex items-center">
+                <div className="relative">
+                  <Image
+                    src={
+                      theme === "dark"
+                        ? "/assets/image/logo-light.png"
+                        : "/assets/image/logo.png"
+                    }
+                    alt="Restaurant POS Logo"
+                    width={180}
+                    height={180}
+                    className="object-contain"
+                    priority
+                  />
+                </div>
+              </Link>
             </div>
             <button
               onClick={() => setSidebarOpen(false)}

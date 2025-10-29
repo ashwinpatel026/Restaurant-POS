@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { PlusIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+import { PageSkeleton } from "@/components/ui/SkeletonLoader";
 
 interface User {
   id: string;
@@ -75,9 +76,7 @@ export default function UsersPage() {
         </div>
 
         {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          </div>
+          <PageSkeleton />
         ) : users.length === 0 ? (
           <div className="card text-center py-12">
             <p className="text-gray-600">No users found</p>

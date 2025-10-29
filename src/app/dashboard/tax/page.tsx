@@ -11,7 +11,9 @@ import {
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import CRUDModal from "@/components/modals/CRUDModal";
+import DeleteConfirmationModal from "@/components/modals/DeleteConfirmationModal";
 import DataTable from "@/components/tables/DataTable";
+import { PageSkeleton } from "@/components/ui/SkeletonLoader";
 
 interface Tax {
   tblTaxId: number;
@@ -138,9 +140,7 @@ export default function TaxManagementPage() {
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        </div>
+        <PageSkeleton />
       </DashboardLayout>
     );
   }
@@ -374,43 +374,14 @@ export default function TaxManagementPage() {
       </CRUDModal>
 
       {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-gray-700">
-            <div className="mt-3 text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/20">
-                <TrashIcon className="h-6 w-6 text-red-600 dark:text-red-400" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mt-2">
-                Delete Tax
-              </h3>
-              <div className="mt-2 px-7 py-3">
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Are you sure you want to delete the tax "
-                  {taxToDelete?.taxname}"? This action cannot be undone and will
-                  affect any related menu masters.
-                </p>
-              </div>
-              <div className="items-center px-4 py-3">
-                <div className="flex space-x-3">
-                  <button
-                    onClick={handleDeleteCancel}
-                    className="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-800 dark:text-gray-200 text-base font-medium rounded-md shadow-sm hover:bg-gray-400 dark:hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-300"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleDeleteConfirm}
-                    className="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <DeleteConfirmationModal
+        isOpen={showDeleteModal}
+        onClose={handleDeleteCancel}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Tax"
+        itemName={taxToDelete?.taxname || ""}
+        description={`Are you sure you want to delete the tax "${taxToDelete?.taxname}"? This action cannot be undone and will affect any related menu masters.`}
+      />
     </DashboardLayout>
   );
 }

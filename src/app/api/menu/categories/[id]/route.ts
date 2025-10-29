@@ -15,17 +15,38 @@ export async function GET(
     }
 
     const resolvedParams = await params
-    const categoryId = parseInt(resolvedParams.id)
+    const categoryId = BigInt(resolvedParams.id)
 
     const category = await prisma.menuCategory.findUnique({
-      where: { tblMenuCategoryId: categoryId }
+      where: { menuCategoryId: categoryId },
+      include: {
+        menuMaster: {
+          select: {
+            menuMasterId: true,
+            name: true,
+            menuMasterCode: true
+          }
+        }
+      }
     })
 
     if (!category) {
       return NextResponse.json({ error: 'Category not found' }, { status: 404 })
     }
 
-    return NextResponse.json(category)
+    // Convert BigInt to string for JSON serialization
+    const categoryWithStringId = {
+      ...category,
+      menuCategoryId: category.menuCategoryId.toString(),
+      tblMenuCategoryId: Number(category.menuCategoryId),
+      tblMenuMasterId: Number(category.menuMaster.menuMasterId),
+      menuMaster: {
+        ...category.menuMaster,
+        menuMasterId: category.menuMaster.menuMasterId.toString()
+      }
+    }
+
+    return NextResponse.json(categoryWithStringId)
   } catch (error) {
     console.error('Error fetching category:', error)
     return NextResponse.json(
@@ -47,22 +68,40 @@ export async function PUT(
     }
 
     const resolvedParams = await params
-    const categoryId = parseInt(resolvedParams.id)
+    const categoryId = BigInt(resolvedParams.id)
     const body = await request.json()
 
-    const { name, colorCode, isActive, tblMenuMasterId } = body
+    const { name, colorCode, isActive, menuMasterId } = body
+
+    // Get the menu master to get its code
+    const menuMaster = await prisma.menuMaster.findUnique({
+      where: { menuMasterId: BigInt(menuMasterId) },
+      select: { menuMasterCode: true }
+    })
+
+    if (!menuMaster) {
+      return NextResponse.json({ error: 'Menu master not found' }, { status: 404 })
+    }
 
     const category = await prisma.menuCategory.update({
-      where: { tblMenuCategoryId: categoryId },
+      where: { menuCategoryId: categoryId },
       data: {
         name,
         colorCode,
         isActive,
-        tblMenuMasterId: parseInt(tblMenuMasterId)
+        menuMasterCode: menuMaster.menuMasterCode
       }
     })
 
-    return NextResponse.json(category)
+    // Convert BigInt to string for JSON serialization
+    const categoryWithStringId = {
+      ...category,
+      menuCategoryId: category.menuCategoryId.toString(),
+      tblMenuCategoryId: Number(category.menuCategoryId),
+      tblMenuMasterId: Number(menuMasterId)
+    }
+
+    return NextResponse.json(categoryWithStringId)
   } catch (error) {
     console.error('Error updating category:', error)
     return NextResponse.json(
@@ -84,11 +123,11 @@ export async function DELETE(
     }
 
     const resolvedParams = await params
-    const categoryId = parseInt(resolvedParams.id)
+    const categoryId = BigInt(resolvedParams.id)
 
     // Check if category exists
     const category = await prisma.menuCategory.findUnique({
-      where: { tblMenuCategoryId: categoryId }
+      where: { menuCategoryId: categoryId }
     })
 
     if (!category) {
@@ -97,7 +136,7 @@ export async function DELETE(
 
     // Check if category has any menu items
     const itemsCount = await prisma.menuItem.count({
-      where: { tblMenuCategoryId: categoryId }
+      where: { tblMenuCategoryId: Number(category.menuCategoryId) }
     })
 
     // If category has menu items, prevent deletion
@@ -109,7 +148,7 @@ export async function DELETE(
 
     // Safe to delete the category
     await prisma.menuCategory.delete({
-      where: { tblMenuCategoryId: categoryId }
+      where: { menuCategoryId: categoryId }
     })
 
     return NextResponse.json({ message: 'Category deleted successfully' })

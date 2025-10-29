@@ -9,6 +9,7 @@ import {
   UserGroupIcon,
   ChartBarIcon,
 } from "@heroicons/react/24/outline";
+import { PageSkeleton, StatsSkeleton } from "@/components/ui/SkeletonLoader";
 
 interface DashboardStats {
   todayOrders: number;
@@ -76,6 +77,64 @@ export default function DashboardPage() {
     },
   ];
 
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          {/* Header */}
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              Dashboard
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-1">
+              Welcome back, {session?.user?.name}!
+            </p>
+          </div>
+          <StatsSkeleton count={4} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4"></div>
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                  >
+                    <div>
+                      <div className="h-4 w-24 bg-gray-200 dark:bg-gray-600 rounded animate-pulse mb-1"></div>
+                      <div className="h-3 w-16 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                    </div>
+                    <div className="text-right">
+                      <div className="h-4 w-16 bg-gray-200 dark:bg-gray-600 rounded animate-pulse mb-1"></div>
+                      <div className="h-5 w-20 bg-gray-200 dark:bg-gray-600 rounded-full animate-pulse"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+              <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4"></div>
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                  >
+                    <div>
+                      <div className="h-4 w-20 bg-gray-200 dark:bg-gray-600 rounded animate-pulse mb-1"></div>
+                      <div className="h-3 w-24 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                    </div>
+                    <div className="h-5 w-16 bg-gray-200 dark:bg-gray-600 rounded-full animate-pulse"></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -99,7 +158,7 @@ export default function DashboardPage() {
                     {stat.title}
                   </p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">
-                    {loading ? "..." : stat.value}
+                    {stat.value}
                   </p>
                   {stat.change && (
                     <p className="text-sm text-green-600 dark:text-green-400 mt-1">

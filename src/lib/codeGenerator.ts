@@ -7,7 +7,7 @@ import { prisma } from './database'
  * @returns Next sequential code (e.g., W001, W002, W003...)
  */
 export async function generateNextCode(
-  model: 'printer' | 'prepStation' | 'availability' | 'tax' | 'menuMaster' | 'menuCategory' | 'menuItem',
+  model: 'printer' | 'prepStation' | 'availability' | 'tax' | 'menuMaster' | 'menuCategory' | 'menuItem' | 'modifierGroup' | 'modifierItem',
   codeField: string
 ): Promise<string> {
   try {
@@ -50,7 +50,7 @@ export async function generateNextCode(
  * @returns Unique sequential code
  */
 export async function generateUniqueCode(
-  model: 'printer' | 'prepStation' | 'availability' | 'tax' | 'menuMaster' | 'menuCategory' | 'menuItem',
+  model: 'printer' | 'prepStation' | 'availability' | 'tax' | 'menuMaster' | 'menuCategory' | 'menuItem' | 'modifierGroup' | 'modifierItem',
   codeField: string,
   maxRetries: number = 3
 ): Promise<string> {
