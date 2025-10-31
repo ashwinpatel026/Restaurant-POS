@@ -40,11 +40,20 @@ interface Printer {
   printerId: string; // Changed to string for BigInt serialization
   printerCode: string;
   printerName: string | null;
+  isActive?: number | null;
+}
+
+interface Station {
+  tblStationId: string; // Changed to string for BigInt serialization
+  stationCode: string;
+  stationname: string | null;
+  isActive?: number | null;
 }
 
 export default function PrepZonePage() {
   const [prepZones, setPrepZones] = useState<PrepZone[]>([]);
   const [printers, setPrinters] = useState<Printer[]>([]);
+  const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Modal states
@@ -59,9 +68,10 @@ export default function PrepZonePage() {
 
   const fetchData = async () => {
     try {
-      const [zonesRes, printersRes] = await Promise.all([
+      const [zonesRes, printersRes, stationsRes] = await Promise.all([
         fetch("/api/menu/prep-zone"),
         fetch("/api/printer"),
+        fetch("/api/station"),
       ]);
 
       if (zonesRes.ok) {
@@ -72,6 +82,11 @@ export default function PrepZonePage() {
       if (printersRes.ok) {
         const data = await printersRes.json();
         setPrinters(data);
+      }
+
+      if (stationsRes.ok) {
+        const data = await stationsRes.json();
+        setStations(data);
       }
     } catch (error) {
       toast.error("Error loading data");
@@ -315,6 +330,25 @@ export default function PrepZonePage() {
                   ),
                 },
                 {
+                  header: "Station",
+                  accessor: "stationCode",
+                  cell: (zone: PrepZone) => (
+                    <div className="text-sm text-gray-900 dark:text-white">
+                      {zone.stationCode ? (
+                        <div className="flex items-center">
+                          <span className="text-blue-600 dark:text-blue-400 font-medium">
+                            {stations.find(
+                              (s) => s.stationCode === zone.stationCode
+                            )?.stationname || zone.stationCode}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">Not assigned</span>
+                      )}
+                    </div>
+                  ),
+                },
+                {
                   header: "Printer",
                   accessor: "printerCode",
                   cell: (zone: PrepZone) => (
@@ -429,6 +463,7 @@ export default function PrepZonePage() {
         <PrepZoneForm
           zone={editingZone}
           printers={printers}
+          stations={stations}
           onSave={handleSave}
           onCancel={() => {
             setShowModal(false);
@@ -453,11 +488,13 @@ export default function PrepZonePage() {
 function PrepZoneForm({
   zone,
   printers,
+  stations,
   onSave,
   onCancel,
 }: {
   zone?: PrepZone | null;
   printers: Printer[];
+  stations: Station[];
   onSave: (data: any) => void;
   onCancel: () => void;
 }) {
@@ -516,6 +553,29 @@ function PrepZoneForm({
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           placeholder="Enter zone name (e.g., Grill Zone)"
         />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Station *
+        </label>
+        <select
+          required
+          value={formData.stationCode}
+          onChange={(e) =>
+            setFormData({ ...formData, stationCode: e.target.value })
+          }
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="">Select Station</option>
+          {stations
+            .filter((s) => s.isActive === 1 || s.isActive === undefined)
+            .map((station) => (
+              <option key={station.tblStationId} value={station.stationCode}>
+                {station.stationname || station.stationCode}
+              </option>
+            ))}
+        </select>
       </div>
 
       <div>

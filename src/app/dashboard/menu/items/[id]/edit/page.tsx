@@ -35,6 +35,8 @@ interface MenuItem {
   taxCode?: string;
   modifiers: any[];
   assignedModifiers?: any[];
+  inheritModifiers?: boolean;
+  inheritModifierGroup?: boolean;
 }
 
 interface MenuCategory {
@@ -71,10 +73,8 @@ export default function EditMenuItemPage() {
       if (itemRes.ok) {
         const itemData = await itemRes.json();
 
-        // Fetch modifiers for this menu item (skip for now - will be handled separately)
-        // TODO: Update when modifier assignment system is ready
-        itemData.assignedModifiers = [];
-
+        // assignedModifiers and inheritModifiers are already fetched by the API endpoint
+        // Keep them as returned from the API
         setMenuItem(itemData);
       } else {
         toast.error("Menu item not found");

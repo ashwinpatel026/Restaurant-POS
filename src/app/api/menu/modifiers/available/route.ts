@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
       }
 
       return {
-        id: modifier.id.toString(),
+        id: Number(modifier.id),
         name: modifier.groupName,
         labelName: modifier.labelName,
         posName: modifier.labelName || modifier.groupName,
@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
         sampleItems,
         configSummary,
         modifierItems: items.map((item: any) => ({
-          id: item.id.toString(),
+          id: Number(item.id),
           name: item.name,
           labelName: item.labelName,
           posName: item.labelName || item.name,

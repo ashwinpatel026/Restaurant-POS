@@ -21,22 +21,32 @@ export default function TableModal({
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     tableNumber: "",
-    capacity: "4",
+    seatingCapacity: "4",
     location: "",
+    status: "0", // 0 = Available
   });
 
   useEffect(() => {
     if (table) {
       setFormData({
-        tableNumber: table.tableNumber,
-        capacity: table.capacity.toString(),
+        tableNumber: table.tableNumber || "",
+        seatingCapacity: (
+          table.seatingCapacity ||
+          table.capacity ||
+          4
+        ).toString(),
         location: table.location || "",
+        status:
+          table.status !== null && table.status !== undefined
+            ? table.status.toString()
+            : "0",
       });
     } else {
       setFormData({
         tableNumber: "",
-        capacity: "4",
+        seatingCapacity: "4",
         location: "",
+        status: "0",
       });
     }
   }, [table]);
@@ -46,15 +56,19 @@ export default function TableModal({
     setLoading(true);
 
     try {
-      const url = table ? `/api/tables/${table.id}` : "/api/tables";
+      const url = table
+        ? `/api/tables/${table.tableId || table.id}`
+        : "/api/tables";
       const method = table ? "PUT" : "POST";
 
       const response = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...formData,
-          capacity: parseInt(formData.capacity),
+          tableNumber: formData.tableNumber,
+          seatingCapacity: parseInt(formData.seatingCapacity),
+          location: formData.location || null,
+          status: parseInt(formData.status),
         }),
       });
 
@@ -70,6 +84,7 @@ export default function TableModal({
       }
     } catch (error) {
       toast.error("An error occurred");
+      console.error("Error:", error);
     } finally {
       setLoading(false);
     }
@@ -87,7 +102,7 @@ export default function TableModal({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black bg-opacity-25" />
+          <div className="fixed inset-0 bg-black bg-opacity-25 dark:bg-opacity-50" />
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-y-auto">
@@ -101,14 +116,14 @@ export default function TableModal({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 shadow-xl transition-all">
+              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
                 <div className="flex items-center justify-between mb-4">
-                  <Dialog.Title className="text-xl font-bold text-gray-900">
+                  <Dialog.Title className="text-xl font-bold text-gray-900 dark:text-white">
                     {table ? "Edit Table" : "Add Table"}
                   </Dialog.Title>
                   <button
                     onClick={onClose}
-                    className="text-gray-400 hover:text-gray-600"
+                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                   >
                     <XMarkIcon className="w-6 h-6" />
                   </button>
@@ -116,11 +131,13 @@ export default function TableModal({
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
-                    <label className="label">Table Number</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Table Number *
+                    </label>
                     <input
                       type="text"
                       required
-                      className="input"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       value={formData.tableNumber}
                       onChange={(e) =>
                         setFormData({
@@ -128,27 +145,35 @@ export default function TableModal({
                           tableNumber: e.target.value,
                         })
                       }
+                      placeholder="e.g., T01, T02"
                     />
                   </div>
 
                   <div>
-                    <label className="label">Capacity (seats)</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Seating Capacity *
+                    </label>
                     <input
                       type="number"
                       required
                       min="1"
-                      className="input"
-                      value={formData.capacity}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={formData.seatingCapacity}
                       onChange={(e) =>
-                        setFormData({ ...formData, capacity: e.target.value })
+                        setFormData({
+                          ...formData,
+                          seatingCapacity: e.target.value,
+                        })
                       }
                     />
                   </div>
 
                   <div>
-                    <label className="label">Location</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Location
+                    </label>
                     <select
-                      className="input"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       value={formData.location}
                       onChange={(e) =>
                         setFormData({ ...formData, location: e.target.value })
@@ -159,6 +184,26 @@ export default function TableModal({
                       <option value="Outdoor">Outdoor</option>
                       <option value="Patio">Patio</option>
                       <option value="VIP">VIP</option>
+                      <option value="Window">Window</option>
+                      <option value="Bar">Bar</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Initial Status
+                    </label>
+                    <select
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={formData.status}
+                      onChange={(e) =>
+                        setFormData({ ...formData, status: e.target.value })
+                      }
+                    >
+                      <option value="0">Available</option>
+                      <option value="1">Occupied</option>
+                      <option value="2">Reserved</option>
+                      <option value="3">Maintenance</option>
                     </select>
                   </div>
 
@@ -166,14 +211,14 @@ export default function TableModal({
                     <button
                       type="button"
                       onClick={onClose}
-                      className="btn btn-secondary flex-1"
+                      className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={loading}
-                      className="btn btn-primary flex-1"
+                      className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                     >
                       {loading ? "Saving..." : table ? "Update" : "Create"}
                     </button>

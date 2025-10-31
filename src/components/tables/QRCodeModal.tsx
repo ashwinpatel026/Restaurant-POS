@@ -29,7 +29,17 @@ export default function QRCodeModal({
   const generateQRCode = async () => {
     if (!table) return;
 
-    const qrUrl = `${window.location.origin}/qr-order/${table.qrCode}`;
+    // Use tableNumber for QR code URL (or tableId if tableNumber is not available)
+    const tableIdentifier = table.tableNumber || table.tableId || table.id;
+
+    if (!tableIdentifier) {
+      console.error("Table identifier not found");
+      return;
+    }
+
+    const qrUrl = `${window.location.origin}/qr-order/${encodeURIComponent(
+      tableIdentifier
+    )}`;
 
     try {
       const dataUrl = await QRCode.toDataURL(qrUrl, {
@@ -104,7 +114,7 @@ export default function QRCodeModal({
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black bg-opacity-25" />
+          <div className="fixed inset-0 bg-black bg-opacity-25 dark:bg-opacity-50" />
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-y-auto">
@@ -118,31 +128,38 @@ export default function QRCodeModal({
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white p-6 shadow-xl transition-all">
+              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
                 <div className="flex items-center justify-between mb-4">
-                  <Dialog.Title className="text-xl font-bold text-gray-900">
-                    Table {table.tableNumber} QR Code
+                  <Dialog.Title className="text-xl font-bold text-gray-900 dark:text-white">
+                    Table {table.tableNumber || table.id || table.tableId} QR
+                    Code
                   </Dialog.Title>
                   <button
                     onClick={onClose}
-                    className="text-gray-400 hover:text-gray-600"
+                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                   >
                     <XMarkIcon className="w-6 h-6" />
                   </button>
                 </div>
 
                 <div className="flex flex-col items-center space-y-4">
-                  {qrDataUrl && (
-                    <div className="p-4 bg-white border-2 border-gray-200 rounded-lg">
+                  {qrDataUrl ? (
+                    <div className="p-4 bg-white dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 rounded-lg">
                       <img
                         src={qrDataUrl}
                         alt="QR Code"
                         className="w-64 h-64"
                       />
                     </div>
+                  ) : (
+                    <div className="p-4 bg-gray-100 dark:bg-gray-700 border-2 border-gray-200 dark:border-gray-600 rounded-lg flex items-center justify-center w-64 h-64">
+                      <p className="text-gray-500 dark:text-gray-400">
+                        Generating QR code...
+                      </p>
+                    </div>
                   )}
 
-                  <p className="text-sm text-gray-600 text-center">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 text-center">
                     Customers can scan this QR code to view menu and place
                     orders
                   </p>
@@ -150,13 +167,15 @@ export default function QRCodeModal({
                   <div className="flex space-x-3 w-full pt-4">
                     <button
                       onClick={handleDownload}
-                      className="btn btn-secondary flex-1"
+                      disabled={!qrDataUrl}
+                      className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Download
                     </button>
                     <button
                       onClick={handlePrint}
-                      className="btn btn-primary flex-1"
+                      disabled={!qrDataUrl}
+                      className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Print
                     </button>

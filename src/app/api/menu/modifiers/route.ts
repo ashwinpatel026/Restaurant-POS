@@ -12,48 +12,74 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const menuItemId = searchParams.get('menuItemId')
-    const categoryId = searchParams.get('categoryId')
     const includeItems = searchParams.get('includeItems') === 'true'
 
+    // Build where clause for new schema (modifier groups)
     const where: any = {}
-    if (menuItemId) {
-      where.tblMenuItemId = parseInt(menuItemId)
-    }
-    if (categoryId) {
-      where.tblMenuCategoryId = parseInt(categoryId)
-    }
 
-    const modifiers = await prisma.modifier.findMany({
+    // Fetch modifier groups
+    const groups = await (prisma as any).modifierGroup.findMany({
       where,
-      include: {
-        modifierItems: includeItems ? {
-          where: { isActive: 1 },
-          orderBy: { tblModifierItemId: 'asc' }
-        } : false
-      },
-      orderBy: { name: 'asc' }
+      orderBy: { groupName: 'asc' }
     })
 
-    // Add item count for each modifier
-    const modifiersWithCount = await Promise.all(
-      modifiers.map(async (modifier) => {
-        const itemCount = await prisma.modifierItem.count({
-          where: { 
-            tblModifierId: modifier.tblModifierId,
-            isActive: 1
-          }
-        })
-        
-        return {
-          ...modifier,
-          itemCount,
-          sampleItems: modifier.modifierItems?.slice(0, 3).map(item => item.name) || []
-        }
+    // Optionally fetch all modifier items and group them by modifierGroupCode
+    let itemsByGroup: Map<string, any[]> = new Map()
+    if (includeItems) {
+      const allItems = await (prisma as any).modifierItem.findMany({
+        where: { isActive: 1 },
+        orderBy: { displayOrder: 'asc' }
       })
-    )
 
-    return NextResponse.json(modifiersWithCount)
+      for (const item of allItems) {
+        if (!item.modifierGroupCode) continue
+        const list = itemsByGroup.get(item.modifierGroupCode) || []
+        list.push(item)
+        itemsByGroup.set(item.modifierGroupCode, list)
+      }
+    }
+
+    // Map to legacy-compatible response shape expected by the UI
+    const formatted = groups.map((group: any) => {
+      const groupItems = includeItems
+        ? (itemsByGroup.get(group.modifierGroupCode) || [])
+        : []
+
+      const itemCount = groupItems.length
+      const sampleItems = groupItems.slice(0, 3).map((it: any) => it.name)
+
+      return {
+        // IDs - both formats for compatibility
+        id: Number(group.id),
+        tblModifierId: Number(group.id),
+        name: group.groupName,
+        labelName: group.labelName,
+        posName: group.labelName || group.groupName,
+        colorCode: '#3B82F6',
+        required: group.isRequired,
+        isMultiselect: group.isMultiselect,
+        minSelection: group.minSelection,
+        maxSelection: group.maxSelection,
+        additionalChargeType: 'price_set_on_individual_modifiers',
+        // Helpers
+        itemCount,
+        sampleItems,
+        // Optional items
+        modifierItems: includeItems
+          ? groupItems.map((it: any) => ({
+              id: Number(it.id),
+              tblModifierItemId: Number(it.id),
+              name: it.name,
+              labelName: it.labelName,
+              posName: it.labelName || it.name,
+              colorCode: it.colorCode,
+              price: it.price
+            }))
+          : undefined
+      }
+    })
+
+    return NextResponse.json(formatted)
   } catch (error) {
     console.error('Error fetching modifiers:', error)
     return NextResponse.json(
@@ -88,20 +114,21 @@ export async function POST(request: NextRequest) {
       modifierItems
     } = body
 
-    const modifier = await prisma.modifier.create({
+    // Create a new modifier group using the new schema
+    const createdGroup = await (prisma as any).modifierGroup.create({
       data: {
-        name,
+        groupName: name,
         labelName,
-        posName: posName || name,
-        colorCode,
-        priceStrategy: parseInt(priceStrategy),
-        price: parseFloat(price || 0),
-        required: parseInt(required),
-        isMultiselect: parseInt(isMultiselect),
+        // No explicit posName field in schema; use labelName/derived in UI
+        // Default color if not provided
+        // colorCode is not stored in group table; UI uses default
+        priceStrategy: priceStrategy ? parseInt(priceStrategy) : 1,
+        // price is defined at item level in the new model; keep null here
+        isRequired: required ? parseInt(required) : 0,
+        isMultiselect: isMultiselect ? parseInt(isMultiselect) : 0,
         minSelection: minSelection ? parseInt(minSelection) : null,
         maxSelection: maxSelection ? parseInt(maxSelection) : null,
-        additionalChargeType: additionalChargeType || 'price_set_on_individual_modifiers',
-        tblMenuCategoryId: tblMenuCategoryId ? parseInt(tblMenuCategoryId) : null,
+        // The new schema uses menuCategoryCode (string) instead of id; skip mapping here
         createdBy: parseInt(session.user.id),
         storeCode: process.env.STORE_CODE || null
       }
@@ -109,22 +136,21 @@ export async function POST(request: NextRequest) {
 
     // Create modifier items if provided
     if (modifierItems && modifierItems.length > 0) {
-      const modifierItemsData = modifierItems.map((item: any) => ({
+      const itemsData = modifierItems.map((item: any) => ({
         name: item.name,
         labelName: item.labelName || item.name,
-        posName: item.posName || item.name,
         colorCode: item.colorCode || '#3B82F6',
         price: item.price || 0,
-        tblModifierId: modifier.tblModifierId,
+        modifierGroupCode: createdGroup.modifierGroupCode || null,
         storeCode: process.env.STORE_CODE || null
       }))
 
-      await prisma.modifierItem.createMany({
-        data: modifierItemsData
+      await (prisma as any).modifierItem.createMany({
+        data: itemsData
       })
     }
 
-    return NextResponse.json(modifier, { status: 201 })
+    return NextResponse.json(createdGroup, { status: 201 })
   } catch (error) {
     console.error('Error creating modifier:', error)
     return NextResponse.json(

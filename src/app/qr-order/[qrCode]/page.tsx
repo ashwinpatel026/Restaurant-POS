@@ -69,15 +69,17 @@ export default function QROrderPage() {
 
   const fetchMenuData = async () => {
     try {
-      const response = await fetch("/api/menu/masters");
+      // Fetch menu data as public (no auth required for QR orders)
+      const response = await fetch("/api/menu/masters?public=true");
       if (response.ok) {
         const data = await response.json();
-        setMenuMasters(data);
+        setMenuMasters(data || []);
       } else {
         toast.error("Failed to load menu");
       }
     } catch (error) {
       toast.error("Error loading menu");
+      console.error("Error fetching menu:", error);
     } finally {
       setLoading(false);
     }
@@ -148,13 +150,51 @@ export default function QROrderPage() {
 
     setOrdering(true);
     try {
-      // Here you would typically create an order
-      // For now, we'll just show a success message
-      toast.success("Order placed successfully!");
-      setCart([]);
-      setCustomerName("");
-      setShowCart(false);
+      // Calculate totals
+      const subtotal = cart.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0
+      );
+      const tax = subtotal * 0.18; // 18% tax (adjust as needed)
+      const total = subtotal + tax;
+
+      const orderItems = cart.map((item) => ({
+        menuItemId: item.menuItemId,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        notes: null,
+      }));
+
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          tableNumber: qrCode, // Use QR code (table number) as identifier
+          orderType: "QR_ORDER",
+          customerName: customerName.trim(),
+          orderItems,
+          subtotal,
+          tax,
+          discount: 0,
+          total,
+        }),
+      });
+
+      if (response.ok) {
+        const order = await response.json();
+        toast.success(`Order placed successfully! Order #${order.orderNumber}`);
+        setCart([]);
+        setCustomerName("");
+        setShowCart(false);
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to place order");
+      }
     } catch (error) {
+      console.error("Error placing order:", error);
       toast.error("Failed to place order");
     } finally {
       setOrdering(false);
@@ -235,58 +275,72 @@ export default function QROrderPage() {
               {master.name}
             </h2>
 
-            {master.menuCategories.map((category) => (
-              <div key={category.tblMenuCategoryId} className="mb-8">
-                <h3 className="text-2xl font-semibold text-gray-800 mb-4">
-                  {category.name}
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {category.menuItems
-                    .filter((item) => item.isActive === 1)
-                    .map((item) => (
-                      <div
-                        key={item.tblMenuItemId}
-                        className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
-                      >
-                        <h4 className="text-lg font-semibold text-gray-900 mb-2">
-                          {item.name}
-                        </h4>
-                        <p className="text-gray-600 mb-3">{item.labelName}</p>
-                        <p className="text-xl font-bold text-blue-600 mb-4">
-                          {formatPrice(item.price)}
-                        </p>
-
-                        {item.modifiers.length > 0 && (
-                          <div className="mb-4">
-                            <p className="text-sm text-gray-500 mb-2">
-                              Customizations:
+            {master.menuCategories && master.menuCategories.length > 0 ? (
+              master.menuCategories.map((category) => (
+                <div key={category.tblMenuCategoryId} className="mb-8">
+                  <h3 className="text-2xl font-semibold text-gray-800 mb-4">
+                    {category.name}
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {category.menuItems && category.menuItems.length > 0 ? (
+                      category.menuItems
+                        .filter((item) => item.isActive === 1)
+                        .map((item) => (
+                          <div
+                            key={item.tblMenuItemId}
+                            className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
+                          >
+                            <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                              {item.name}
+                            </h4>
+                            <p className="text-gray-600 mb-3">
+                              {item.labelName}
                             </p>
-                            {item.modifiers.map((modifier) => (
-                              <div
-                                key={modifier.tblModifierId}
-                                className="text-sm text-gray-600"
-                              >
-                                {modifier.name}{" "}
-                                {modifier.required === 1 && (
-                                  <span className="text-red-500">*</span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                            <p className="text-xl font-bold text-blue-600 mb-4">
+                              {formatPrice(item.price)}
+                            </p>
 
-                        <button
-                          onClick={() => addToCart(item)}
-                          className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
-                        >
-                          <PlusIcon className="w-4 h-4" />
-                          <span>Add to Cart</span>
-                        </button>
-                      </div>
-                    ))}
+                            {item.modifiers.length > 0 && (
+                              <div className="mb-4">
+                                <p className="text-sm text-gray-500 mb-2">
+                                  Customizations:
+                                </p>
+                                {item.modifiers.map((modifier) => (
+                                  <div
+                                    key={modifier.tblModifierId}
+                                    className="text-sm text-gray-600"
+                                  >
+                                    {modifier.name}{" "}
+                                    {modifier.required === 1 && (
+                                      <span className="text-red-500">*</span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            <button
+                              onClick={() => addToCart(item)}
+                              className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
+                            >
+                              <PlusIcon className="w-4 h-4" />
+                              <span>Add to Cart</span>
+                            </button>
+                          </div>
+                        ))
+                    ) : (
+                      <p className="text-gray-500 col-span-full text-center py-4">
+                        No items available in this category.
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <p className="text-gray-500 text-center py-8">
+                No categories available for this menu.
+              </p>
+            )}
           </div>
         ))}
       </div>

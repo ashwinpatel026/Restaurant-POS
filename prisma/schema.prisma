@@ -211,6 +211,7 @@ model MenuItem {
   inheritDiningTax               Boolean   @default(true) @map("inherit_dining_tax")
   diningTaxEffect                String?   @default("No Effect") @map("dining_tax_effect") @db.VarChar(50)
   disqualifyDiningTaxExemption   Boolean   @default(false) @map("disqualify_dining_tax_exemption")
+  inheritModifierGroup           Boolean   @default(true) @map("inherit_modifier_group")
   createdBy                      Int?      @map("createdby")
   createdOn                      DateTime  @default(now()) @map("createdon")
   isSyncToWeb                    Int       @default(0) @map("is_sync_to_web")
@@ -282,6 +283,25 @@ model ModifierItem {
   @@map("tbl_modifier_item")
 }
 
+/// Menu item to modifier group assignment table
+model MenuItemModifierGroup {
+  id                   BigInt    @id @default(autoincrement()) @map("id")
+  menuItemCode         String?   @map("menu_item_code") @db.VarChar(100)
+  modifierGroupCode    String?   @map("modifier_group_code") @db.VarChar(100)
+  inheritFromMenuGroup Int       @default(1) @map("inherit_from_menu_group")
+  createdBy            Int?      @map("createdby")
+  createdOn            DateTime  @default(now()) @map("createdon")
+  isSyncToWeb          Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal        Int       @default(0) @map("is_sync_to_local")
+  storeCode            String?   @map("store_code") @db.VarChar(100)
+
+  // Relations are based on codes (no enforced FKs in DB schema)
+  // menuItemCode -> MenuItem.menuCategoryCode (by code)
+  // modifierGroupCode -> ModifierGroup.modifierGroupCode (by code)
+
+  @@map("tbl_menu_item_modifier_group")
+}
+
 model Station {
   tblStationId  BigInt  @id @default(autoincrement()) @map("tbl_station_id")
   stationCode   String  @unique @map("station_code") @db.VarChar(100)
@@ -349,6 +369,74 @@ model Printer {
   prepZones PrepZone[]
 
   @@map("tbl_printer")
+}
+
+model Table {
+  tableId           Int      @id @default(autoincrement()) @map("table_id")
+  tableNumber       String   @unique @map("table_number") @db.VarChar(50)
+  seatingCapacity   Int      @map("seating_capacity")
+  currentOccupancy  Int      @default(0) @map("current_occupancy")
+  location          String?  @map("location") @db.VarChar(100)
+  status            Int?     @map("status")
+  createdDate       DateTime @default(now()) @map("created_date")
+  isSyncToWeb       Int      @default(0) @map("is_sync_to_web")
+  isSyncToLocal     Int      @default(0) @map("is_sync_to_local")
+  storeCode         String?  @map("store_code") @db.VarChar(100)
+
+  // Relationships
+  orders Order[]
+
+  @@map("tbl_table")
+}
+
+model Order {
+  orderId        BigInt    @id @default(autoincrement()) @map("order_id")
+  orderNumber    String    @unique @map("order_number") @db.VarChar(100)
+  tableId        Int?      @map("table_id")
+  orderType      String    @map("order_type") @db.VarChar(50) // DINE_IN, TAKEAWAY, DELIVERY, QR_ORDER
+  status         String    @default("PENDING") @map("status") @db.VarChar(50) // PENDING, CONFIRMED, PREPARING, READY, SERVED, COMPLETED, CANCELLED
+  customerName   String?   @map("customer_name") @db.VarChar(200)
+  customerPhone  String?   @map("customer_phone") @db.VarChar(20)
+  subtotal       Decimal   @default(0) @map("subtotal") @db.Decimal(10, 2)
+  tax            Decimal   @default(0) @map("tax") @db.Decimal(10, 2)
+  discount       Decimal   @default(0) @map("discount") @db.Decimal(10, 2)
+  total          Decimal   @default(0) @map("total") @db.Decimal(10, 2)
+  notes          String?   @map("notes")
+  createdBy      Int?      @map("created_by")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  completedAt    DateTime? @map("completed_at")
+  isSyncToWeb    Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal  Int       @default(0) @map("is_sync_to_local")
+  storeCode      String?   @map("store_code") @db.VarChar(100)
+
+  // Relationships
+  table Table? @relation(fields: [tableId], references: [tableId])
+  orderItems OrderItem[]
+
+  @@map("tbl_order")
+}
+
+model OrderItem {
+  orderItemId  BigInt    @id @default(autoincrement()) @map("order_item_id")
+  orderId      BigInt    @map("order_id")
+  menuItemId   BigInt?   @map("menu_item_id")
+  menuItemCode String?   @map("menu_item_code") @db.VarChar(100)
+  name         String    @map("name") @db.VarChar(500)
+  quantity     Int       @default(1) @map("quantity")
+  price        Decimal   @map("price") @db.Decimal(10, 2)
+  subtotal     Decimal   @map("subtotal") @db.Decimal(10, 2)
+  notes        String?   @map("notes")
+  status       String    @default("PENDING") @map("status") @db.VarChar(50)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  isSyncToWeb  Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal Int      @default(0) @map("is_sync_to_local")
+  storeCode    String?   @map("store_code") @db.VarChar(100)
+
+  // Relationships
+  order Order @relation(fields: [orderId], references: [orderId], onDelete: Cascade)
+
+  @@map("tbl_order_item")
 }
 
 // Enums

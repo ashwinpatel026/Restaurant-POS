@@ -107,12 +107,24 @@ export default function MenuItemTabbedForm({
         isCustomerInvoice: menuItem.isCustomerInvoice ?? 0,
       });
 
-      // Set selected modifiers if editing
-      if (menuItem.assignedModifiers) {
-        const modifierIds = menuItem.assignedModifiers.map(
-          (modifier: any) => modifier.tblModifierId || modifier.id
-        );
-        setSelectedModifiers(modifierIds);
+      // Set selected modifiers if editing (include ALL assigned modifiers for display)
+      if (
+        menuItem.assignedModifiers &&
+        Array.isArray(menuItem.assignedModifiers)
+      ) {
+        // Include ALL modifiers for display (both inherited and explicit)
+        const allModifierIds = menuItem.assignedModifiers
+          .map((modifier: any) => modifier.tblModifierId || modifier.id)
+          .filter(Boolean);
+        setSelectedModifiers(allModifierIds);
+      }
+
+      // Set inherit modifiers flag from MenuItem.inheritModifiers
+      if (menuItem.inheritModifiers !== undefined) {
+        setInheritModifiers(menuItem.inheritModifiers);
+      } else if (menuItem.inheritModifierGroup !== undefined) {
+        // Fallback to inheritModifierGroup if inheritModifiers is not set
+        setInheritModifiers(menuItem.inheritModifierGroup);
       }
     }
   }, [menuItem]);
@@ -162,6 +174,9 @@ export default function MenuItemTabbedForm({
         stockinhand: formData.stockinhand
           ? parseFloat(formData.stockinhand.toString())
           : null,
+        // New fields for modifier assignment
+        selectedModifiers,
+        inheritModifiers,
       };
 
       await onSave(submitData);
@@ -718,9 +733,12 @@ export default function MenuItemTabbedForm({
                   <div className="space-y-2">
                     {selectedModifiers.map((modifierId) => {
                       const modifier = modifiers.find(
-                        (m) => m.tblModifierId === modifierId
+                        (m) =>
+                          m.id === modifierId || m.tblModifierId === modifierId
                       );
-                      if (!modifier) return null;
+                      if (!modifier) {
+                        return null;
+                      }
 
                       return (
                         <div

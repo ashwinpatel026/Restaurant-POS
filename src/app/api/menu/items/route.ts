@@ -113,7 +113,10 @@ export async function POST(request: NextRequest) {
       diningTaxEffect,
       disqualifyDiningTaxExemption,
       isActive,
-      stockinhand
+      stockinhand,
+      // New fields for modifier assignment
+      selectedModifiers,
+      inheritModifiers
     } = body
 
     // Generate unique code for menu item
@@ -159,11 +162,76 @@ export async function POST(request: NextRequest) {
           inheritDiningTax: inheritDiningTax !== undefined ? inheritDiningTax : true,
           diningTaxEffect: diningTaxEffect || 'No Effect',
           disqualifyDiningTaxExemption: disqualifyDiningTaxExemption !== undefined ? disqualifyDiningTaxExemption : false,
+          inheritModifierGroup: inheritModifiers !== undefined ? inheritModifiers : true,
           createdBy: parseInt(session.user.id),
           storeCode: process.env.STORE_CODE || null
         }
       })
     })
+
+    // Create menu item -> modifier group assignments
+    try {
+      const createdItemCode: string | null = (menuItem as any).menuItemCode || null
+      if (createdItemCode) {
+        const rowsToCreate: any[] = []
+        const seenGroups = new Set<string>() // Track already added modifier groups
+
+        // If inherit from category, add all modifier groups for the category
+        if (inheritModifiers && (menuItem as any).menuCategoryCode) {
+          const categoryCode = (menuItem as any).menuCategoryCode as string
+          const categoryGroups = await (prisma as any).modifierGroup.findMany({
+            where: { menuCategoryCode: categoryCode }
+          })
+          for (const g of categoryGroups) {
+            if (g.modifierGroupCode && !seenGroups.has(g.modifierGroupCode)) {
+              rowsToCreate.push({
+                menuItemCode: createdItemCode,
+                modifierGroupCode: g.modifierGroupCode,
+                inheritFromMenuGroup: 1,
+                createdBy: parseInt(session.user.id),
+                storeCode: process.env.STORE_CODE || null
+              })
+              seenGroups.add(g.modifierGroupCode)
+            }
+          }
+        }
+
+        // Add explicit selected modifier groups (these take precedence if already in inherited list)
+        if (Array.isArray(selectedModifiers) && selectedModifiers.length > 0) {
+          const groups = await (prisma as any).modifierGroup.findMany({
+            where: { id: { in: selectedModifiers.map((n: any) => BigInt(n)) } }
+          })
+          for (const g of groups) {
+            if (g.modifierGroupCode) {
+              // If already added as inherited, remove it and add as explicit
+              if (seenGroups.has(g.modifierGroupCode)) {
+                const index = rowsToCreate.findIndex(
+                  (r) => r.menuItemCode === createdItemCode && r.modifierGroupCode === g.modifierGroupCode
+                )
+                if (index >= 0) {
+                  rowsToCreate[index].inheritFromMenuGroup = 0
+                }
+              } else {
+                rowsToCreate.push({
+                  menuItemCode: createdItemCode,
+                  modifierGroupCode: g.modifierGroupCode,
+                  inheritFromMenuGroup: 0,
+                  createdBy: parseInt(session.user.id),
+                  storeCode: process.env.STORE_CODE || null
+                })
+                seenGroups.add(g.modifierGroupCode)
+              }
+            }
+          }
+        }
+
+        if (rowsToCreate.length > 0) {
+          await (prisma as any).menuItemModifierGroup.createMany({ data: rowsToCreate, skipDuplicates: true })
+        }
+      }
+    } catch (e) {
+      console.error('Failed to assign modifier groups to menu item:', e)
+    }
 
     // Convert IDs to strings for JSON response
     const itemWithStringIds = {

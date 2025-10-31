@@ -6,17 +6,82 @@ import { generateUniqueCode } from '@/lib/codeGenerator'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    // Check if this is a public request (for QR orders) by checking referer or query param
+    const url = new URL(request.url)
+    const isPublic = url.searchParams.get('public') === 'true'
     
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Only require auth if not a public request
+    if (!isPublic) {
+      const session = await getServerSession(authOptions)
+      if (!session) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
     }
 
+    // Fetch menu masters with categories and items for public QR orders
     const menuMasters = await prisma.menuMaster.findMany({
+      where: {
+        isActive: 1, // Only active menus for QR orders
+      },
+      include: isPublic ? {
+        menuCategories: {
+          where: {
+            isActive: 1,
+          },
+          include: {
+            // Note: We need to manually fetch menu items as there's no direct relation in Prisma
+            // We'll fetch them separately or use a raw query
+          },
+          orderBy: {
+            createdOn: 'asc'
+          }
+        }
+      } : undefined,
       orderBy: { createdOn: 'desc' }
     })
 
-    // Convert BigInt to string for JSON serialization
+    // If public request, fetch menu items for each category
+    if (isPublic) {
+      // Fetch all menu items
+      const allMenuItems = await prisma.menuItem.findMany({
+        where: {
+          isActive: 1,
+        },
+      })
+
+      // Group menu items by category and attach to categories
+      const menusWithItems = menuMasters.map((menu: any) => {
+        const categoriesWithItems = (menu.menuCategories || []).map((category: any) => {
+          const menuItems = allMenuItems.filter(
+            (item: any) => item.menuCategoryCode === category.menuCategoryCode
+          ).map((item: any) => ({
+            tblMenuItemId: Number(item.menuItemId),
+            name: item.name || '',
+            labelName: item.labelName || '',
+            price: Number(item.basePrice || item.price || 0),
+            isActive: item.isActive,
+            modifiers: [] // Modifiers would need to be fetched separately if needed
+          }))
+
+          return {
+            tblMenuCategoryId: Number(category.menuCategoryId),
+            name: category.name || '',
+            menuItems
+          }
+        })
+
+        return {
+          ...menu,
+          tblMenuMasterId: Number(menu.menuMasterId),
+          menuMasterId: menu.menuMasterId.toString(),
+          menuCategories: categoriesWithItems
+        }
+      })
+
+      return NextResponse.json(menusWithItems)
+    }
+
+    // For authenticated requests, return simple structure
     const menusWithStringId = menuMasters.map((menu: any) => ({
       ...menu,
       menuMasterId: menu.menuMasterId.toString()

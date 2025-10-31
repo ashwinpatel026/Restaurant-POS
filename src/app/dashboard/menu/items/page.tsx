@@ -380,7 +380,10 @@ export default function MenuItemsPage() {
                 {filteredItems.map((item) => (
                   <div
                     key={item.menuItemId || item.tblMenuItemId}
-                    className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-shadow bg-white dark:bg-gray-700"
+                    className="border-2 rounded-lg p-6 hover:shadow-md transition-shadow bg-white dark:bg-gray-700"
+                    style={{
+                      borderColor: item.colorCode || "#E5E7EB",
+                    }}
                   >
                     {/* Image Display */}
                     <div className="mb-4">
