@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Fragment } from "react";
+import { useState, Fragment, useEffect } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
@@ -11,16 +11,69 @@ interface CategoryModalProps {
   onSuccess: () => void;
 }
 
+interface ModifierGroup {
+  id: string;
+  modifierGroupCode: string | null;
+  groupName: string | null;
+  labelName: string | null;
+}
+
 export default function CategoryModal({
   isOpen,
   onClose,
   onSuccess,
 }: CategoryModalProps) {
   const [loading, setLoading] = useState(false);
+  const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
+  const [selectedModifierGroups, setSelectedModifierGroups] = useState<
+    Set<string>
+  >(new Set());
   const [formData, setFormData] = useState({
     name: "",
     description: "",
+    menuMasterId: "",
   });
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchModifierGroups();
+    }
+  }, [isOpen]);
+
+  const fetchModifierGroups = async () => {
+    try {
+      const response = await fetch("/api/modifier-groups");
+      if (response.ok) {
+        const data = await response.json();
+        setModifierGroups(data);
+      }
+    } catch (error) {
+      console.error("Error fetching modifier groups:", error);
+    }
+  };
+
+  const handleModifierGroupToggle = (modifierGroupCode: string) => {
+    const updated = new Set(selectedModifierGroups);
+    if (updated.has(modifierGroupCode)) {
+      updated.delete(modifierGroupCode);
+    } else {
+      updated.add(modifierGroupCode);
+    }
+    setSelectedModifierGroups(updated);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedModifierGroups.size === modifierGroups.length) {
+      setSelectedModifierGroups(new Set());
+    } else {
+      const allCodes = new Set(
+        modifierGroups
+          .map((g) => g.modifierGroupCode)
+          .filter((code): code is string => code !== null)
+      );
+      setSelectedModifierGroups(allCodes);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,16 +83,21 @@ export default function CategoryModal({
       const response = await fetch("/api/menu/categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          modifierGroupCodes: Array.from(selectedModifierGroups),
+        }),
       });
 
       if (response.ok) {
         toast.success("Category created successfully");
         onSuccess();
         onClose();
-        setFormData({ name: "", description: "" });
+        setFormData({ name: "", description: "", menuMasterId: "" });
+        setSelectedModifierGroups(new Set());
       } else {
-        toast.error("Failed to create category");
+        const errorData = await response.json();
+        toast.error(errorData.error || "Failed to create category");
       }
     } catch (error) {
       toast.error("An error occurred");
@@ -114,6 +172,62 @@ export default function CategoryModal({
                         })
                       }
                     />
+                  </div>
+
+                  {/* Modifier Groups Selection */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="label mb-0">
+                        Modifier Groups (Optional)
+                      </label>
+                      {modifierGroups.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleSelectAll}
+                          className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                        >
+                          {selectedModifierGroups.size === modifierGroups.length
+                            ? "Deselect All"
+                            : "Select All"}
+                        </button>
+                      )}
+                    </div>
+                    <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 max-h-48 overflow-y-auto bg-white dark:bg-gray-700">
+                      {modifierGroups.length === 0 ? (
+                        <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
+                          No modifier groups available
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {modifierGroups.map((group) => {
+                            const code = group.modifierGroupCode;
+                            if (!code) return null;
+                            return (
+                              <label
+                                key={group.id}
+                                className="flex items-center cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-600 p-2 rounded"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={selectedModifierGroups.has(code)}
+                                  onChange={() =>
+                                    handleModifierGroupToggle(code)
+                                  }
+                                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
+                                />
+                                <span className="ml-2 text-sm text-gray-900 dark:text-white">
+                                  {group.groupName || group.labelName || code}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Select modifier groups that will be available for all
+                      items in this category
+                    </p>
                   </div>
 
                   <div className="flex space-x-3 pt-4">

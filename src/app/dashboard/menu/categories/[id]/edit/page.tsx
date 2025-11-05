@@ -5,6 +5,10 @@ import { useRouter, useParams } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+import SystemColorPicker, {
+  getPrimaryColor,
+} from "@/components/ui/SystemColorPicker";
+import { CheckIcon } from "@heroicons/react/24/solid";
 
 interface MenuMaster {
   menuMasterId: string;
@@ -17,6 +21,15 @@ interface MenuCategory {
   colorCode?: string;
   isActive: number;
   tblMenuMasterId: number;
+  modifierGroups?: string[];
+  modifierGroupCodes?: string[];
+}
+
+interface ModifierGroup {
+  id: string;
+  modifierGroupCode: string | null;
+  groupName: string | null;
+  labelName: string | null;
 }
 
 export default function EditCategoryPage() {
@@ -26,10 +39,14 @@ export default function EditCategoryPage() {
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [menuMasters, setMenuMasters] = useState<MenuMaster[]>([]);
+  const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
+  const [selectedModifierGroups, setSelectedModifierGroups] = useState<
+    Set<string>
+  >(new Set());
   const [category, setCategory] = useState<MenuCategory | null>(null);
   const [formData, setFormData] = useState({
     name: "",
-    colorCode: "#3B82F6",
+    colorCode: getPrimaryColor(),
     menuMasterId: "",
     isActive: 1,
   });
@@ -40,9 +57,10 @@ export default function EditCategoryPage() {
 
   const fetchData = async () => {
     try {
-      const [categoryRes, mastersRes] = await Promise.all([
+      const [categoryRes, mastersRes, modifierGroupsRes] = await Promise.all([
         fetch(`/api/menu/categories/${categoryId}`),
         fetch("/api/menu/masters"),
+        fetch("/api/modifier-groups"),
       ]);
 
       if (categoryRes.ok) {
@@ -50,24 +68,86 @@ export default function EditCategoryPage() {
         setCategory(categoryData);
         setFormData({
           name: categoryData.name || "",
-          colorCode: categoryData.colorCode || "#3B82F6",
+          colorCode: categoryData.colorCode || getPrimaryColor(),
           menuMasterId:
             categoryData.menuMaster?.menuMasterId?.toString() ||
             categoryData.tblMenuMasterId?.toString() ||
             "",
           isActive: categoryData.isActive || 1,
         });
+
+        // Preselect using codes (prefer codes over names)
+        if (
+          Array.isArray(categoryData.modifierGroupCodes) &&
+          categoryData.modifierGroupCodes.length > 0
+        ) {
+          setSelectedModifierGroups(new Set(categoryData.modifierGroupCodes));
+        } else if (
+          Array.isArray(categoryData.modifierGroups) &&
+          categoryData.modifierGroups.length > 0
+        ) {
+          // Fallback: try to map names to codes by matching
+          const namesSet = new Set<string>(categoryData.modifierGroups);
+          // We'll map after modifier groups are fetched below
+          // Temporarily store names in a Set on window (scoped) to map after fetch completes
+          (window as any).__pendingModifierNames = namesSet;
+        }
       }
 
       if (mastersRes.ok) {
         const mastersData = await mastersRes.json();
         setMenuMasters(mastersData);
       }
+
+      if (modifierGroupsRes.ok) {
+        const modifierGroupsData = await modifierGroupsRes.json();
+        setModifierGroups(modifierGroupsData);
+        // If we had only names from category, map to codes now
+        const pendingNames: Set<string> | undefined = (window as any)
+          .__pendingModifierNames;
+        if (pendingNames && pendingNames.size > 0) {
+          const codesFromNames = modifierGroupsData
+            .filter((g: any) =>
+              pendingNames.has(
+                g.groupName || g.labelName || g.modifierGroupCode
+              )
+            )
+            .map((g: any) => g.modifierGroupCode)
+            .filter((c: string | null) => c !== null) as string[];
+          if (codesFromNames.length > 0) {
+            setSelectedModifierGroups(new Set(codesFromNames));
+          }
+          (window as any).__pendingModifierNames = undefined;
+        }
+      }
     } catch (error) {
       toast.error("Error loading data");
       console.error("Error:", error);
     } finally {
       setFetchLoading(false);
+    }
+  };
+
+  const handleModifierGroupToggle = (modifierGroupCode: string) => {
+    const updated = new Set(selectedModifierGroups);
+    if (updated.has(modifierGroupCode)) {
+      updated.delete(modifierGroupCode);
+    } else {
+      updated.add(modifierGroupCode);
+    }
+    setSelectedModifierGroups(updated);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedModifierGroups.size === modifierGroups.length) {
+      setSelectedModifierGroups(new Set());
+    } else {
+      const allCodes = new Set(
+        modifierGroups
+          .map((g) => g.modifierGroupCode)
+          .filter((code): code is string => code !== null)
+      );
+      setSelectedModifierGroups(allCodes);
     }
   };
 
@@ -86,6 +166,7 @@ export default function EditCategoryPage() {
           colorCode: formData.colorCode,
           menuMasterId: formData.menuMasterId,
           isActive: formData.isActive,
+          modifierGroupCodes: Array.from(selectedModifierGroups),
         }),
       });
 
@@ -189,36 +270,70 @@ export default function EditCategoryPage() {
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Color Code
-                    </label>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="color"
-                        value={formData.colorCode}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            colorCode: e.target.value,
-                          })
-                        }
-                        className="h-10 w-20 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer"
-                      />
-                      <input
-                        type="text"
-                        value={formData.colorCode}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            colorCode: e.target.value,
-                          })
-                        }
-                        className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="#3B82F6"
-                      />
-                    </div>
+                    <SystemColorPicker
+                      label="Color Code"
+                      value={formData.colorCode || ""}
+                      onChange={(color: string) =>
+                        setFormData({ ...formData, colorCode: color })
+                      }
+                    />
                   </div>
                 </div>
+              </div>
+
+              {/* Modifier Groups Selection */}
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                    Assign Modifiers (Optional)
+                  </h3>
+                  {modifierGroups.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleSelectAll}
+                      className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium px-3 py-1 border border-blue-600 dark:border-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                    >
+                      {selectedModifierGroups.size === modifierGroups.length
+                        ? "Deselect All"
+                        : "Select All"}
+                    </button>
+                  )}
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                  Select modifiers that will be available for all items in this
+                  category
+                </p>
+                {modifierGroups.length === 0 ? (
+                  <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                      No modifier groups available
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {modifierGroups.map((group) => {
+                      const code = group.modifierGroupCode;
+                      if (!code) return null;
+                      return (
+                        <button
+                          key={group.id}
+                          type="button"
+                          onClick={() => handleModifierGroupToggle(code)}
+                          className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
+                            selectedModifierGroups.has(code)
+                              ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                              : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                          }`}
+                        >
+                          {group.groupName || group.labelName || code}
+                          {selectedModifierGroups.has(code) && (
+                            <CheckIcon className="w-4 h-4 inline-block ml-2" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Status */}

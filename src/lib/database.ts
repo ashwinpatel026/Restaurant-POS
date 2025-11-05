@@ -10,6 +10,14 @@ export const prisma = globalForPrisma.prisma ?? new PrismaClient({
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
 
+// Warm up database connection on server startup (non-blocking)
+if (typeof window === 'undefined' && !globalForPrisma.prisma) {
+  // Warm up connection in background
+  prisma.$connect().catch(() => {
+    // Silent fail - connection will be established on first query
+  })
+}
+
 // Connection function
 export async function connectDB() {
   try {

@@ -34,44 +34,9 @@ async function seed() {
     await prisma.timeEvent.deleteMany({})
     await prisma.tax.deleteMany({})
     await prisma.user.deleteMany({})
-    await prisma.outlet.deleteMany({})
     console.log('✓ Data cleared\n')
 
-    // Step 2: Create Outlets (one by one)
-    console.log('📦 Creating Outlets...')
-    const outlet1 = await prisma.outlet.create({
-      data: {
-        name: 'Main Branch',
-        code: 'MB001',
-        address: '123 Restaurant Street, Downtown',
-        city: 'Mumbai',
-        state: 'Maharashtra',
-        zipCode: '400001',
-        phone: '+91-1234567890',
-        email: 'main@restaurant.com',
-        openingTime: '09:00',
-        closingTime: '23:00',
-      }
-    })
-    console.log(`  ✓ Created outlet: ${outlet1.name} (${outlet1.code})`)
-
-    const outlet2 = await prisma.outlet.create({
-      data: {
-        name: 'Airport Branch',
-        code: 'AB002',
-        address: '789 Airport Road, Terminal 2',
-        city: 'Mumbai',
-        state: 'Maharashtra',
-        zipCode: '400099',
-        phone: '+91-9876543210',
-        email: 'airport@restaurant.com',
-        openingTime: '06:00',
-        closingTime: '01:00',
-      }
-    })
-    console.log(`  ✓ Created outlet: ${outlet2.name} (${outlet2.code})\n`)
-
-    // Step 3: Create Users (one by one)
+    // Step 2: Create Users (one by one)
     console.log('👥 Creating Users...')
     const hashedPassword = await bcrypt.hash('admin123', 10)
 
@@ -97,7 +62,6 @@ async function seed() {
         lastName: 'Manager',
         role: 'OUTLET_MANAGER',
         phone: '+91-8888888888',
-        outletId: outlet1.id,
       }
     })
     console.log(`  ✓ Created user: ${managerUser.username} (${managerUser.role})`)
@@ -111,12 +75,11 @@ async function seed() {
         lastName: 'Captain',
         role: 'CAPTAIN',
         phone: '+91-7777777777',
-        outletId: outlet1.id,
       }
     })
     console.log(`  ✓ Created user: ${captainUser.username} (${captainUser.role})\n`)
 
-    // Step 4: Create Tax (one by one)
+    // Step 3: Create Tax (one by one)
     console.log('💰 Creating Tax...')
     const tax1 = await prisma.tax.create({
       data: {
@@ -138,7 +101,7 @@ async function seed() {
     })
     console.log(`  ✓ Created tax: ${tax2.taxname} (${tax2.taxCode})\n`)
 
-    // Step 5: Create Printers (one by one)
+    // Step 4: Create Printers (one by one)
     console.log('🖨️  Creating Printers...')
     const printer1 = await prisma.printer.create({
       data: {
@@ -160,7 +123,7 @@ async function seed() {
     })
     console.log(`  ✓ Created printer: ${printer2.printerName} (${printer2.printerCode})\n`)
 
-    // Step 6: Create PrepZones (one by one, depends on printers)
+    // Step 5: Create PrepZones (one by one, depends on printers)
     console.log('🍳 Creating Prep Zones...')
     const prepZone1 = await prisma.prepZone.create({
       data: {
@@ -184,7 +147,7 @@ async function seed() {
     })
     console.log(`  ✓ Created prep zone: ${prepZone2.prepZoneName} (${prepZone2.prepZoneCode})\n`)
 
-    // Step 7: Create MenuMasters (one by one, depends on prepZones)
+    // Step 6: Create MenuMasters (one by one, depends on prepZones)
     console.log('📋 Creating Menu Masters...')
     const menuMaster1 = await prisma.menuMaster.create({
       data: {
@@ -212,7 +175,7 @@ async function seed() {
     })
     console.log(`  ✓ Created menu master: ${menuMaster2.name} (${menuMaster2.menuMasterCode})\n`)
 
-    // Step 8: Create MenuCategories (one by one, depends on menuMasters)
+    // Step 7: Create MenuCategories (one by one, depends on menuMasters)
     console.log('📁 Creating Menu Categories...')
     const category1 = await prisma.menuCategory.create({
       data: {
@@ -250,7 +213,7 @@ async function seed() {
     })
     console.log(`  ✓ Created category: ${category3.name} (${category3.menuCategoryCode})\n`)
 
-    // Step 9: Create ModifierGroups (one by one, depends on categories)
+    // Step 8: Create ModifierGroups (one by one, depends on categories)
     console.log('🔧 Creating Modifier Groups...')
     const modifierGroup1 = await prisma.modifierGroup.create({
       data: {
@@ -297,7 +260,7 @@ async function seed() {
     })
     console.log(`  ✓ Created modifier group: ${modifierGroup3.groupName} (${modifierGroup3.modifierGroupCode})\n`)
 
-    // Step 10: Create ModifierItems (one by one, depends on modifierGroups)
+    // Step 9: Create ModifierItems (one by one, depends on modifierGroups)
     console.log('🔹 Creating Modifier Items...')
     const modifierItem1 = await prisma.modifierItem.create({
       data: {
@@ -390,7 +353,7 @@ async function seed() {
     })
     console.log(`  ✓ Created modifier item: ${modifierItem6.name} (${modifierItem6.modifierItemCode})\n`)
 
-    // Step 11: Create MenuItems (one by one, depends on categories)
+    // Step 10: Create MenuItems (one by one, depends on categories)
     console.log('🍽️  Creating Menu Items...')
     const menuItem1 = await prisma.menuItem.create({
       data: {
@@ -449,7 +412,7 @@ async function seed() {
     })
     console.log(`  ✓ Created menu item: ${menuItem3.name} (${menuItem3.menuItemCode})\n`)
 
-    // Step 12: Create MenuItemModifierGroup assignments (one by one)
+    // Step 11: Create MenuItemModifierGroup assignments (one by one)
     console.log('🔗 Creating Menu Item Modifier Group Assignments...')
     const assignment1 = await prisma.menuItemModifierGroup.create({
       data: {
@@ -484,7 +447,6 @@ async function seed() {
     // Summary
     console.log('✅ Sequential seed completed successfully! 🎉\n')
     console.log('📊 Summary:')
-    console.log(`   • ${2} Outlets`)
     console.log(`   • ${3} Users`)
     console.log(`   • ${2} Tax entries`)
     console.log(`   • ${2} Printers`)

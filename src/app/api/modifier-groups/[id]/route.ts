@@ -17,7 +17,22 @@ export async function GET(
     const group = await (prisma as any).modifierGroup.findUnique({ where: { id: groupId } })
     if (!group) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    const data: any = { ...group, id: group.id.toString() }
+    // Fetch assigned categories for this group
+    const assigned = group.modifierGroupCode
+      ? await prisma.$queryRawUnsafe<Array<{ menu_category_code: string, category_name: string }>>(
+          `SELECT mcm.menu_category_code, mc.name AS category_name
+           FROM tbl_menu_category_modifier mcm
+           JOIN tbl_menu_category mc ON mc.menu_category_code = mcm.menu_category_code
+           WHERE mcm.modifier_group_code = $1`,
+          group.modifierGroupCode
+        )
+      : []
+
+    const data: any = { 
+      ...group, 
+      id: group.id.toString(),
+      assignedCategories: assigned?.map(a => ({ code: a.menu_category_code, name: a.category_name })) || []
+    }
     return NextResponse.json(data)
   } catch (error) {
     console.error('Error fetching modifier group:', error)
@@ -47,7 +62,6 @@ export async function PUT(
       maxSelection,
       showDefaultTop,
       inheritFromMenuGroup,
-      menuCategoryCode,
       isActive,
     } = body
 
@@ -62,7 +76,6 @@ export async function PUT(
         maxSelection: typeof maxSelection === 'number' ? maxSelection : null,
         showDefaultTop: typeof showDefaultTop === 'number' ? showDefaultTop : undefined,
         inheritFromMenuGroup: typeof inheritFromMenuGroup === 'number' ? inheritFromMenuGroup : undefined,
-        menuCategoryCode: menuCategoryCode ?? null,
         isActive: typeof isActive === 'number' ? isActive : undefined,
       }
     })

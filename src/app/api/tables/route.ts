@@ -16,7 +16,12 @@ export async function GET(_request: NextRequest) {
       orderBy: { createdDate: 'desc' },
     })
 
-    return NextResponse.json(tables)
+    // Cache response for 60 seconds
+    return NextResponse.json(tables, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+      },
+    })
   } catch (error) {
     console.error('Error fetching tables:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

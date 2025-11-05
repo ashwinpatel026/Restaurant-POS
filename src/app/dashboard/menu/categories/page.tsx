@@ -8,6 +8,8 @@ import {
   PencilIcon,
   TrashIcon,
   ArrowLeftIcon,
+  Squares2X2Icon,
+  TableCellsIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import CRUDModal from "@/components/modals/CRUDModal";
@@ -23,6 +25,7 @@ interface MenuCategory {
     name: string;
   };
   menuItems: any[];
+  modifierGroups?: string[];
 }
 
 interface MenuMaster {
@@ -46,6 +49,9 @@ export default function MenuCategoriesPage() {
   const [filteredCategories, setFilteredCategories] = useState<MenuCategory[]>(
     []
   );
+
+  // View mode state
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
   useEffect(() => {
     fetchData();
@@ -243,14 +249,38 @@ export default function MenuCategoriesPage() {
 
         {/* Categories List */}
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <h3 className="text-lg font-medium text-gray-900 dark:text-white">
               Categories List ({filteredCategories.length})
             </h3>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setViewMode("grid")}
+                className={`p-2 rounded-lg transition-colors ${
+                  viewMode === "grid"
+                    ? "bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                }`}
+                title="Grid View"
+              >
+                <Squares2X2Icon className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setViewMode("table")}
+                className={`p-2 rounded-lg transition-colors ${
+                  viewMode === "table"
+                    ? "bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                }`}
+                title="Table View"
+              >
+                <TableCellsIcon className="w-5 h-5" />
+              </button>
+            </div>
           </div>
-          <div className="p-6">
+          <div className={viewMode === "table" ? "overflow-x-auto" : "p-6"}>
             {filteredCategories.length === 0 ? (
-              <div className="text-center py-8">
+              <div className="text-center py-8 p-6">
                 <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
                   <span className="text-gray-400 dark:text-gray-500 text-2xl">
                     📂
@@ -274,6 +304,123 @@ export default function MenuCategoriesPage() {
                   Add Category
                 </button>
               </div>
+            ) : viewMode === "table" ? (
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Category
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Menu Master
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Modifier Groups
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {filteredCategories.map((category) => (
+                    <tr
+                      key={category.tblMenuCategoryId}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                      style={
+                        category.colorCode
+                          ? {
+                              borderLeft: `4px solid ${category.colorCode}`,
+                            }
+                          : undefined
+                      }
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div
+                            className="w-3 h-3 rounded-full mr-3 flex-shrink-0"
+                            style={{
+                              backgroundColor: category.colorCode || "#3B82F6",
+                            }}
+                          ></div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {category.name}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          {getMenuMasterName(category.tblMenuMasterId)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-wrap gap-1.5">
+                          {category.modifierGroups &&
+                          category.modifierGroups.length > 0 ? (
+                            <>
+                              {category.modifierGroups
+                                .slice(0, 2)
+                                .map((modifierCode, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"
+                                  >
+                                    {modifierCode}
+                                  </span>
+                                ))}
+                              {category.modifierGroups.length > 2 && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+                                  +{category.modifierGroups.length - 2}
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-sm text-gray-400 dark:text-gray-500">
+                              None
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            category.isActive === 1
+                              ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400"
+                              : "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400"
+                          }`}
+                        >
+                          {category.isActive === 1 ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex justify-end space-x-2">
+                          <button
+                            onClick={() =>
+                              handleEdit(category.tblMenuCategoryId)
+                            }
+                            className="p-1 text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors duration-200"
+                            title="Edit category"
+                          >
+                            <PencilIcon className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() =>
+                              handleDelete(category.tblMenuCategoryId)
+                            }
+                            className="p-1 text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors duration-200"
+                            title="Delete category"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredCategories.map((category) => (
@@ -314,6 +461,31 @@ export default function MenuCategoriesPage() {
                         <strong>Menu Master:</strong>{" "}
                         {getMenuMasterName(category.tblMenuMasterId)}
                       </p>
+                      {category.modifierGroups &&
+                        category.modifierGroups.length > 0 && (
+                          <div className="mt-3">
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                              Assigned Modifiers:
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {category.modifierGroups
+                                .slice(0, 6)
+                                .map((modifierCode, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="inline-flex items-center px-2 py-2 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"
+                                  >
+                                    {modifierCode}
+                                  </span>
+                                ))}
+                              {category.modifierGroups.length > 6 && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+                                  +{category.modifierGroups.length - 3} more
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
                     </div>
 
                     <div className="flex justify-end space-x-2">

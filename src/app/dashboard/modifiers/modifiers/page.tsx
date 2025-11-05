@@ -44,13 +44,17 @@ export default function ModifiersPage() {
 
   const fetchData = async () => {
     try {
-      const modifiersRes = await fetch("/api/modifier-groups");
+      const modifiersRes = await fetch("/api/modifier-groups", {
+        next: { revalidate: 60 }, // Cache for 60 seconds
+      });
 
       if (modifiersRes.ok) {
         const modifiersData = await modifiersRes.json();
         setModifiers(modifiersData);
+      } else {
+        throw new Error("Failed to fetch modifiers");
       }
-    } catch (error) {
+    } catch (error: any) {
       toast.error("Error loading data");
       console.error("Error:", error);
     } finally {
@@ -130,7 +134,7 @@ export default function ModifiersPage() {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Modifier Groups
+              Modifiers
             </h1>
             <p className="text-gray-600 dark:text-gray-400 mt-2">
               Manage item customization options and pricing strategies
@@ -149,7 +153,7 @@ export default function ModifiersPage() {
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-              Modifier Groups
+              Modifiers
             </h3>
           </div>
           <div className="p-6">

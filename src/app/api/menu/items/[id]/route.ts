@@ -86,7 +86,12 @@ export async function GET(
                 id: Number(group.id),
                 tblModifierId: Number(group.id),
                 modifierGroupCode: group.modifierGroupCode,
-                inheritFromMenuGroup: assignment.inheritFromMenuGroup
+                inheritFromMenuGroup: assignment.inheritFromMenuGroup,
+                isInheritFromMenuCategory: (assignment as any).isInheritFromMenuCategory,
+                isRequired: assignment.isRequired ?? 0,
+                isMultiselect: assignment.isMultiselect ?? 0,
+                minSelection: assignment.minSelection ?? null,
+                maxSelection: assignment.maxSelection ?? null
               })
             }
           }
@@ -156,10 +161,11 @@ export async function PUT(
       diningTaxEffect,
       disqualifyDiningTaxExemption,
       isActive,
-      stockinhand,
-      // New fields for modifier assignment
-      selectedModifiers,
-      inheritModifiers
+    stockinhand,
+    // New fields for modifier assignment
+    selectedModifiers,
+    inheritModifiers,
+    modifierAssignments
     } = body
 
     // Check if menuImg is too large (base64 string length check)
@@ -222,43 +228,51 @@ export async function PUT(
         // Inherit from category
         if (inheritModifiers && current?.menuCategoryCode) {
           const categoryCode = current.menuCategoryCode as string
-          const categoryGroups = await (prisma as any).modifierGroup.findMany({
-            where: { menuCategoryCode: categoryCode }
-          })
-          for (const g of categoryGroups) {
-            if (g.modifierGroupCode && !seenGroups.has(g.modifierGroupCode)) {
+          const mcmRows = await prisma.$queryRawUnsafe<Array<{ modifier_group_code: string }>>(
+            `SELECT modifier_group_code FROM tbl_menu_category_modifier WHERE menu_category_code = $1`,
+            categoryCode
+          )
+          for (const row of mcmRows) {
+            const code = row.modifier_group_code
+            if (code && !seenGroups.has(code)) {
               rowsToCreate.push({
                 menuItemCode,
-                modifierGroupCode: g.modifierGroupCode,
+                modifierGroupCode: code,
                 inheritFromMenuGroup: 1,
+                isInheritFromMenuCategory: 1,
+                isRequired: 0,
+                isMultiselect: 0,
+                minSelection: null,
+                maxSelection: null,
                 createdBy: parseInt(session.user.id),
                 storeCode: process.env.STORE_CODE || null
               })
-              seenGroups.add(g.modifierGroupCode)
+              seenGroups.add(code)
             }
           }
         }
 
-        // Add explicit selected modifier groups (these take precedence if already in inherited list)
+        // Add explicit selected modifier groups (always allowed, independent of inheritance)
         if (Array.isArray(selectedModifiers) && selectedModifiers.length > 0) {
           const groups = await (prisma as any).modifierGroup.findMany({
             where: { id: { in: selectedModifiers.map((n: any) => BigInt(n)) } }
           })
           for (const g of groups) {
             if (g.modifierGroupCode) {
-              // If already added as inherited, update it to explicit
-              if (seenGroups.has(g.modifierGroupCode)) {
-                const index = rowsToCreate.findIndex(
-                  (r) => r.menuItemCode === menuItemCode && r.modifierGroupCode === g.modifierGroupCode
-                )
-                if (index >= 0) {
-                  rowsToCreate[index].inheritFromMenuGroup = 0
-                }
-              } else {
+              // Do not overwrite inherited rows; add only explicit ones when not inheriting
+              if (!seenGroups.has(g.modifierGroupCode)) {
+                const opts = Array.isArray(modifierAssignments)
+                  ? (modifierAssignments.find((a: any) => Number(a.modifierId) === Number(g.id)) || {})
+                  : {}
                 rowsToCreate.push({
                   menuItemCode,
                   modifierGroupCode: g.modifierGroupCode,
                   inheritFromMenuGroup: 0,
+                  isInheritFromMenuCategory: 0,
+                  isRequired: typeof opts.isRequired === 'number' ? opts.isRequired : 0,
+                  isMultiselect: typeof opts.isMultiselect === 'number' ? opts.isMultiselect : 0,
+                  minSelection: typeof opts.minSelection === 'number' ? opts.minSelection : null,
+                  maxSelection: typeof opts.maxSelection === 'number' ? opts.maxSelection : null,
                   createdBy: parseInt(session.user.id),
                   storeCode: process.env.STORE_CODE || null
                 })

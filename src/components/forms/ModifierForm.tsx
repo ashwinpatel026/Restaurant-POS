@@ -15,8 +15,8 @@ interface ModifierGroupData {
   maxSelection?: number | null;
   showDefaultTop: number;
   inheritFromMenuGroup: number;
-  menuCategoryCode?: string | null;
   isActive: number;
+  assignedCategories?: { code: string; name: string }[];
 }
 
 interface Category {
@@ -44,7 +44,6 @@ export default function ModifierForm({
     maxSelection: "",
     showDefaultTop: 0,
     inheritFromMenuGroup: 0,
-    menuCategoryCode: "",
     priceStrategy: 1,
     price: 0,
     isActive: 1,
@@ -77,9 +76,6 @@ export default function ModifierForm({
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
 
   useEffect(() => {
-    // Fetch categories on component mount
-    fetchCategories();
-
     if (modifier) {
       setFormData({
         groupName: modifier.groupName || "",
@@ -92,7 +88,6 @@ export default function ModifierForm({
           modifier.maxSelection != null ? String(modifier.maxSelection) : "",
         showDefaultTop: modifier.showDefaultTop ?? 0,
         inheritFromMenuGroup: modifier.inheritFromMenuGroup ?? 0,
-        menuCategoryCode: modifier.menuCategoryCode || "",
         priceStrategy: (modifier as any).priceStrategy ?? 1,
         price: (modifier as any).price ?? 0,
         isActive: modifier.isActive ?? 1,
@@ -150,17 +145,7 @@ export default function ModifierForm({
     }
   }, [modifier]);
 
-  const fetchCategories = async () => {
-    try {
-      const response = await fetch("/api/menu/categories");
-      if (response.ok) {
-        const categoriesData = await response.json();
-        setCategories(categoriesData);
-      }
-    } catch (error) {
-      console.error("Error fetching categories:", error);
-    }
-  };
+  // No longer fetching categories; assignments shown read-only from modifier.assignedCategories
 
   // Removed legacy fetchModifierItems; items are created alongside group on save for add flow
 
@@ -219,7 +204,6 @@ export default function ModifierForm({
           : null,
         showDefaultTop: parseInt(String(formData.showDefaultTop)),
         inheritFromMenuGroup: parseInt(String(formData.inheritFromMenuGroup)),
-        menuCategoryCode: formData.menuCategoryCode || null,
         priceStrategy: parseInt(String(formData.priceStrategy)),
         price:
           formData.priceStrategy === 3
@@ -262,10 +246,10 @@ export default function ModifierForm({
           <div className="p-6 border-b border-gray-200 dark:border-gray-700">
             <div className="mb-6">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Modifier Group Details
+                Modifiers Details
               </h3>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Basic information about the modifier group
+                Basic information about the modifiers
               </p>
             </div>
 
@@ -273,7 +257,7 @@ export default function ModifierForm({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Modifier Group Name *
+                    Modifiers Name *
                   </label>
                   <input
                     type="text"
@@ -303,33 +287,35 @@ export default function ModifierForm({
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Assigned Categories (Read-only) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Inherit to Category (by Code)
+                    Assigned Categories
                   </label>
-                  <select
-                    value={formData.menuCategoryCode}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        menuCategoryCode: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Select a category (optional)</option>
-                    {categories.map((category) => (
-                      <option
-                        key={category.menuCategoryCode}
-                        value={category.menuCategoryCode}
-                      >
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
+                  {modifier &&
+                  (modifier as any).assignedCategories &&
+                  (modifier as any).assignedCategories.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {(modifier as any).assignedCategories.map(
+                        (c: any, idx: number) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                            title={c.code}
+                          >
+                            {c.name}
+                          </span>
+                        )
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      No categories assigned
+                    </p>
+                  )}
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Assign this group to a category; items may inherit
-                    accordingly.
+                    Managed in Menu Categories &rarr; assign via menu category
+                    edit.
                   </p>
                 </div>
                 <div className="flex items-center space-x-6">

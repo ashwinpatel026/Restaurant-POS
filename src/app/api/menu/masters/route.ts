@@ -78,7 +78,12 @@ export async function GET(request: NextRequest) {
         }
       })
 
-      return NextResponse.json(menusWithItems)
+      // Cache response for 60 seconds
+      return NextResponse.json(menusWithItems, {
+        headers: {
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+        },
+      })
     }
 
     // For authenticated requests, return simple structure
@@ -87,7 +92,12 @@ export async function GET(request: NextRequest) {
       menuMasterId: menu.menuMasterId.toString()
     }))
 
-    return NextResponse.json(menusWithStringId)
+    // Cache response for 60 seconds
+    return NextResponse.json(menusWithStringId, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+      },
+    })
   } catch (error) {
     console.error('Error fetching menu masters:', error)
     return NextResponse.json(

@@ -200,7 +200,7 @@ export default function PrepZonePage() {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Prep Zone Management
+              Prep-Zone Management
             </h1>
             <p className="text-gray-600 dark:text-gray-400 mt-2">
               Manage preparation zones for your kitchen
@@ -211,7 +211,7 @@ export default function PrepZonePage() {
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
           >
             <PlusIcon className="w-4 h-4 mr-2" />
-            Add Prep Zone
+            Add Prep-Zone
           </button>
         </div>
 

@@ -10,11 +10,6 @@ export function generateOrderNumber(): string {
   return `ORD-${timestamp}-${random}`
 }
 
-export function generateSupplyOrderNumber(): string {
-  const timestamp = Date.now().toString(36).toUpperCase()
-  const random = Math.random().toString(36).substring(2, 6).toUpperCase()
-  return `SUP-${timestamp}-${random}`
-}
 
 export function formatCurrency(amount: number | string): string {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount
@@ -55,9 +50,6 @@ export function getStatusColor(status: string): string {
     AVAILABLE: 'bg-green-100 text-green-800',
     OCCUPIED: 'bg-red-100 text-red-800',
     RESERVED: 'bg-blue-100 text-blue-800',
-    IN_STOCK: 'bg-green-100 text-green-800',
-    LOW_STOCK: 'bg-yellow-100 text-yellow-800',
-    OUT_OF_STOCK: 'bg-red-100 text-red-800',
   }
   return statusColors[status] || 'bg-gray-100 text-gray-800'
 }

@@ -6,6 +6,8 @@ import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
+import SystemColorPicker from "@/components/ui/SystemColorPicker";
+import { CheckIcon } from "@heroicons/react/24/solid";
 
 interface PrepZone {
   prepZoneId: string;
@@ -247,58 +249,61 @@ export default function EditMenuMasterPage() {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Color Code
-                    </label>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="color"
-                        value={formData.colorCode}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            colorCode: e.target.value,
-                          })
-                        }
-                        className="h-10 w-20 border border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer"
-                      />
-                      <input
-                        type="text"
-                        value={formData.colorCode}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            colorCode: e.target.value,
-                          })
-                        }
-                        className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="#3B82F6"
-                      />
-                    </div>
-                  </div>
+                  <SystemColorPicker
+                    label="Color Code"
+                    value={formData.colorCode || ""}
+                    onChange={(color: string) =>
+                      setFormData({ ...formData, colorCode: color })
+                    }
+                  />
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Prep Zone
                     </label>
-                    <select
-                      value={formData.prepZoneCode}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          prepZoneCode: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select Prep Zone</option>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData({
+                            ...formData,
+                            prepZoneCode: "",
+                          })
+                        }
+                        className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
+                          formData.prepZoneCode === ""
+                            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                            : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                        }`}
+                      >
+                        None
+                        {formData.prepZoneCode === "" && (
+                          <CheckIcon className="w-4 h-4 inline-block ml-2" />
+                        )}
+                      </button>
                       {prepZones.map((zone) => (
-                        <option key={zone.prepZoneId} value={zone.prepZoneCode}>
+                        <button
+                          key={zone.prepZoneId}
+                          type="button"
+                          onClick={() =>
+                            setFormData({
+                              ...formData,
+                              prepZoneCode: zone.prepZoneCode,
+                            })
+                          }
+                          className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
+                            formData.prepZoneCode === zone.prepZoneCode
+                              ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                              : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                          }`}
+                        >
                           {zone.prepZoneName}
-                        </option>
+                          {formData.prepZoneCode === zone.prepZoneCode && (
+                            <CheckIcon className="w-4 h-4 inline-block ml-2" />
+                          )}
+                        </button>
                       ))}
-                    </select>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -388,4 +393,3 @@ export default function EditMenuMasterPage() {
     </DashboardLayout>
   );
 }
-

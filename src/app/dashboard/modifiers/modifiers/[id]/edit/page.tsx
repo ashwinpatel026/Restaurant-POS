@@ -73,7 +73,6 @@ export default function EditModifierPage() {
           maxSelection: formData.maxSelection,
           showDefaultTop: formData.showDefaultTop,
           inheritFromMenuGroup: formData.inheritFromMenuGroup,
-          menuCategoryCode: formData.menuCategoryCode || null,
           priceStrategy: formData.priceStrategy,
           price: formData.priceStrategy === 3 ? formData.price : null,
           isActive: formData.isActive,
@@ -182,10 +181,10 @@ export default function EditModifierPage() {
         </div>
 
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Edit Modifier Group: {modifier.groupName}
+          Edit Modifiers: {modifier.groupName}
         </h1>
         <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Update configuration and options for this modifier group.
+          Update configuration and options for this modifiers.
         </p>
 
         <ModifierForm

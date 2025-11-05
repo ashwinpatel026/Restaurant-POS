@@ -22,7 +22,12 @@ export async function GET(request: NextRequest) {
       prepZoneId: prepZone.prepZoneId.toString()
     }))
 
-    return NextResponse.json(serializedPrepZones)
+    // Cache response for 60 seconds
+    return NextResponse.json(serializedPrepZones, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+      },
+    })
   } catch (error) {
     console.error('Error fetching prep zones:', error)
     return NextResponse.json(

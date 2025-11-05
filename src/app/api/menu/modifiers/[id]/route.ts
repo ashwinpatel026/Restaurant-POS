@@ -35,7 +35,20 @@ export async function GET(
       items = found.map((i: any) => ({ ...i, id: i.id.toString() }))
     }
 
-    const data: any = { ...group, id: group.id.toString(), items }
+    // Fetch assigned categories via junction table
+    let assignedCategories: Array<{ code: string, name: string }> = []
+    if (group.modifierGroupCode) {
+      const rows = await prisma.$queryRawUnsafe<Array<{ menu_category_code: string, category_name: string }>>(
+        `SELECT mcm.menu_category_code, mc.name AS category_name
+         FROM tbl_menu_category_modifier mcm
+         JOIN tbl_menu_category mc ON mc.menu_category_code = mcm.menu_category_code
+         WHERE mcm.modifier_group_code = $1`,
+        group.modifierGroupCode
+      )
+      assignedCategories = rows.map(r => ({ code: r.menu_category_code, name: r.category_name }))
+    }
+
+    const data: any = { ...group, id: group.id.toString(), items, assignedCategories }
     return NextResponse.json(data)
   } catch (error) {
     console.error('Error fetching modifier:', error)
@@ -70,7 +83,6 @@ export async function PUT(
       maxSelection,
       showDefaultTop,
       inheritFromMenuGroup,
-      menuCategoryCode,
       priceStrategy,
       price,
       isActive
@@ -87,7 +99,6 @@ export async function PUT(
         maxSelection: typeof maxSelection === 'number' ? maxSelection : null,
         showDefaultTop: typeof showDefaultTop === 'number' ? showDefaultTop : undefined,
         inheritFromMenuGroup: typeof inheritFromMenuGroup === 'number' ? inheritFromMenuGroup : undefined,
-        menuCategoryCode: menuCategoryCode ?? null,
         priceStrategy: typeof priceStrategy === 'number' ? priceStrategy : undefined,
         price: typeof price === 'number' ? price : null,
         isActive: typeof isActive === 'number' ? isActive : undefined,

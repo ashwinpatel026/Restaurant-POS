@@ -56,7 +56,7 @@ export default function DashboardPage() {
     },
     {
       title: "Today's Sales",
-      value: `₹${stats.todaySales.toLocaleString()}`,
+      value: `$${stats.todaySales.toLocaleString()}`,
       icon: CurrencyDollarIcon,
       color: "bg-green-500",
       change: "+8%",
@@ -196,7 +196,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="text-right">
                     <p className="font-medium text-gray-900 dark:text-white">
-                      ₹{(250 * i).toFixed(2)}
+                      ${(250 * i).toFixed(2)}
                     </p>
                     <span className="badge bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400">
                       Preparing
@@ -204,34 +204,6 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-
-          <div className="card">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-              Low Stock Alerts
-            </h2>
-            <div className="space-y-3">
-              {["Tomatoes", "Onions", "Chicken", "Paneer", "Rice"].map(
-                (item, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
-                  >
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">
-                        {item}
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Running low
-                      </p>
-                    </div>
-                    <span className="badge bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400">
-                      {10 - i * 2} kg left
-                    </span>
-                  </div>
-                )
-              )}
             </div>
           </div>
         </div>

@@ -93,10 +93,10 @@ export default function AddModifierPage() {
         </div>
 
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Add Modifier Group
+          Add Modifiers
         </h1>
         <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Create a new modifier group with selection rules and items.
+          Create a new Modifiers with selection rules and items.
         </p>
 
         <ModifierForm

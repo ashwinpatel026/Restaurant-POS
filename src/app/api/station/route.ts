@@ -43,7 +43,12 @@ export async function GET() {
       tblStationId: station.tblStationId.toString()
     }))
 
-    return NextResponse.json(stationsWithStringId)
+    // Cache response for 60 seconds
+    return NextResponse.json(stationsWithStringId, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+      },
+    })
   } catch (error) {
     console.error('Error fetching stations:', error)
     return NextResponse.json(

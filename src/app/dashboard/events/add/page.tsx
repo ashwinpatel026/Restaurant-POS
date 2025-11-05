@@ -9,8 +9,13 @@ import toast from "react-hot-toast";
 export default function AddEventPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [selectedDaysToApply, setSelectedDaysToApply] = useState<Set<string>>(
+    new Set()
+  );
   const [formData, setFormData] = useState({
     eventName: "",
+    priceStrategy: "amount_add", // default strategy
+    priceValue: "",
     globalPriceAmountAdd: "",
     globalPriceAmountDisc: "",
     globalPricePerAdd: "",
@@ -47,10 +52,35 @@ export default function AddEventPage() {
     setLoading(true);
 
     try {
+      // Map the selected strategy to the appropriate backend fields
+      const submitData = { ...formData };
+
+      // Reset all price fields
+      submitData.globalPriceAmountAdd = "";
+      submitData.globalPriceAmountDisc = "";
+      submitData.globalPricePerAdd = "";
+      submitData.globalPricePerDisc = "";
+
+      // Set the appropriate field based on selected strategy
+      switch (formData.priceStrategy) {
+        case "amount_add":
+          submitData.globalPriceAmountAdd = formData.priceValue;
+          break;
+        case "amount_disc":
+          submitData.globalPriceAmountDisc = formData.priceValue;
+          break;
+        case "percent_add":
+          submitData.globalPricePerAdd = formData.priceValue;
+          break;
+        case "percent_disc":
+          submitData.globalPricePerDisc = formData.priceValue;
+          break;
+      }
+
       const response = await fetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(submitData),
       });
 
       if (response.ok) {
@@ -76,6 +106,188 @@ export default function AddEventPage() {
         ? ""
         : day.charAt(0).toUpperCase() + day.slice(1), // Store day name like "Monday"
     });
+  };
+
+  const applyToDays = (
+    sourceDay: string,
+    targetGroup: "all" | "working" | "weekend",
+    apply: boolean
+  ) => {
+    const sourceDayData = days.find((d) => d.key === sourceDay);
+    if (!sourceDayData) return;
+
+    const updatedFormData = { ...formData };
+    let targetDays: string[] = [];
+
+    if (targetGroup === "all") {
+      targetDays = days.map((d) => d.key);
+    } else if (targetGroup === "working") {
+      targetDays = ["monday", "tuesday", "wednesday", "thursday", "friday"];
+    } else if (targetGroup === "weekend") {
+      targetDays = ["saturday", "sunday"];
+    }
+
+    if (apply) {
+      // Apply schedule: copy Monday's times to selected group
+      const sourceStartTime = formData[
+        `${sourceDayData.shortKey}StartTime` as keyof typeof formData
+      ] as string;
+      const sourceEndTime = formData[
+        `${sourceDayData.shortKey}EndTime` as keyof typeof formData
+      ] as string;
+
+      if (!sourceStartTime || !sourceEndTime) {
+        toast.error("Please set start and end times for Monday first");
+        return;
+      }
+
+      targetDays.forEach((dayKey) => {
+        const dayData = days.find((d) => d.key === dayKey);
+        if (dayData) {
+          const dayName = dayKey.charAt(0).toUpperCase() + dayKey.slice(1);
+          (updatedFormData as any)[dayKey] = dayName;
+          (updatedFormData as any)[`${dayData.shortKey}StartTime`] =
+            sourceStartTime;
+          (updatedFormData as any)[`${dayData.shortKey}EndTime`] =
+            sourceEndTime;
+        }
+      });
+
+      setFormData(updatedFormData);
+      toast.success(
+        `Schedule applied to ${
+          targetGroup === "all"
+            ? "all days"
+            : targetGroup === "working"
+            ? "working days"
+            : "weekend"
+        }`
+      );
+    } else {
+      // Remove schedule: clear selected group
+      targetDays.forEach((dayKey) => {
+        const dayData = days.find((d) => d.key === dayKey);
+        if (dayData) {
+          (updatedFormData as any)[dayKey] = "";
+          (updatedFormData as any)[`${dayData.shortKey}StartTime`] = "";
+          (updatedFormData as any)[`${dayData.shortKey}EndTime`] = "";
+        }
+      });
+
+      setFormData(updatedFormData);
+      toast.success(
+        `Schedule removed from ${
+          targetGroup === "all"
+            ? "all days"
+            : targetGroup === "working"
+            ? "working days"
+            : "weekend"
+        }`
+      );
+    }
+  };
+
+  const handleDayCheckboxToggle = (dayKey: string, checked: boolean) => {
+    const updatedSelectedDays = new Set(selectedDaysToApply);
+
+    if (checked) {
+      updatedSelectedDays.add(dayKey);
+    } else {
+      updatedSelectedDays.delete(dayKey);
+    }
+
+    setSelectedDaysToApply(updatedSelectedDays);
+
+    // Apply or remove schedule for the selected day
+    const mondayStartTime = formData.monStartTime as string;
+    const mondayEndTime = formData.monEndTime as string;
+
+    if (!mondayStartTime || !mondayEndTime) {
+      toast.error("Please set start and end times for Monday first");
+      return;
+    }
+
+    const dayData = days.find((d) => d.key === dayKey);
+    if (!dayData) return;
+
+    const updatedFormData = { ...formData };
+
+    if (checked) {
+      // Apply Monday's schedule to selected day
+      const dayName = dayKey.charAt(0).toUpperCase() + dayKey.slice(1);
+      (updatedFormData as any)[dayKey] = dayName;
+      (updatedFormData as any)[`${dayData.shortKey}StartTime`] =
+        mondayStartTime;
+      (updatedFormData as any)[`${dayData.shortKey}EndTime`] = mondayEndTime;
+      toast.success(`Schedule applied to ${dayData.label}`);
+    } else {
+      // Remove schedule from day
+      (updatedFormData as any)[dayKey] = "";
+      (updatedFormData as any)[`${dayData.shortKey}StartTime`] = "";
+      (updatedFormData as any)[`${dayData.shortKey}EndTime`] = "";
+      toast.success(`Schedule removed from ${dayData.label}`);
+    }
+
+    setFormData(updatedFormData);
+  };
+
+  const handleSelectAllDays = (checked: boolean) => {
+    const mondayStartTime = formData.monStartTime as string;
+    const mondayEndTime = formData.monEndTime as string;
+
+    if (!mondayStartTime || !mondayEndTime) {
+      toast.error("Please set start and end times for Monday first");
+      return;
+    }
+
+    const allDaysExceptMonday = days.filter((d) => d.key !== "monday");
+    const updatedSelectedDays = new Set<string>();
+    const updatedFormData = { ...formData };
+
+    if (checked) {
+      // Select all days
+      allDaysExceptMonday.forEach((dayData) => {
+        updatedSelectedDays.add(dayData.key);
+        const dayName =
+          dayData.key.charAt(0).toUpperCase() + dayData.key.slice(1);
+        (updatedFormData as any)[dayData.key] = dayName;
+        (updatedFormData as any)[`${dayData.shortKey}StartTime`] =
+          mondayStartTime;
+        (updatedFormData as any)[`${dayData.shortKey}EndTime`] = mondayEndTime;
+      });
+      toast.success("Schedule applied to all days");
+    } else {
+      // Deselect all days
+      allDaysExceptMonday.forEach((dayData) => {
+        (updatedFormData as any)[dayData.key] = "";
+        (updatedFormData as any)[`${dayData.shortKey}StartTime`] = "";
+        (updatedFormData as any)[`${dayData.shortKey}EndTime`] = "";
+      });
+      toast.success("Schedule removed from all days");
+    }
+
+    setSelectedDaysToApply(updatedSelectedDays);
+    setFormData(updatedFormData);
+  };
+
+  const handleMondayToggle = (checked: boolean) => {
+    handleDayToggle("monday");
+
+    // Clear selected days when Monday is unchecked
+    if (!checked) {
+      setSelectedDaysToApply(new Set());
+      // Remove schedule from all selected days
+      const updatedFormData = { ...formData };
+      selectedDaysToApply.forEach((dayKey) => {
+        const dayData = days.find((d) => d.key === dayKey);
+        if (dayData) {
+          (updatedFormData as any)[dayKey] = "";
+          (updatedFormData as any)[`${dayData.shortKey}StartTime`] = "";
+          (updatedFormData as any)[`${dayData.shortKey}EndTime`] = "";
+        }
+      });
+      setFormData(updatedFormData);
+    }
   };
 
   const days = [
@@ -117,13 +329,6 @@ export default function AddEventPage() {
               Basic Information
             </h2>
             <div className="space-y-4">
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <p className="text-sm text-blue-800 dark:text-blue-200">
-                  <strong>Note:</strong> Event Code will be automatically
-                  generated (e.g., TE001, TE002, etc.)
-                </p>
-              </div>
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Event Name *
@@ -147,76 +352,103 @@ export default function AddEventPage() {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Price Adjustments
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Amount Add ($)
+            <div className="space-y-4">
+              {/* Radio Button Group */}
+              <div className="space-y-2">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name="priceStrategy"
+                    value="amount_add"
+                    checked={formData.priceStrategy === "amount_add"}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        priceStrategy: e.target.value,
+                        priceValue: "",
+                      })
+                    }
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+                  />
+                  <span className="ml-2 text-sm font-medium text-gray-900 dark:text-white">
+                    Amount Add ($)
+                  </span>
                 </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.globalPriceAmountAdd}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      globalPriceAmountAdd: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="0.00"
-                />
+
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name="priceStrategy"
+                    value="percent_add"
+                    checked={formData.priceStrategy === "percent_add"}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        priceStrategy: e.target.value,
+                        priceValue: "",
+                      })
+                    }
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+                  />
+                  <span className="ml-2 text-sm font-medium text-gray-900 dark:text-white">
+                    Percentage Add (%)
+                  </span>
+                </label>
+
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name="priceStrategy"
+                    value="amount_disc"
+                    checked={formData.priceStrategy === "amount_disc"}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        priceStrategy: e.target.value,
+                        priceValue: "",
+                      })
+                    }
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+                  />
+                  <span className="ml-2 text-sm font-medium text-gray-900 dark:text-white">
+                    Amount Discount ($)
+                  </span>
+                </label>
+
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="radio"
+                    name="priceStrategy"
+                    value="percent_disc"
+                    checked={formData.priceStrategy === "percent_disc"}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        priceStrategy: e.target.value,
+                        priceValue: "",
+                      })
+                    }
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
+                  />
+                  <span className="ml-2 text-sm font-medium text-gray-900 dark:text-white">
+                    Percentage Discount (%)
+                  </span>
+                </label>
               </div>
 
+              {/* Value Input */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Amount Discount ($)
+                  Value:
                 </label>
                 <input
                   type="number"
                   step="0.01"
-                  value={formData.globalPriceAmountDisc}
+                  value={formData.priceValue}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      globalPriceAmountDisc: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="0.00"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Percentage Add (%)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.globalPricePerAdd}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      globalPricePerAdd: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="0.00"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Percentage Discount (%)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.globalPricePerDisc}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      globalPricePerDisc: e.target.value,
+                      priceValue: e.target.value,
                     })
                   }
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -239,67 +471,198 @@ export default function AddEventPage() {
                 return (
                   <div
                     key={day.key}
-                    className="flex items-center space-x-4 p-4 border border-gray-200 dark:border-gray-600 rounded-lg"
+                    className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg space-y-4"
                   >
-                    <div className="flex items-center w-40">
-                      <input
-                        type="checkbox"
-                        checked={isActive}
-                        onChange={() => handleDayToggle(day.key)}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
-                      />
-                      <label className="ml-2 text-sm font-medium text-gray-900 dark:text-white">
-                        {day.label}
-                      </label>
-                    </div>
-
-                    <div className="flex-1 grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                          Start Time
-                        </label>
+                    {/* First Row: Checkbox, Day Label, and Time Inputs */}
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center gap-2">
                         <input
-                          type="text"
-                          disabled={!isActive}
-                          value={
-                            formData[
-                              `${day.shortKey}StartTime` as keyof typeof formData
-                            ] as string
-                          }
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              [`${day.shortKey}StartTime`]: e.target.value,
-                            })
-                          }
-                          placeholder="HH:MM (24-hour format)"
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
+                          type="checkbox"
+                          checked={isActive}
+                          onChange={(e) => {
+                            if (day.key === "monday") {
+                              handleMondayToggle(e.target.checked);
+                            } else {
+                              handleDayToggle(day.key);
+                            }
+                          }}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
                         />
+                        <label className="text-sm font-medium text-gray-900 dark:text-white">
+                          {day.label}
+                        </label>
                       </div>
 
-                      <div>
-                        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                          End Time
-                        </label>
-                        <input
-                          type="text"
-                          disabled={!isActive}
-                          value={
-                            formData[
-                              `${day.shortKey}EndTime` as keyof typeof formData
-                            ] as string
-                          }
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              [`${day.shortKey}EndTime`]: e.target.value,
-                            })
-                          }
-                          placeholder="HH:MM (24-hour format)"
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
-                        />
+                      <div className="flex-1 grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                            Start Time
+                          </label>
+                          <input
+                            type="text"
+                            disabled={!isActive}
+                            value={
+                              formData[
+                                `${day.shortKey}StartTime` as keyof typeof formData
+                              ] as string
+                            }
+                            onChange={(e) => {
+                              const newStartTime = e.target.value;
+                              const updatedFormData = {
+                                ...formData,
+                                [`${day.shortKey}StartTime`]: newStartTime,
+                              };
+                              // Update selected days if Monday's time changes
+                              if (
+                                day.key === "monday" &&
+                                selectedDaysToApply.size > 0
+                              ) {
+                                selectedDaysToApply.forEach((dayKey) => {
+                                  const targetDayData = days.find(
+                                    (d) => d.key === dayKey
+                                  );
+                                  if (targetDayData) {
+                                    (updatedFormData as any)[
+                                      `${targetDayData.shortKey}StartTime`
+                                    ] = newStartTime;
+                                  }
+                                });
+                              }
+                              setFormData(updatedFormData);
+                            }}
+                            placeholder="HH:MM (24-hour format)"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+                            End Time
+                          </label>
+                          <input
+                            type="text"
+                            disabled={!isActive}
+                            value={
+                              formData[
+                                `${day.shortKey}EndTime` as keyof typeof formData
+                              ] as string
+                            }
+                            onChange={(e) => {
+                              const newEndTime = e.target.value;
+                              const updatedFormData = {
+                                ...formData,
+                                [`${day.shortKey}EndTime`]: newEndTime,
+                              };
+                              // Update selected days if Monday's time changes
+                              if (
+                                day.key === "monday" &&
+                                selectedDaysToApply.size > 0
+                              ) {
+                                selectedDaysToApply.forEach((dayKey) => {
+                                  const targetDayData = days.find(
+                                    (d) => d.key === dayKey
+                                  );
+                                  if (targetDayData) {
+                                    (updatedFormData as any)[
+                                      `${targetDayData.shortKey}EndTime`
+                                    ] = newEndTime;
+                                  }
+                                });
+                              }
+                              setFormData(updatedFormData);
+                            }}
+                            placeholder="HH:MM (24-hour format)"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
+                          />
+                        </div>
                       </div>
                     </div>
+
+                    {/* Second Row: Apply to List - Only for Monday, always visible */}
+                    {day.key === "monday" && (
+                      <div className="pt-4 border-t border-gray-200 dark:border-gray-600">
+                        <div className="flex items-center gap-4">
+                          <label className="text-xs font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                            Apply to:
+                          </label>
+                          <div className="flex flex-wrap gap-3">
+                            {/* Select All Checkbox */}
+                            {(() => {
+                              const isMondayComplete =
+                                formData.monday &&
+                                formData.monStartTime &&
+                                formData.monEndTime;
+                              const allDaysExceptMonday = days.filter(
+                                (d) => d.key !== "monday"
+                              );
+                              const allSelected =
+                                allDaysExceptMonday.length > 0 &&
+                                allDaysExceptMonday.every((day) =>
+                                  selectedDaysToApply.has(day.key)
+                                );
+                              return (
+                                <label
+                                  className={`flex items-center ${
+                                    isMondayComplete
+                                      ? "cursor-pointer"
+                                      : "cursor-not-allowed opacity-50"
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={allSelected}
+                                    onChange={(e) =>
+                                      handleSelectAllDays(e.target.checked)
+                                    }
+                                    disabled={!isMondayComplete}
+                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded disabled:cursor-not-allowed"
+                                  />
+                                  <span className="ml-2 text-xs font-medium text-gray-900 dark:text-white">
+                                    All Days
+                                  </span>
+                                </label>
+                              );
+                            })()}
+                            {days
+                              .filter((d) => d.key !== "monday")
+                              .map((targetDay) => {
+                                const isMondayComplete =
+                                  formData.monday &&
+                                  formData.monStartTime &&
+                                  formData.monEndTime;
+                                return (
+                                  <label
+                                    key={targetDay.key}
+                                    className={`flex items-center ${
+                                      isMondayComplete
+                                        ? "cursor-pointer"
+                                        : "cursor-not-allowed opacity-50"
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedDaysToApply.has(
+                                        targetDay.key
+                                      )}
+                                      onChange={(e) =>
+                                        handleDayCheckboxToggle(
+                                          targetDay.key,
+                                          e.target.checked
+                                        )
+                                      }
+                                      disabled={!isMondayComplete}
+                                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded disabled:cursor-not-allowed"
+                                    />
+                                    <span className="ml-2 text-xs text-gray-900 dark:text-white">
+                                      {targetDay.label}
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -308,9 +671,14 @@ export default function AddEventPage() {
 
           {/* Event Dates */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Event Duration
-            </h2>
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Event Duration
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Leave blank to keep it active forever
+              </p>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
