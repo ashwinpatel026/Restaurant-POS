@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import {
   PlusIcon,
@@ -35,9 +35,13 @@ interface PrepZone {
 
 export default function MenuMastersPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [menuMasters, setMenuMasters] = useState<MenuMaster[]>([]);
   const [prepZones, setPrepZones] = useState<PrepZone[]>([]);
   const [loading, setLoading] = useState(true);
+  const fetchingRef = useRef(false);
+  const lastRefreshRef = useRef<string | null>(null);
 
   // Modal states
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -55,6 +59,24 @@ export default function MenuMastersPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Refetch when refresh parameter is present (only once per refresh token)
+  useEffect(() => {
+    const refreshToken = searchParams.get("refresh");
+    if (
+      pathname === "/dashboard/menu/masters" &&
+      refreshToken &&
+      refreshToken !== lastRefreshRef.current &&
+      !fetchingRef.current
+    ) {
+      lastRefreshRef.current = refreshToken;
+      fetchData();
+      // Clean up the refresh parameter after a delay to avoid re-triggering
+      setTimeout(() => {
+        router.replace("/dashboard/menu/masters", { scroll: false });
+      }, 100);
+    }
+  }, [pathname, searchParams, router]);
 
   // Filter effect
   useEffect(() => {
@@ -97,7 +119,14 @@ export default function MenuMastersPage() {
   };
 
   const fetchData = async () => {
+    // Prevent duplicate calls
+    if (fetchingRef.current) {
+      return;
+    }
+    fetchingRef.current = true;
+
     try {
+      setLoading(true);
       const [mastersRes, prepZonesRes] = await Promise.all([
         fetch("/api/menu/masters"),
         fetch("/api/menu/prep-zone"),
@@ -117,6 +146,7 @@ export default function MenuMastersPage() {
       console.error("Error:", error);
     } finally {
       setLoading(false);
+      fetchingRef.current = false;
     }
   };
 

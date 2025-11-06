@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import {
   PlusIcon,
@@ -36,10 +36,14 @@ interface ModifierGroup {
 
 export default function ModifierItemsPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [modifierItems, setModifierItems] = useState<ModifierItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<ModifierItem[]>([]);
   const [modifiers, setModifiers] = useState<ModifierGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const fetchingRef = useRef(false);
+  const lastRefreshRef = useRef<string | null>(null);
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState("");
@@ -52,6 +56,24 @@ export default function ModifierItemsPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Refetch when refresh parameter is present (only once per refresh token)
+  useEffect(() => {
+    const refreshToken = searchParams.get("refresh");
+    if (
+      pathname === "/dashboard/modifiers/items" &&
+      refreshToken &&
+      refreshToken !== lastRefreshRef.current &&
+      !fetchingRef.current
+    ) {
+      lastRefreshRef.current = refreshToken;
+      fetchData();
+      // Clean up the refresh parameter after a delay to avoid re-triggering
+      setTimeout(() => {
+        router.replace("/dashboard/modifiers/items", { scroll: false });
+      }, 100);
+    }
+  }, [pathname, searchParams, router]);
 
   // Apply filters effect
   useEffect(() => {
@@ -81,7 +103,14 @@ export default function ModifierItemsPage() {
   };
 
   const fetchData = async () => {
+    // Prevent duplicate calls
+    if (fetchingRef.current) {
+      return;
+    }
+    fetchingRef.current = true;
+
     try {
+      setLoading(true);
       const [itemsRes, modifiersRes] = await Promise.all([
         fetch("/api/modifier-items"),
         fetch("/api/modifier-groups"),
@@ -107,6 +136,7 @@ export default function ModifierItemsPage() {
       console.error("Error:", error);
     } finally {
       setLoading(false);
+      fetchingRef.current = false;
     }
   };
 

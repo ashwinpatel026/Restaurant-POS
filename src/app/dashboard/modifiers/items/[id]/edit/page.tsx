@@ -81,7 +81,7 @@ export default function EditModifierItemPage() {
 
       if (response.ok) {
         toast.success("Modifier item updated successfully!");
-        router.push("/dashboard/modifiers/items");
+        router.push(`/dashboard/modifiers/items?refresh=${Date.now()}`);
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to update modifier item");

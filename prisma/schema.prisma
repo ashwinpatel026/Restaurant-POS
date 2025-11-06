@@ -218,6 +218,29 @@ model MenuItem {
   @@map("tbl_menu_item")
 }
 
+model MenuItemPrepTime {
+  id                 BigInt    @id @default(autoincrement()) @map("id")
+  menuItemCode       String    @map("menu_item_code") @db.VarChar(100)
+  prepZoneCode       String?   @map("prep_zone_code") @db.VarChar(100)
+  dimension          String?   @map("dimension") @db.VarChar(100)
+  weight             String?   @map("weight") @db.VarChar(100)
+  prepTimeMinutes    Int       @default(0) @map("prep_time_minutes")
+  createdBy          Int?      @map("createdby")
+  createdOn          DateTime  @default(now()) @map("createdon")
+  updatedBy          Int?      @map("updatedby")
+  updatedOn          DateTime? @map("updatedon")
+  isSyncToWeb        Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal      Int       @default(0) @map("is_sync_to_local")
+  storeCode          String?   @map("store_code") @db.VarChar(100)
+
+  // Relationships
+  // Note: Relations are based on codes (no enforced FKs in DB schema)
+  // menuItemCode -> MenuItem.menuItemCode (by code)
+  // prepZoneCode -> PrepZone.prepZoneCode (by code)
+
+  @@map("tbl_menu_item_prep_time")
+}
+
 model Tax {
   tblTaxId      Int      @id @default(autoincrement()) @map("tbl_tax_id")
   taxCode       String   @unique @map("tax_code") @db.VarChar(100)

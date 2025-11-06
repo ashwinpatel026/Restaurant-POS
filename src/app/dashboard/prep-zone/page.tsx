@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import {
   PlusIcon,
@@ -15,7 +16,11 @@ import toast from "react-hot-toast";
 import CRUDModal from "@/components/modals/CRUDModal";
 import DeleteConfirmationModal from "@/components/modals/DeleteConfirmationModal";
 import DataTable from "@/components/tables/DataTable";
-import { PageSkeleton } from "@/components/ui/SkeletonLoader";
+import {
+  TableSkeleton,
+  StatsSkeleton,
+  PageHeaderSkeleton,
+} from "@/components/ui/SkeletonLoader";
 
 interface PrepZone {
   prepZoneId: string; // Changed to string for BigInt serialization
@@ -51,10 +56,15 @@ interface Station {
 }
 
 export default function PrepZonePage() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [prepZones, setPrepZones] = useState<PrepZone[]>([]);
   const [printers, setPrinters] = useState<Printer[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(true);
+  const fetchingRef = useRef(false);
+  const lastRefreshRef = useRef<string | null>(null);
 
   // Modal states
   const [showModal, setShowModal] = useState(false);
@@ -66,8 +76,33 @@ export default function PrepZonePage() {
     fetchData();
   }, []);
 
+  // Refetch when refresh parameter is present (only once per refresh token)
+  useEffect(() => {
+    const refreshToken = searchParams.get("refresh");
+    if (
+      pathname === "/dashboard/prep-zone" &&
+      refreshToken &&
+      refreshToken !== lastRefreshRef.current &&
+      !fetchingRef.current
+    ) {
+      lastRefreshRef.current = refreshToken;
+      fetchData();
+      // Clean up the refresh parameter after a delay to avoid re-triggering
+      setTimeout(() => {
+        router.replace("/dashboard/prep-zone", { scroll: false });
+      }, 100);
+    }
+  }, [pathname, searchParams, router]);
+
   const fetchData = async () => {
+    // Prevent duplicate calls
+    if (fetchingRef.current) {
+      return;
+    }
+    fetchingRef.current = true;
+
     try {
+      setLoading(true);
       const [zonesRes, printersRes, stationsRes] = await Promise.all([
         fetch("/api/menu/prep-zone"),
         fetch("/api/printer"),
@@ -93,6 +128,7 @@ export default function PrepZonePage() {
       console.error("Error:", error);
     } finally {
       setLoading(false);
+      fetchingRef.current = false;
     }
   };
 
@@ -185,7 +221,21 @@ export default function PrepZonePage() {
   if (loading) {
     return (
       <DashboardLayout>
-        <PageSkeleton />
+        <div className="space-y-6">
+          {/* Header Skeleton */}
+          <PageHeaderSkeleton />
+
+          {/* Stats Skeleton */}
+          <StatsSkeleton count={3} />
+
+          {/* Table Skeleton */}
+          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+            <div className="mb-4">
+              <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+            </div>
+            <TableSkeleton rows={8} columns={8} />
+          </div>
+        </div>
       </DashboardLayout>
     );
   }
@@ -541,7 +591,7 @@ function PrepZoneForm({
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Zone Name *
+          Prep-Zone Name *
         </label>
         <input
           type="text"
@@ -674,15 +724,6 @@ function PrepZoneForm({
           </span>
         </label>
       </div>
-
-      {!zone && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-          <p className="text-sm text-blue-800 dark:text-blue-300">
-            ℹ️ Zone code will be automatically generated (e.g., PZ001, PZ002,
-            PZ003...)
-          </p>
-        </div>
-      )}
 
       <div className="flex justify-end space-x-3 pt-4">
         <button

@@ -421,23 +421,6 @@ function PrinterForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {printer && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Printer Code
-          </label>
-          <input
-            type="text"
-            disabled
-            value={printer.printerCode}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed"
-          />
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Printer code is auto-generated and cannot be changed
-          </p>
-        </div>
-      )}
-
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Printer Name *
@@ -469,15 +452,6 @@ function PrinterForm({
           </span>
         </label>
       </div>
-
-      {!printer && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-          <p className="text-sm text-blue-800 dark:text-blue-300">
-            ℹ️ Printer code will be automatically generated (e.g., W001, W002,
-            W003...)
-          </p>
-        </div>
-      )}
 
       <div className="flex justify-end space-x-3 pt-4">
         <button

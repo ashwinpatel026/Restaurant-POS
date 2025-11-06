@@ -99,13 +99,30 @@ export async function GET(
       }
     }
 
+    // Fetch prep time data if exists
+    let prepTimeData = null
+    if (menuItemCode) {
+      const prepTime = await (prisma as any).menuItemPrepTime.findFirst({
+        where: { menuItemCode }
+      })
+      if (prepTime) {
+        prepTimeData = {
+          prepZoneCode: prepTime.prepZoneCode,
+          dimension: prepTime.dimension,
+          weight: prepTime.weight,
+          prepTimeMinutes: prepTime.prepTimeMinutes
+        }
+      }
+    }
+
     // Convert IDs to strings for JSON response
     const itemWithStringIds = {
       ...menuItem,
       menuItemId: (menuItem as any).menuItemId?.toString?.(),
       skuPlu: (menuItem as any).skuPlu ? (menuItem as any).skuPlu.toString() : null,
       assignedModifiers: assignedModifierGroups,
-      inheritModifiers: inheritModifiersFlag
+      inheritModifiers: inheritModifiersFlag,
+      ...(prepTimeData || {})
     }
 
     return NextResponse.json(itemWithStringIds)
@@ -165,7 +182,12 @@ export async function PUT(
     // New fields for modifier assignment
     selectedModifiers,
     inheritModifiers,
-    modifierAssignments
+    modifierAssignments,
+    // Prep time fields
+    prepZoneCode,
+    dimension,
+    weight,
+    prepTimeMinutes
     } = body
 
     // Check if menuImg is too large (base64 string length check)
@@ -212,6 +234,54 @@ export async function PUT(
         }
       })
     })
+
+    // Update or create prep time record
+    try {
+      const current = await (prisma as any).menuItem.findUnique({ where: { menuItemId: itemId } as any })
+      const menuItemCode: string | null = current?.menuItemCode || null
+      if (menuItemCode) {
+        // Check if prep time record exists
+        const existingPrepTime = await (prisma as any).menuItemPrepTime.findFirst({
+          where: { menuItemCode }
+        })
+
+        if (prepZoneCode || dimension || weight || prepTimeMinutes) {
+          // Update or create prep time record if any prep time field is provided
+          if (existingPrepTime) {
+            await (prisma as any).menuItemPrepTime.update({
+              where: { id: existingPrepTime.id },
+              data: {
+                prepZoneCode: prepZoneCode || null,
+                dimension: dimension || null,
+                weight: weight || null,
+                prepTimeMinutes: prepTimeMinutes ? parseInt(prepTimeMinutes.toString()) : 0,
+                updatedBy: parseInt(session.user.id),
+                updatedOn: new Date()
+              }
+            })
+          } else {
+            await (prisma as any).menuItemPrepTime.create({
+              data: {
+                menuItemCode: menuItemCode,
+                prepZoneCode: prepZoneCode || null,
+                dimension: dimension || null,
+                weight: weight || null,
+                prepTimeMinutes: prepTimeMinutes ? parseInt(prepTimeMinutes.toString()) : 0,
+                createdBy: parseInt(session.user.id),
+                storeCode: process.env.STORE_CODE || null
+              }
+            })
+          }
+        } else if (existingPrepTime) {
+          // Delete prep time record if all prep time fields are cleared
+          await (prisma as any).menuItemPrepTime.delete({
+            where: { id: existingPrepTime.id }
+          })
+        }
+      }
+    } catch (e) {
+      console.error('Failed to update prep time record:', e)
+    }
 
     // Replace menu item -> modifier group assignments
     try {

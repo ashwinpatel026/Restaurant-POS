@@ -172,7 +172,7 @@ export default function EditCategoryPage() {
 
       if (response.ok) {
         toast.success("Category updated successfully!");
-        router.push("/dashboard/menu/categories");
+        router.push(`/dashboard/menu/categories?refresh=${Date.now()}`);
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to update category");

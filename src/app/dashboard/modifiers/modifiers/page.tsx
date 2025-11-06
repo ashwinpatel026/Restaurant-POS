@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import {
   PlusIcon,
   PencilIcon,
   TrashIcon,
   ArrowLeftIcon,
+  Squares2X2Icon,
+  TableCellsIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import CRUDModal from "@/components/modals/CRUDModal";
@@ -31,22 +33,52 @@ interface ModifierGroup {
 
 export default function ModifiersPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [modifiers, setModifiers] = useState<ModifierGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const fetchingRef = useRef(false);
+  const lastRefreshRef = useRef<string | null>(null);
 
   // Modal states
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
+  // View mode state
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+
   useEffect(() => {
     fetchData();
   }, []);
 
+  // Refetch when refresh parameter is present (only once per refresh token)
+  useEffect(() => {
+    const refreshToken = searchParams.get("refresh");
+    if (
+      pathname === "/dashboard/modifiers/modifiers" &&
+      refreshToken &&
+      refreshToken !== lastRefreshRef.current &&
+      !fetchingRef.current
+    ) {
+      lastRefreshRef.current = refreshToken;
+      fetchData();
+      // Clean up the refresh parameter after a delay to avoid re-triggering
+      setTimeout(() => {
+        router.replace("/dashboard/modifiers/modifiers", { scroll: false });
+      }, 100);
+    }
+  }, [pathname, searchParams, router]);
+
   const fetchData = async () => {
+    // Prevent duplicate calls
+    if (fetchingRef.current) {
+      return;
+    }
+    fetchingRef.current = true;
+
     try {
-      const modifiersRes = await fetch("/api/modifier-groups", {
-        next: { revalidate: 60 }, // Cache for 60 seconds
-      });
+      setLoading(true);
+      const modifiersRes = await fetch("/api/modifier-groups");
 
       if (modifiersRes.ok) {
         const modifiersData = await modifiersRes.json();
@@ -59,6 +91,7 @@ export default function ModifiersPage() {
       console.error("Error:", error);
     } finally {
       setLoading(false);
+      fetchingRef.current = false;
     }
   };
 
@@ -151,12 +184,36 @@ export default function ModifiersPage() {
 
         {/* Modifiers List */}
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-              Modifiers
+              Modifiers ({modifiers.length})
             </h3>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setViewMode("grid")}
+                className={`p-2 rounded-lg transition-colors ${
+                  viewMode === "grid"
+                    ? "bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                }`}
+                title="Grid View"
+              >
+                <Squares2X2Icon className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setViewMode("table")}
+                className={`p-2 rounded-lg transition-colors ${
+                  viewMode === "table"
+                    ? "bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
+                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                }`}
+                title="Table View"
+              >
+                <TableCellsIcon className="w-5 h-5" />
+              </button>
+            </div>
           </div>
-          <div className="p-6">
+          <div className={viewMode === "table" ? "overflow-x-auto" : "p-2"}>
             {modifiers.length === 0 ? (
               <div className="text-center py-8">
                 <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -178,18 +235,50 @@ export default function ModifiersPage() {
                   Add Modifier
                 </button>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {modifiers.map((modifier) => (
-                  <div
-                    key={modifier.id}
-                    className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-shadow bg-white dark:bg-gray-700"
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                        {modifier.groupName || "Unnamed Group"}
-                      </h3>
-                      <div className="flex flex-col space-y-1">
+            ) : viewMode === "table" ? (
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Modifier Group
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Label
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Required
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Selection Type
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Min/Max
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {modifiers.map((modifier) => (
+                    <tr
+                      key={modifier.id}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">
+                          {modifier.groupName || "Unnamed Group"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900 dark:text-white">
+                          {modifier.labelName || "N/A"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`px-2 py-1 text-xs font-medium rounded-full ${
                             modifier.isRequired === 1
@@ -199,6 +288,8 @@ export default function ModifiersPage() {
                         >
                           {modifier.isRequired === 1 ? "Required" : "Optional"}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`px-2 py-1 text-xs font-medium rounded-full ${
                             modifier.isMultiselect === 1
@@ -208,45 +299,128 @@ export default function ModifiersPage() {
                         >
                           {modifier.isMultiselect === 1 ? "Multi" : "Single"}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {typeof modifier.minSelection === "number" ||
+                        typeof modifier.maxSelection === "number" ? (
+                          <span>
+                            {modifier.minSelection ?? "-"} /{" "}
+                            {modifier.maxSelection ?? "-"}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 dark:text-gray-500">
+                            N/A
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            modifier.isActive === 1
+                              ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400"
+                              : "bg-gray-100 dark:bg-gray-900/20 text-gray-800 dark:text-gray-400"
+                          }`}
+                        >
+                          {modifier.isActive === 1 ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex justify-end space-x-2">
+                          <button
+                            onClick={() => handleEdit(modifier)}
+                            className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+                            title="Edit modifier"
+                          >
+                            <PencilIcon className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(modifier.id)}
+                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                            title="Delete modifier"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {modifiers.map((modifier) => (
+                    <div
+                      key={modifier.id}
+                      className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-shadow bg-white dark:bg-gray-700"
+                    >
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                          {modifier.groupName || "Unnamed Group"}
+                        </h3>
+                        <div className="flex flex-col space-y-1">
+                          <span
+                            className={`px-2 py-1 text-xs font-medium rounded-full ${
+                              modifier.isRequired === 1
+                                ? "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400"
+                                : "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400"
+                            }`}
+                          >
+                            {modifier.isRequired === 1
+                              ? "Required"
+                              : "Optional"}
+                          </span>
+                          <span
+                            className={`px-2 py-1 text-xs font-medium rounded-full ${
+                              modifier.isMultiselect === 1
+                                ? "bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400"
+                                : "bg-gray-100 dark:bg-gray-900/20 text-gray-800 dark:text-gray-400"
+                            }`}
+                          >
+                            {modifier.isMultiselect === 1 ? "Multi" : "Single"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
+                        <p>
+                          <strong>Label:</strong> {modifier.labelName || "N/A"}
+                        </p>
+                        {typeof modifier.minSelection === "number" && (
+                          <p>
+                            <strong>Min Selection:</strong>{" "}
+                            {modifier.minSelection}
+                          </p>
+                        )}
+                        {typeof modifier.maxSelection === "number" && (
+                          <p>
+                            <strong>Max Selection:</strong>{" "}
+                            {modifier.maxSelection}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex justify-end space-x-2">
+                        <button
+                          onClick={() => handleEdit(modifier)}
+                          className="flex-1 inline-flex justify-center items-center px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                          title="Edit modifier"
+                        >
+                          <PencilIcon className="w-4 h-4 mr-1" />
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(modifier.id)}
+                          className="flex-1 inline-flex justify-center items-center px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                          title="Delete modifier"
+                        >
+                          <TrashIcon className="w-4 h-4 mr-1" />
+                          Delete
+                        </button>
                       </div>
                     </div>
-
-                    <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
-                      <p>
-                        <strong>Label:</strong> {modifier.labelName || "N/A"}
-                      </p>
-                      {typeof modifier.minSelection === "number" && (
-                        <p>
-                          <strong>Min Selection:</strong>{" "}
-                          {modifier.minSelection}
-                        </p>
-                      )}
-                      {typeof modifier.maxSelection === "number" && (
-                        <p>
-                          <strong>Max Selection:</strong>{" "}
-                          {modifier.maxSelection}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex justify-end space-x-2">
-                      <button
-                        onClick={() => handleEdit(modifier)}
-                        className="p-1 text-blue-500 hover:text-blue-700 transition-colors duration-200"
-                        title="Edit modifier"
-                      >
-                        <PencilIcon className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(modifier.id)}
-                        className="p-1 text-red-500 hover:text-red-700 transition-colors duration-200"
-                        title="Delete modifier"
-                      >
-                        <TrashIcon className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>

@@ -122,7 +122,12 @@ export async function POST(request: NextRequest) {
       // New fields for modifier assignment
       selectedModifiers,
       inheritModifiers,
-      modifierAssignments
+      modifierAssignments,
+      // Prep time fields
+      prepZoneCode,
+      dimension,
+      weight,
+      prepTimeMinutes
     } = body
 
     // Generate unique code for menu item
@@ -174,6 +179,26 @@ export async function POST(request: NextRequest) {
         }
       })
     })
+
+    // Create prep time record if any prep time field is provided
+    try {
+      const createdItemCode: string | null = (menuItem as any).menuItemCode || null
+      if (createdItemCode && (prepZoneCode || dimension || weight || prepTimeMinutes)) {
+        await (prisma as any).menuItemPrepTime.create({
+          data: {
+            menuItemCode: createdItemCode,
+            prepZoneCode: prepZoneCode || null,
+            dimension: dimension || null,
+            weight: weight || null,
+            prepTimeMinutes: prepTimeMinutes ? parseInt(prepTimeMinutes.toString()) : 0,
+            createdBy: parseInt(session.user.id),
+            storeCode: process.env.STORE_CODE || null
+          }
+        })
+      }
+    } catch (e) {
+      console.error('Failed to create prep time record:', e)
+    }
 
     // Create menu item -> modifier group assignments
     try {

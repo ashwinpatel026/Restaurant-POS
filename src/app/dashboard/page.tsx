@@ -6,7 +6,6 @@ import DashboardLayout from "@/components/layouts/DashboardLayout";
 import {
   ShoppingBagIcon,
   CurrencyDollarIcon,
-  UserGroupIcon,
   ChartBarIcon,
 } from "@heroicons/react/24/outline";
 import { PageSkeleton, StatsSkeleton } from "@/components/ui/SkeletonLoader";
@@ -15,7 +14,6 @@ interface DashboardStats {
   todayOrders: number;
   todaySales: number;
   activeOrders: number;
-  occupiedTables: number;
 }
 
 export default function DashboardPage() {
@@ -24,7 +22,6 @@ export default function DashboardPage() {
     todayOrders: 0,
     todaySales: 0,
     activeOrders: 0,
-    occupiedTables: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -68,13 +65,6 @@ export default function DashboardPage() {
       color: "bg-purple-500",
       change: "",
     },
-    {
-      title: "Occupied Tables",
-      value: stats.occupiedTables,
-      icon: UserGroupIcon,
-      color: "bg-orange-500",
-      change: "",
-    },
   ];
 
   if (loading) {
@@ -90,7 +80,7 @@ export default function DashboardPage() {
               Welcome back, {session?.user?.name}!
             </p>
           </div>
-          <StatsSkeleton count={4} />
+          <StatsSkeleton count={3} />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
               <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4"></div>
@@ -149,7 +139,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {statCards.map((stat, index) => (
             <div key={index} className="card">
               <div className="flex items-center justify-between">

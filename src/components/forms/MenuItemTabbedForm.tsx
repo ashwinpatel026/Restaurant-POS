@@ -51,6 +51,10 @@ export default function MenuItemTabbedForm({
     isOnlineOrderByApp: 0,
     isOnlineOrdering: 0,
     isCustomerInvoice: 0,
+    prepZoneCode: "",
+    dimension: "",
+    weight: "",
+    prepTimeMinutes: 0,
   });
 
   const [modifiers, setModifiers] = useState<any[]>([]);
@@ -81,10 +85,12 @@ export default function MenuItemTabbedForm({
   const [inheritModifiers, setInheritModifiers] = useState(true);
   const [taxes, setTaxes] = useState<any[]>([]);
   const [inheritedModifiers, setInheritedModifiers] = useState<any[]>([]);
+  const [prepZones, setPrepZones] = useState<any[]>([]);
 
   useEffect(() => {
     fetchModifiers();
     fetchTaxes();
+    fetchPrepZones();
   }, []);
 
   useEffect(() => {
@@ -129,6 +135,10 @@ export default function MenuItemTabbedForm({
         isOnlineOrderByApp: menuItem.isOnlineOrderByApp ?? 0,
         isOnlineOrdering: menuItem.isOnlineOrdering ?? 0,
         isCustomerInvoice: menuItem.isCustomerInvoice ?? 0,
+        prepZoneCode: menuItem.prepZoneCode || "",
+        dimension: menuItem.dimension || "",
+        weight: menuItem.weight || "",
+        prepTimeMinutes: menuItem.prepTimeMinutes ?? 0,
       });
 
       // Set selected modifiers if editing (ONLY explicit rows: inherit_from_menu_group = 0)
@@ -203,6 +213,18 @@ export default function MenuItemTabbedForm({
     }
   };
 
+  const fetchPrepZones = async () => {
+    try {
+      const res = await fetch("/api/menu/prep-zone");
+      if (res.ok) {
+        const data = await res.json();
+        setPrepZones(data);
+      }
+    } catch (e) {
+      console.error("Error fetching prep zones", e);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -236,6 +258,13 @@ export default function MenuItemTabbedForm({
           }),
         })),
         inheritModifiers,
+        // Prep time fields
+        prepZoneCode: formData.prepZoneCode || null,
+        dimension: formData.dimension || null,
+        weight: formData.weight || null,
+        prepTimeMinutes: formData.prepTimeMinutes
+          ? parseInt(formData.prepTimeMinutes.toString())
+          : null,
       };
 
       await onSave(submitData);
@@ -461,6 +490,155 @@ export default function MenuItemTabbedForm({
             </div>
           </div>
 
+          {/* Prep Zone & Prep Time Section */}
+          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                Prep-Zone & Prep Time
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Select a prep-zone and configure prep-time details for this menu
+                item
+              </p>
+            </div>
+
+            <div className="space-y-6">
+              {/* Prep Zone Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Prep Zone
+                </label>
+                <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50">
+                  <div className="max-h-64 overflow-y-auto pr-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-track]:dark:bg-gray-800 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:dark:bg-gray-600 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-gray-400 [&::-webkit-scrollbar-thumb]:dark:hover:bg-gray-500">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                      {/* None Option */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData({ ...formData, prepZoneCode: "" })
+                        }
+                        className={`relative p-4 rounded-lg border-2 transition-all text-left ${
+                          formData.prepZoneCode === ""
+                            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md"
+                            : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`text-sm font-medium ${
+                              formData.prepZoneCode === ""
+                                ? "text-blue-700 dark:text-blue-300"
+                                : "text-gray-700 dark:text-gray-300"
+                            }`}
+                          >
+                            None
+                          </span>
+                          {formData.prepZoneCode === "" && (
+                            <CheckIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                          )}
+                        </div>
+                      </button>
+
+                      {/* Prep Zone Cards */}
+                      {prepZones.map((prepZone) => {
+                        const prepZoneValue = prepZone.prepZoneCode || "";
+                        const isSelected =
+                          formData.prepZoneCode === prepZoneValue;
+                        return (
+                          <button
+                            key={prepZone.prepZoneCode || prepZone.prepZoneId}
+                            type="button"
+                            onClick={() =>
+                              setFormData({
+                                ...formData,
+                                prepZoneCode: prepZoneValue,
+                              })
+                            }
+                            className={`relative p-4 rounded-lg border-2 transition-all text-left ${
+                              isSelected
+                                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md"
+                                : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1 min-w-0">
+                                <p
+                                  className={`text-sm font-medium truncate ${
+                                    isSelected
+                                      ? "text-blue-700 dark:text-blue-300"
+                                      : "text-gray-700 dark:text-gray-300"
+                                  }`}
+                                  title={prepZone.prepZoneName || prepZoneValue}
+                                >
+                                  {prepZone.prepZoneName || prepZoneValue}
+                                </p>
+                              </div>
+                              {isSelected && (
+                                <CheckIcon className="w-5 h-5 text-blue-600 dark:text-blue-400 ml-2 flex-shrink-0" />
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Prep Time Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Prep Time (minutes)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.prepTimeMinutes}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        prepTimeMinutes: parseInt(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Dimension
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.dimension}
+                    onChange={(e) =>
+                      setFormData({ ...formData, dimension: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter dimension"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Weight
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.weight}
+                    onChange={(e) =>
+                      setFormData({ ...formData, weight: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter weight"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Pricing Section */}
           <div className="p-6 border-b border-gray-200 dark:border-gray-700">
             <div className="mb-6">
@@ -513,6 +691,143 @@ export default function MenuItemTabbedForm({
                     <option value={2}>Size Price</option>
                     <option value={3}>Open Price</option>
                   </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tax Configuration Section */}
+          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                Tax Configuration
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Configure tax settings for this menu item
+              </p>
+            </div>
+
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Select Tax
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, taxCode: "" })}
+                      className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
+                        formData.taxCode === ""
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                          : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                      }`}
+                    >
+                      None
+                      {formData.taxCode === "" && (
+                        <CheckIcon className="w-4 h-4 inline-block ml-2" />
+                      )}
+                    </button>
+                    {taxes.map((t) => (
+                      <button
+                        key={t.taxCode}
+                        type="button"
+                        onClick={() =>
+                          setFormData({ ...formData, taxCode: t.taxCode })
+                        }
+                        className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
+                          formData.taxCode === t.taxCode
+                            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                            : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                        }`}
+                      >
+                        {t.taxname}
+                        {formData.taxCode === t.taxCode && (
+                          <CheckIcon className="w-4 h-4 inline-block ml-2" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[
+                  {
+                    key: "inheritTaxInclusion",
+                    label: "Inherit tax inclusion from category",
+                  },
+                  { key: "isTaxIncluded", label: "Tax is included in price" },
+                  {
+                    key: "inheritDiningTax",
+                    label: "Inherit dining tax from category",
+                  },
+                  {
+                    key: "disqualifyDiningTaxExemption",
+                    label: "Disqualify dining tax exemption",
+                  },
+                ].map((t) => (
+                  <div
+                    key={t.key}
+                    className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg"
+                  >
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      {t.label}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          [t.key]: !(prev as any)[t.key],
+                        }))
+                      }
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        (formData as any)[t.key]
+                          ? "bg-blue-600"
+                          : "bg-gray-300 dark:bg-gray-600"
+                      }`}
+                      aria-pressed={(formData as any)[t.key]}
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                          (formData as any)[t.key]
+                            ? "translate-x-5"
+                            : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Dining Tax Effect
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {["No Effect", "Add", "Subtract"].map((effect) => (
+                    <button
+                      key={effect}
+                      type="button"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          diningTaxEffect: effect,
+                        })
+                      }
+                      className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
+                        formData.diningTaxEffect === effect
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                          : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                      }`}
+                    >
+                      {effect}
+                      {formData.diningTaxEffect === effect && (
+                        <CheckIcon className="w-4 h-4 inline-block ml-2" />
+                      )}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
@@ -681,143 +996,6 @@ export default function MenuItemTabbedForm({
                     </button>
                   </div>
                 )}
-              </div>
-            </div>
-          </div>
-
-          {/* Tax Configuration Section */}
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Tax Configuration
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Configure tax settings for this menu item
-              </p>
-            </div>
-
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Select Tax
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, taxCode: "" })}
-                      className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
-                        formData.taxCode === ""
-                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
-                          : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                      }`}
-                    >
-                      None
-                      {formData.taxCode === "" && (
-                        <CheckIcon className="w-4 h-4 inline-block ml-2" />
-                      )}
-                    </button>
-                    {taxes.map((t) => (
-                      <button
-                        key={t.taxCode}
-                        type="button"
-                        onClick={() =>
-                          setFormData({ ...formData, taxCode: t.taxCode })
-                        }
-                        className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
-                          formData.taxCode === t.taxCode
-                            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
-                            : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                        }`}
-                      >
-                        {t.taxname}
-                        {formData.taxCode === t.taxCode && (
-                          <CheckIcon className="w-4 h-4 inline-block ml-2" />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {[
-                  {
-                    key: "inheritTaxInclusion",
-                    label: "Inherit tax inclusion from category",
-                  },
-                  { key: "isTaxIncluded", label: "Tax is included in price" },
-                  {
-                    key: "inheritDiningTax",
-                    label: "Inherit dining tax from category",
-                  },
-                  {
-                    key: "disqualifyDiningTaxExemption",
-                    label: "Disqualify dining tax exemption",
-                  },
-                ].map((t) => (
-                  <div
-                    key={t.key}
-                    className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg"
-                  >
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                      {t.label}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          [t.key]: !(prev as any)[t.key],
-                        }))
-                      }
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        (formData as any)[t.key]
-                          ? "bg-blue-600"
-                          : "bg-gray-300 dark:bg-gray-600"
-                      }`}
-                      aria-pressed={(formData as any)[t.key]}
-                    >
-                      <span
-                        className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                          (formData as any)[t.key]
-                            ? "translate-x-5"
-                            : "translate-x-1"
-                        }`}
-                      />
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Dining Tax Effect
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {["No Effect", "Add", "Subtract"].map((effect) => (
-                    <button
-                      key={effect}
-                      type="button"
-                      onClick={() =>
-                        setFormData({
-                          ...formData,
-                          diningTaxEffect: effect,
-                        })
-                      }
-                      className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
-                        formData.diningTaxEffect === effect
-                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
-                          : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                      }`}
-                    >
-                      {effect}
-                      {formData.diningTaxEffect === effect && (
-                        <CheckIcon className="w-4 h-4 inline-block ml-2" />
-                      )}
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
           </div>

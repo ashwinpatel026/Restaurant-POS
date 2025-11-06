@@ -129,7 +129,7 @@ export default function EditModifierPage() {
       }
 
       toast.success("Modifier group updated successfully!");
-      router.push("/dashboard/modifiers/modifiers");
+      router.push(`/dashboard/modifiers/modifiers?refresh=${Date.now()}`);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Error updating modifier"

@@ -145,7 +145,7 @@ export default function EditMenuMasterPage() {
 
       if (response.ok) {
         toast.success("Menu master updated successfully!");
-        router.push("/dashboard/menu/masters");
+        router.push(`/dashboard/menu/masters?refresh=${Date.now()}`);
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to update menu master");

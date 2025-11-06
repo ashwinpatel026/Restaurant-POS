@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
-import { ArrowLeftIcon } from "@heroicons/react/24/outline";
+import { ArrowLeftIcon, CheckIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
 
@@ -474,7 +474,7 @@ export default function EditEventPage() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center space-x-4">
           <button
@@ -524,109 +524,130 @@ export default function EditEventPage() {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Price Adjustments
             </h2>
-            <div className="space-y-4">
-              {/* Radio Button Group */}
-              <div className="space-y-2">
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="radio"
-                    name="priceStrategy"
-                    value="amount_add"
-                    checked={formData.priceStrategy === "amount_add"}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        priceStrategy: e.target.value,
-                        priceValue: "",
-                      })
-                    }
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
-                  />
-                  <span className="ml-2 text-sm font-medium text-gray-900 dark:text-white">
-                    Amount Add ($)
-                  </span>
-                </label>
-
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="radio"
-                    name="priceStrategy"
-                    value="percent_add"
-                    checked={formData.priceStrategy === "percent_add"}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        priceStrategy: e.target.value,
-                        priceValue: "",
-                      })
-                    }
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
-                  />
-                  <span className="ml-2 text-sm font-medium text-gray-900 dark:text-white">
-                    Percentage Add (%)
-                  </span>
-                </label>
-
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="radio"
-                    name="priceStrategy"
-                    value="amount_disc"
-                    checked={formData.priceStrategy === "amount_disc"}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        priceStrategy: e.target.value,
-                        priceValue: "",
-                      })
-                    }
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
-                  />
-                  <span className="ml-2 text-sm font-medium text-gray-900 dark:text-white">
-                    Amount Discount ($)
-                  </span>
-                </label>
-
-                <label className="flex items-center cursor-pointer">
-                  <input
-                    type="radio"
-                    name="priceStrategy"
-                    value="percent_disc"
-                    checked={formData.priceStrategy === "percent_disc"}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        priceStrategy: e.target.value,
-                        priceValue: "",
-                      })
-                    }
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600"
-                  />
-                  <span className="ml-2 text-sm font-medium text-gray-900 dark:text-white">
-                    Percentage Discount (%)
-                  </span>
-                </label>
-              </div>
-
-              {/* Value Input */}
+            <div className="space-y-6">
+              {/* Amount Group */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Value:
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Amount Adjustments ($)
                 </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.priceValue}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      priceValue: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="0.00"
-                />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        priceStrategy: "amount_add",
+                        priceValue: "",
+                      })
+                    }
+                    className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
+                      formData.priceStrategy === "amount_add"
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                    }`}
+                  >
+                    Amount Add ($)
+                    {formData.priceStrategy === "amount_add" && (
+                      <CheckIcon className="w-4 h-4 inline-block ml-2" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        priceStrategy: "amount_disc",
+                        priceValue: "",
+                      })
+                    }
+                    className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
+                      formData.priceStrategy === "amount_disc"
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                    }`}
+                  >
+                    Amount Discount ($)
+                    {formData.priceStrategy === "amount_disc" && (
+                      <CheckIcon className="w-4 h-4 inline-block ml-2" />
+                    )}
+                  </button>
+                </div>
               </div>
+
+              {/* Divider */}
+              <div className="border-t border-gray-200 dark:border-gray-700"></div>
+
+              {/* Percentage Group */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Percentage Adjustments (%)
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        priceStrategy: "percent_add",
+                        priceValue: "",
+                      })
+                    }
+                    className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
+                      formData.priceStrategy === "percent_add"
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                    }`}
+                  >
+                    Percentage Add (%)
+                    {formData.priceStrategy === "percent_add" && (
+                      <CheckIcon className="w-4 h-4 inline-block ml-2" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        priceStrategy: "percent_disc",
+                        priceValue: "",
+                      })
+                    }
+                    className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
+                      formData.priceStrategy === "percent_disc"
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                    }`}
+                  >
+                    Percentage Discount (%)
+                    {formData.priceStrategy === "percent_disc" && (
+                      <CheckIcon className="w-4 h-4 inline-block ml-2" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-gray-200 dark:border-gray-700"></div>
+            </div>
+
+            {/* Value Input */}
+            <div className="mt-4 flex items-center gap-3">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                Value:
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={formData.priceValue}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    priceValue: e.target.value,
+                  })
+                }
+                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="0.00"
+              />
             </div>
           </div>
 
@@ -645,108 +666,112 @@ export default function EditEventPage() {
                     key={day.key}
                     className="p-4 border border-gray-200 dark:border-gray-600 rounded-lg space-y-4"
                   >
-                    {/* First Row: Checkbox, Day Label, and Time Inputs */}
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={isActive}
-                          onChange={(e) => {
-                            if (day.key === "monday") {
-                              handleMondayToggle(e.target.checked);
-                            } else {
-                              handleDayToggle(day.key);
-                            }
-                          }}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
-                        />
-                        <label className="text-sm font-medium text-gray-900 dark:text-white">
-                          {day.label}
+                    {/* First Row: Day Button, and Time Inputs */}
+                    <div className="grid grid-cols-[140px_1fr_1fr] gap-4 items-center">
+                      {/* Day Button - Fixed Width */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (day.key === "monday") {
+                            handleMondayToggle(!isActive);
+                          } else {
+                            handleDayToggle(day.key);
+                          }
+                        }}
+                        className={`px-4 py-2 rounded-lg border-2 transition-all whitespace-nowrap text-center ${
+                          isActive
+                            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                            : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                        }`}
+                      >
+                        {day.label}
+                        {isActive && (
+                          <CheckIcon className="w-4 h-4 inline-block ml-2" />
+                        )}
+                      </button>
+
+                      {/* Start Time - Fixed Column */}
+                      <div className="flex items-center gap-3">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap w-20">
+                          Start Time:
                         </label>
+                        <input
+                          type="text"
+                          disabled={!isActive}
+                          value={
+                            (formData[
+                              `${day.shortKey}StartTime` as keyof typeof formData
+                            ] as string) || ""
+                          }
+                          onChange={(e) => {
+                            const newStartTime = e.target.value;
+                            const updatedFormData = {
+                              ...formData,
+                              [`${day.shortKey}StartTime`]: newStartTime,
+                            };
+                            // Update selected days if Monday's time changes
+                            if (
+                              day.key === "monday" &&
+                              selectedDaysToApply.size > 0
+                            ) {
+                              selectedDaysToApply.forEach((dayKey) => {
+                                const targetDayData = days.find(
+                                  (d) => d.key === dayKey
+                                );
+                                if (targetDayData) {
+                                  (updatedFormData as any)[
+                                    `${targetDayData.shortKey}StartTime`
+                                  ] = newStartTime;
+                                }
+                              });
+                            }
+                            setFormData(updatedFormData);
+                          }}
+                          placeholder="HH:MM"
+                          className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
+                        />
                       </div>
 
-                      <div className="flex-1 grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                            Start Time
-                          </label>
-                          <input
-                            type="text"
-                            disabled={!isActive}
-                            value={
-                              (formData[
-                                `${day.shortKey}StartTime` as keyof typeof formData
-                              ] as string) || ""
+                      {/* End Time - Fixed Column */}
+                      <div className="flex items-center gap-3">
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap w-20">
+                          End Time:
+                        </label>
+                        <input
+                          type="text"
+                          disabled={!isActive}
+                          value={
+                            (formData[
+                              `${day.shortKey}EndTime` as keyof typeof formData
+                            ] as string) || ""
+                          }
+                          onChange={(e) => {
+                            const newEndTime = e.target.value;
+                            const updatedFormData = {
+                              ...formData,
+                              [`${day.shortKey}EndTime`]: newEndTime,
+                            };
+                            // Update selected days if Monday's time changes
+                            if (
+                              day.key === "monday" &&
+                              selectedDaysToApply.size > 0
+                            ) {
+                              selectedDaysToApply.forEach((dayKey) => {
+                                const targetDayData = days.find(
+                                  (d) => d.key === dayKey
+                                );
+                                if (targetDayData) {
+                                  (updatedFormData as any)[
+                                    `${targetDayData.shortKey}EndTime`
+                                  ] = newEndTime;
+                                }
+                              });
                             }
-                            onChange={(e) => {
-                              const newStartTime = e.target.value;
-                              const updatedFormData = {
-                                ...formData,
-                                [`${day.shortKey}StartTime`]: newStartTime,
-                              };
-                              // Update selected days if Monday's time changes
-                              if (
-                                day.key === "monday" &&
-                                selectedDaysToApply.size > 0
-                              ) {
-                                selectedDaysToApply.forEach((dayKey) => {
-                                  const targetDayData = days.find(
-                                    (d) => d.key === dayKey
-                                  );
-                                  if (targetDayData) {
-                                    (updatedFormData as any)[
-                                      `${targetDayData.shortKey}StartTime`
-                                    ] = newStartTime;
-                                  }
-                                });
-                              }
-                              setFormData(updatedFormData);
-                            }}
-                            placeholder="HH:MM (24-hour format)"
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
-                            End Time
-                          </label>
-                          <input
-                            type="text"
-                            disabled={!isActive}
-                            value={
-                              (formData[
-                                `${day.shortKey}EndTime` as keyof typeof formData
-                              ] as string) || ""
-                            }
-                            onChange={(e) => {
-                              const newEndTime = e.target.value;
-                              const updatedFormData = {
-                                ...formData,
-                                [`${day.shortKey}EndTime`]: newEndTime,
-                              };
-                              // Update selected days if Monday's time changes
-                              if (
-                                day.key === "monday" &&
-                                selectedDaysToApply.size > 0
-                              ) {
-                                selectedDaysToApply.forEach((dayKey) => {
-                                  const targetDayData = days.find(
-                                    (d) => d.key === dayKey
-                                  );
-                                  if (targetDayData) {
-                                    (updatedFormData as any)[
-                                      `${targetDayData.shortKey}EndTime`
-                                    ] = newEndTime;
-                                  }
-                                });
-                              }
-                              setFormData(updatedFormData);
-                            }}
-                            placeholder="HH:MM (24-hour format)"
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
-                          />
-                        </div>
+                            setFormData(updatedFormData);
+                          }}
+                          placeholder="HH:MM"
+                          className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
+                        />
                       </div>
                     </div>
 
@@ -754,11 +779,11 @@ export default function EditEventPage() {
                     {day.key === "monday" && (
                       <div className="pt-4 border-t border-gray-200 dark:border-gray-600">
                         <div className="flex items-center gap-4">
-                          <label className="text-xs font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
                             Apply to:
                           </label>
-                          <div className="flex flex-wrap gap-3">
-                            {/* Select All Checkbox */}
+                          <div className="flex flex-wrap gap-2">
+                            {/* Select All Button */}
                             {(() => {
                               const isMondayComplete =
                                 formData.monday &&
@@ -773,26 +798,27 @@ export default function EditEventPage() {
                                   selectedDaysToApply.has(day.key)
                                 );
                               return (
-                                <label
-                                  className={`flex items-center ${
-                                    isMondayComplete
-                                      ? "cursor-pointer"
-                                      : "cursor-not-allowed opacity-50"
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleSelectAllDays(!allSelected)
+                                  }
+                                  disabled={!isMondayComplete}
+                                  className={`px-3 py-2 rounded-lg border-2 transition-all text-xs font-medium whitespace-nowrap ${
+                                    allSelected
+                                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                                      : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                                  } ${
+                                    !isMondayComplete
+                                      ? "opacity-50 cursor-not-allowed"
+                                      : ""
                                   }`}
                                 >
-                                  <input
-                                    type="checkbox"
-                                    checked={allSelected}
-                                    onChange={(e) =>
-                                      handleSelectAllDays(e.target.checked)
-                                    }
-                                    disabled={!isMondayComplete}
-                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded disabled:cursor-not-allowed"
-                                  />
-                                  <span className="ml-2 text-xs font-medium text-gray-900 dark:text-white">
-                                    All Days
-                                  </span>
-                                </label>
+                                  All Days
+                                  {allSelected && (
+                                    <CheckIcon className="w-3 h-3 inline-block ml-1.5" />
+                                  )}
+                                </button>
                               );
                             })()}
                             {days
@@ -802,33 +828,35 @@ export default function EditEventPage() {
                                   formData.monday &&
                                   formData.monStartTime &&
                                   formData.monEndTime;
+                                const isSelected = selectedDaysToApply.has(
+                                  targetDay.key
+                                );
                                 return (
-                                  <label
+                                  <button
                                     key={targetDay.key}
-                                    className={`flex items-center ${
-                                      isMondayComplete
-                                        ? "cursor-pointer"
-                                        : "cursor-not-allowed opacity-50"
+                                    type="button"
+                                    onClick={() =>
+                                      handleDayCheckboxToggle(
+                                        targetDay.key,
+                                        !isSelected
+                                      )
+                                    }
+                                    disabled={!isMondayComplete}
+                                    className={`px-3 py-2 rounded-lg border-2 transition-all text-xs font-medium whitespace-nowrap ${
+                                      isSelected
+                                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                                    } ${
+                                      !isMondayComplete
+                                        ? "opacity-50 cursor-not-allowed"
+                                        : ""
                                     }`}
                                   >
-                                    <input
-                                      type="checkbox"
-                                      checked={selectedDaysToApply.has(
-                                        targetDay.key
-                                      )}
-                                      onChange={(e) =>
-                                        handleDayCheckboxToggle(
-                                          targetDay.key,
-                                          e.target.checked
-                                        )
-                                      }
-                                      disabled={!isMondayComplete}
-                                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded disabled:cursor-not-allowed"
-                                    />
-                                    <span className="ml-2 text-xs text-gray-900 dark:text-white">
-                                      {targetDay.label}
-                                    </span>
-                                  </label>
+                                    {targetDay.label}
+                                    {isSelected && (
+                                      <CheckIcon className="w-3 h-3 inline-block ml-1.5" />
+                                    )}
+                                  </button>
                                 );
                               })}
                           </div>
