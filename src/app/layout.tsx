@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Acute RPOS System",
-  description: "Comprehensive Point of Sale System for Restaurant Chain",
+  description: "Acute Restaurant POS System",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
