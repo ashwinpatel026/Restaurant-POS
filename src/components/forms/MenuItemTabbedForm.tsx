@@ -394,43 +394,45 @@ export default function MenuItemTabbedForm({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Category *
                   </label>
-                  <div className="flex flex-wrap gap-2">
-                    {categories.map((category) => {
-                      const categoryValue =
-                        category.menuCategoryCode ||
-                        category.tblMenuCategoryId?.toString() ||
-                        "";
-                      return (
-                        <button
-                          key={
-                            category.menuCategoryCode ||
-                            category.tblMenuCategoryId
-                          }
-                          type="button"
-                          onClick={() =>
-                            setFormData({
-                              ...formData,
-                              menuCategoryCode: categoryValue,
-                            })
-                          }
-                          className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
-                            formData.menuCategoryCode === categoryValue
-                              ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
-                              : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                          }`}
-                        >
-                          {category.name}
-                          {formData.menuCategoryCode === categoryValue && (
-                            <CheckIcon className="w-4 h-4 inline-block ml-2" />
-                          )}
-                        </button>
-                      );
-                    })}
+                  <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50">
+                    <div className="flex flex-wrap gap-2">
+                      {categories.map((category) => {
+                        const categoryValue =
+                          category.menuCategoryCode ||
+                          category.tblMenuCategoryId?.toString() ||
+                          "";
+                        return (
+                          <button
+                            key={
+                              category.menuCategoryCode ||
+                              category.tblMenuCategoryId
+                            }
+                            type="button"
+                            onClick={() =>
+                              setFormData({
+                                ...formData,
+                                menuCategoryCode: categoryValue,
+                              })
+                            }
+                            className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
+                              formData.menuCategoryCode === categoryValue
+                                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                                : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                            }`}
+                          >
+                            {category.name}
+                            {formData.menuCategoryCode === categoryValue && (
+                              <CheckIcon className="w-4 h-4 inline-block ml-2" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 

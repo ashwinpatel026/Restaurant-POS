@@ -9,6 +9,7 @@ import SystemColorPicker, {
   getPrimaryColor,
 } from "@/components/ui/SystemColorPicker";
 import { CheckIcon } from "@heroicons/react/24/solid";
+import StatusToggle from "@/components/forms/StatusToggle";
 
 interface PrepZone {
   prepZoneId: string;
@@ -48,8 +49,8 @@ export default function AddMenuMasterPage() {
   const fetchData = async () => {
     try {
       const [prepZonesRes, eventsRes] = await Promise.all([
-        fetch("/api/menu/prep-zone"),
-        fetch("/api/events"),
+        fetch("/api/menu/prep-zone", { cache: "no-store" }),
+        fetch("/api/events", { cache: "no-store" }),
       ]);
 
       if (prepZonesRes.ok) {
@@ -90,7 +91,7 @@ export default function AddMenuMasterPage() {
 
       if (response.ok) {
         toast.success("Menu master created successfully!");
-        router.push("/dashboard/menu/masters");
+        router.push(`/dashboard/menu/masters?refresh=${Date.now()}`);
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to create menu master");
@@ -260,30 +261,14 @@ export default function AddMenuMasterPage() {
                 </div>
               </div>
 
-              {/* Status */}
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                  Status
-                </h3>
-                <div>
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={formData.isActive === 1}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          isActive: e.target.checked ? 1 : 0,
-                        })
-                      }
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
-                    />
-                    <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                      Active
-                    </span>
-                  </label>
-                </div>
-              </div>
+              <StatusToggle
+                label="Menu Master Status"
+                description="Toggle to control whether this menu master is active across the POS."
+                value={formData.isActive === 1}
+                onChange={(val) =>
+                  setFormData({ ...formData, isActive: val ? 1 : 0 })
+                }
+              />
             </div>
 
             {/* Footer */}

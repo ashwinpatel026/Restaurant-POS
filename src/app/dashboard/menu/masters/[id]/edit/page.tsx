@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
 import SystemColorPicker from "@/components/ui/SystemColorPicker";
 import { CheckIcon } from "@heroicons/react/24/solid";
+import StatusToggle from "@/components/forms/StatusToggle";
 
 interface PrepZone {
   prepZoneId: string;
@@ -69,9 +70,9 @@ export default function EditMenuMasterPage() {
   const fetchData = async () => {
     try {
       const [prepZonesRes, eventsRes, masterRes] = await Promise.all([
-        fetch("/api/menu/prep-zone"),
-        fetch("/api/events"),
-        fetch(`/api/menu/masters/${masterId}`),
+        fetch("/api/menu/prep-zone", { cache: "no-store" }),
+        fetch("/api/events", { cache: "no-store" }),
+        fetch(`/api/menu/masters/${masterId}`, { cache: "no-store" }),
       ]);
 
       if (prepZonesRes.ok) {
@@ -92,7 +93,8 @@ export default function EditMenuMasterPage() {
         let eventCode = "";
         if (masterData.isEventMenu === 1 && masterData.menuMasterCode) {
           const eventAssocRes = await fetch(
-            `/api/menu/masters/${masterId}/events`
+            `/api/menu/masters/${masterId}/events`,
+            { cache: "no-store" }
           );
           if (eventAssocRes.ok) {
             const eventAssocData = await eventAssocRes.json();
@@ -109,8 +111,9 @@ export default function EditMenuMasterPage() {
           colorCode: masterData.colorCode || "#3B82F6",
           prepZoneCode: masterData.prepZoneCode || "",
           eventCode: eventCode,
-          isEventMenu: masterData.isEventMenu || 0,
-          isActive: masterData.isActive || 1,
+          isEventMenu: masterData.isEventMenu ? 1 : 0,
+          isActive:
+            typeof masterData.isActive === "number" ? masterData.isActive : 1,
         });
       }
     } catch (error) {
@@ -217,7 +220,7 @@ export default function EditMenuMasterPage() {
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
                   Basic Information
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Menu Master Name *
@@ -249,60 +252,64 @@ export default function EditMenuMasterPage() {
                     />
                   </div>
 
-                  <SystemColorPicker
-                    label="Color Code"
-                    value={formData.colorCode || ""}
-                    onChange={(color: string) =>
-                      setFormData({ ...formData, colorCode: color })
-                    }
-                  />
+                  <div>
+                    <SystemColorPicker
+                      label="Color Code"
+                      value={formData.colorCode || ""}
+                      onChange={(color: string) =>
+                        setFormData({ ...formData, colorCode: color })
+                      }
+                    />
+                  </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Prep Zone
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Select Prep Zone
                     </label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setFormData({
-                            ...formData,
-                            prepZoneCode: "",
-                          })
-                        }
-                        className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
-                          formData.prepZoneCode === ""
-                            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
-                            : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                        }`}
-                      >
-                        None
-                        {formData.prepZoneCode === "" && (
-                          <CheckIcon className="w-4 h-4 inline-block ml-2" />
-                        )}
-                      </button>
-                      {prepZones.map((zone) => (
+                    <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700">
+                      <div className="flex flex-wrap gap-2">
                         <button
-                          key={zone.prepZoneId}
                           type="button"
                           onClick={() =>
                             setFormData({
                               ...formData,
-                              prepZoneCode: zone.prepZoneCode,
+                              prepZoneCode: "",
                             })
                           }
                           className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
-                            formData.prepZoneCode === zone.prepZoneCode
+                            formData.prepZoneCode === ""
                               ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
                               : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
                           }`}
                         >
-                          {zone.prepZoneName}
-                          {formData.prepZoneCode === zone.prepZoneCode && (
+                          None
+                          {formData.prepZoneCode === "" && (
                             <CheckIcon className="w-4 h-4 inline-block ml-2" />
                           )}
                         </button>
-                      ))}
+                        {prepZones.map((zone) => (
+                          <button
+                            key={zone.prepZoneId}
+                            type="button"
+                            onClick={() =>
+                              setFormData({
+                                ...formData,
+                                prepZoneCode: zone.prepZoneCode,
+                              })
+                            }
+                            className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
+                              formData.prepZoneCode === zone.prepZoneCode
+                                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                                : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                            }`}
+                          >
+                            {zone.prepZoneName}
+                            {formData.prepZoneCode === zone.prepZoneCode && (
+                              <CheckIcon className="w-4 h-4 inline-block ml-2" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -344,30 +351,15 @@ export default function EditMenuMasterPage() {
                 </div>
               </div>
 
-              {/* Status */}
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                  Status
-                </h3>
-                <div>
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={formData.isActive === 1}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          isActive: e.target.checked ? 1 : 0,
-                        })
-                      }
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
-                    />
-                    <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                      Active
-                    </span>
-                  </label>
-                </div>
-              </div>
+              <StatusToggle
+                label="Menu Master Status"
+                description="Toggle to control whether this menu master is active across the POS."
+                value={formData.isActive === 1}
+                onChange={(val) =>
+                  setFormData({ ...formData, isActive: val ? 1 : 0 })
+                }
+                disabled={submitting}
+              />
             </div>
 
             {/* Footer */}

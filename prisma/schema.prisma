@@ -23,6 +23,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  loginActivities UserLoginActivity[]
+
   @@map("users")
 }
 
@@ -216,6 +218,41 @@ model MenuItem {
   storeCode                      String?   @map("store_code") @db.VarChar(100)
 
   @@map("tbl_menu_item")
+}
+
+model SystemSetting {
+  id            BigInt    @id @default(autoincrement()) @map("id")
+  storeCode     String?   @map("store_code") @db.VarChar(100)
+  theme         String?   @map("theme") @db.VarChar(50)
+  allowedColors String?   @map("allowed_colors")
+  primaryColor  String?   @map("primary_color") @db.VarChar(20)
+  createdBy     Int?      @map("createdby")
+  createdOn     DateTime  @default(now()) @map("createdon")
+  updatedBy     Int?      @map("updatedby")
+  updatedOn     DateTime? @map("updatedon")
+  isSyncToWeb   Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal Int       @default(0) @map("is_sync_to_local")
+
+  @@map("tbl_system_setting")
+}
+
+model UserLoginActivity {
+  id            BigInt    @id @default(autoincrement()) @map("id")
+  userId        Int       @map("user_id")
+  email         String?   @map("email") @db.VarChar(150)
+  storeCode     String?   @map("store_code") @db.VarChar(100)
+  loginAt       DateTime  @default(now()) @map("login_at")
+  ipAddress     String?   @map("ip_address") @db.VarChar(100)
+  userAgent     String?   @map("user_agent")
+  device        String?   @map("device") @db.VarChar(150)
+  platform      String?   @map("platform") @db.VarChar(150)
+  success       Int       @default(1) @map("success")
+  failureReason String?   @map("failure_reason")
+  createdOn     DateTime  @default(now()) @map("createdon")
+
+  user          User      @relation(fields: [userId], references: [id])
+
+  @@map("tbl_user_login_activity")
 }
 
 model MenuItemPrepTime {

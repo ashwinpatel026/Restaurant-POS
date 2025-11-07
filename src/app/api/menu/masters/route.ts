@@ -20,9 +20,11 @@ export async function GET(request: NextRequest) {
 
     // Fetch menu masters with categories and items for public QR orders
     const menuMasters = await prisma.menuMaster.findMany({
-      where: {
-        isActive: 1, // Only active menus for QR orders
-      },
+      where: isPublic
+        ? {
+            isActive: 1, // Only active menus for QR orders
+          }
+        : undefined,
       include: isPublic ? {
         menuCategories: {
           where: {

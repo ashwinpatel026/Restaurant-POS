@@ -96,12 +96,7 @@ export async function GET(request: NextRequest) {
       return result
     })
 
-    // Cache response for 60 seconds
-    return NextResponse.json(categoriesWithStringIds, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
-      },
-    })
+    return NextResponse.json(categoriesWithStringIds)
   } catch (error) {
     console.error('Error fetching menu categories:', error)
     return NextResponse.json(

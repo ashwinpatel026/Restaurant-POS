@@ -128,8 +128,8 @@ export default function MenuMastersPage() {
     try {
       setLoading(true);
       const [mastersRes, prepZonesRes] = await Promise.all([
-        fetch("/api/menu/masters"),
-        fetch("/api/menu/prep-zone"),
+        fetch("/api/menu/masters", { cache: "no-store" }),
+        fetch("/api/menu/prep-zone", { cache: "no-store" }),
       ]);
 
       if (mastersRes.ok) {

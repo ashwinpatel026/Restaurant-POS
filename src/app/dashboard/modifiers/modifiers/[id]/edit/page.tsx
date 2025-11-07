@@ -60,22 +60,19 @@ export default function EditModifierPage() {
   const handleSave = async (formData: any) => {
     if (!id) return;
     try {
+      const {
+        modifierItems: formItems = [],
+        removedItemIds = [],
+        ...groupData
+      } = formData || {};
+
       // 1) Update modifier group
       const groupResponse = await fetch(`/api/menu/modifiers/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          groupName: formData.groupName,
-          labelName: formData.labelName,
-          isRequired: formData.isRequired,
-          isMultiselect: formData.isMultiselect,
-          minSelection: formData.minSelection,
-          maxSelection: formData.maxSelection,
-          showDefaultTop: formData.showDefaultTop,
-          inheritFromMenuGroup: formData.inheritFromMenuGroup,
-          priceStrategy: formData.priceStrategy,
-          price: formData.priceStrategy === 3 ? formData.price : null,
-          isActive: formData.isActive,
+          ...groupData,
+          price: groupData.priceStrategy === 3 ? groupData.price ?? 0 : null,
         }),
       });
 
@@ -86,50 +83,69 @@ export default function EditModifierPage() {
 
       const updatedGroup = await groupResponse.json();
 
-      // 2) Update modifier items - delete existing and create new
-      if (modifier?.modifierGroupCode && formData.modifierItems) {
-        // Delete existing items
-        const itemsRes = await fetch(
-          `/api/modifier-items?modifierGroupCode=${modifier.modifierGroupCode}`
-        );
-        if (itemsRes.ok) {
-          const existingItems = await itemsRes.json();
-          for (const item of existingItems) {
-            await fetch(`/api/modifier-items/${item.id}`, { method: "DELETE" });
+      const modifierGroupCode =
+        updatedGroup.modifierGroupCode ||
+        updatedGroup.modifier_group_code ||
+        modifier?.modifierGroupCode ||
+        null;
+
+      // 2) Handle removed items
+      if (Array.isArray(removedItemIds)) {
+        for (const itemId of removedItemIds) {
+          if (!itemId) continue;
+          const deleteRes = await fetch(`/api/modifier-items/${itemId}`, {
+            method: "DELETE",
+          });
+          if (!deleteRes.ok) {
+            const err = await deleteRes.json().catch(() => ({}));
+            throw new Error(err.error || "Failed to delete modifier item");
           }
         }
+      }
 
-        // Create new items
-        for (const item of formData.modifierItems) {
+      // 3) Upsert modifier items
+      if (Array.isArray(formItems)) {
+        for (const item of formItems) {
           if (!item.name?.trim()) continue;
-          const itemResponse = await fetch("/api/modifier-items", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              modifierGroupCode:
-                updatedGroup.modifierGroupCode ||
-                updatedGroup.modifier_group_code,
-              name: item.name,
-              labelName: item.labelName || null,
-              colorCode: item.colorCode || null,
-              price: typeof item.price === "number" ? item.price : null,
-              isDefault: item.isDefault ? 1 : 0,
-              displayOrder:
-                typeof item.displayOrder === "number"
-                  ? item.displayOrder
-                  : null,
-              isActive: 1,
-            }),
-          });
-          if (!itemResponse.ok) {
-            const err = await itemResponse.json();
-            throw new Error(err.error || "Failed to update modifier item");
+
+          const payload = {
+            modifierGroupCode,
+            name: item.name,
+            labelName: item.labelName || null,
+            colorCode: item.colorCode || null,
+            price: typeof item.price === "number" ? item.price : null,
+            isDefault: item.isDefault ? 1 : 0,
+            displayOrder:
+              typeof item.displayOrder === "number" ? item.displayOrder : null,
+            isActive: typeof item.isActive === "number" ? item.isActive : 1,
+          };
+
+          if (item.id) {
+            const updateRes = await fetch(`/api/modifier-items/${item.id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            if (!updateRes.ok) {
+              const err = await updateRes.json().catch(() => ({}));
+              throw new Error(err.error || "Failed to update modifier item");
+            }
+          } else {
+            const createRes = await fetch("/api/modifier-items", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            if (!createRes.ok) {
+              const err = await createRes.json().catch(() => ({}));
+              throw new Error(err.error || "Failed to create modifier item");
+            }
           }
         }
       }
 
       toast.success("Modifier group updated successfully!");
-      router.push(`/dashboard/modifiers/modifiers?refresh=${Date.now()}`);
+      router.push("/dashboard/modifiers/modifiers");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Error updating modifier"

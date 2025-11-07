@@ -9,6 +9,7 @@ import SystemColorPicker, {
   getPrimaryColor,
 } from "@/components/ui/SystemColorPicker";
 import { CheckIcon } from "@heroicons/react/24/solid";
+import StatusToggle from "@/components/forms/StatusToggle";
 
 interface MenuMaster {
   menuMasterId: string;
@@ -46,8 +47,8 @@ export default function AddCategoryPage() {
   const fetchData = async () => {
     try {
       const [mastersRes, modifierGroupsRes] = await Promise.all([
-        fetch("/api/menu/masters"),
-        fetch("/api/modifier-groups"),
+        fetch("/api/menu/masters", { cache: "no-store" }),
+        fetch("/api/modifier-groups", { cache: "no-store" }),
       ]);
 
       if (mastersRes.ok) {
@@ -90,6 +91,10 @@ export default function AddCategoryPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.menuMasterId) {
+      toast.error("Please select a menu master");
+      return;
+    }
     setLoading(true);
 
     try {
@@ -109,7 +114,7 @@ export default function AddCategoryPage() {
 
       if (response.ok) {
         toast.success("Category created successfully!");
-        router.push("/dashboard/menu/categories");
+        router.push(`/dashboard/menu/categories`);
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to create category");
@@ -152,7 +157,7 @@ export default function AddCategoryPage() {
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
                   Basic Information
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Category Name *
@@ -170,33 +175,64 @@ export default function AddCategoryPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Menu Master *
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Select Menu Master *
                     </label>
-                    <select
-                      required
-                      value={formData.menuMasterId}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          menuMasterId: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select Menu Master</option>
-                      {menuMasters.map((master) => (
-                        <option
-                          key={master.menuMasterId}
-                          value={master.menuMasterId}
-                        >
-                          {master.name}
-                        </option>
-                      ))}
-                    </select>
+                    {menuMasters.length === 0 ? (
+                      <div className="border border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 text-sm text-gray-500 dark:text-gray-400">
+                        No menu masters available. Please create a menu master
+                        first.
+                      </div>
+                    ) : (
+                      <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700">
+                        <div className="max-h-48 overflow-y-auto pr-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-track]:dark:bg-gray-800 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:dark:bg-gray-600 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-gray-400 [&::-webkit-scrollbar-thumb]:dark:hover:bg-gray-500">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3">
+                            {menuMasters.map((master) => {
+                              const isSelected =
+                                formData.menuMasterId === master.menuMasterId;
+                              return (
+                                <button
+                                  key={master.menuMasterId}
+                                  type="button"
+                                  onClick={() =>
+                                    setFormData({
+                                      ...formData,
+                                      menuMasterId: master.menuMasterId,
+                                    })
+                                  }
+                                  className={`relative p-4 rounded-lg border-2 transition-all text-left ${
+                                    isSelected
+                                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md"
+                                      : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex-1 min-w-0">
+                                      <p
+                                        className={`text-sm font-medium truncate ${
+                                          isSelected
+                                            ? "text-blue-700 dark:text-blue-300"
+                                            : "text-gray-700 dark:text-gray-300"
+                                        }`}
+                                        title={master.name}
+                                      >
+                                        {master.name}
+                                      </p>
+                                    </div>
+                                    {isSelected && (
+                                      <CheckIcon className="w-5 h-5 text-blue-600 dark:text-blue-400 ml-2 flex-shrink-0" />
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="md:col-span-2">
+                  <div>
                     <SystemColorPicker
                       label="Color Options"
                       value={formData.colorCode}
@@ -208,7 +244,7 @@ export default function AddCategoryPage() {
                 </div>
               </div>
 
-              {/* Modifier Groups Selection */}
+              {/* Modifiers Selection */}
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white">
@@ -237,67 +273,73 @@ export default function AddCategoryPage() {
                     </p>
                   </div>
                 ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {modifierGroups.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={handleSelectAll}
-                        className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium px-3 py-1 border border-blue-600 dark:border-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                      >
-                        {selectedModifierGroups.size === modifierGroups.length
-                          ? "Deselect All"
-                          : "Select All"}
-                      </button>
-                    )}
-                    {modifierGroups.map((group) => {
-                      const code = group.modifierGroupCode;
-                      if (!code) return null;
-                      return (
+                  <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700">
+                    <div className="flex flex-wrap items-center gap-2 mb-4">
+                      {modifierGroups.length > 0 && (
                         <button
-                          key={group.id}
                           type="button"
-                          onClick={() => handleModifierGroupToggle(code)}
-                          className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
-                            selectedModifierGroups.has(code)
-                              ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
-                              : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                          }`}
+                          onClick={handleSelectAll}
+                          className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium px-3 py-1 border border-blue-600 dark:border-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                         >
-                          {group.groupName || group.labelName || code}
-                          {selectedModifierGroups.has(code) && (
-                            <CheckIcon className="w-4 h-4 inline-block ml-2" />
-                          )}
+                          {selectedModifierGroups.size === modifierGroups.length
+                            ? "Deselect All"
+                            : "Select All"}
                         </button>
-                      );
-                    })}
+                      )}
+                    </div>
+                    <div className="max-h-64 overflow-y-auto pr-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-track]:dark:bg-gray-800 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:dark:bg-gray-600 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-gray-400 [&::-webkit-scrollbar-thumb]:dark:hover:bg-gray-500">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                        {modifierGroups.map((group) => {
+                          const code = group.modifierGroupCode;
+                          if (!code) return null;
+                          const isSelected = selectedModifierGroups.has(code);
+                          return (
+                            <button
+                              key={group.id}
+                              type="button"
+                              onClick={() => handleModifierGroupToggle(code)}
+                              className={`relative p-4 rounded-lg border-2 transition-all text-left ${
+                                isSelected
+                                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md"
+                                  : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1 min-w-0">
+                                  <p
+                                    className={`text-sm font-medium truncate ${
+                                      isSelected
+                                        ? "text-blue-700 dark:text-blue-300"
+                                        : "text-gray-700 dark:text-gray-300"
+                                    }`}
+                                    title={
+                                      group.groupName || group.labelName || code
+                                    }
+                                  >
+                                    {group.groupName || group.labelName || code}
+                                  </p>
+                                </div>
+                                {isSelected && (
+                                  <CheckIcon className="w-5 h-5 text-blue-600 dark:text-blue-400 ml-2 flex-shrink-0" />
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Status */}
-              <div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                  Status
-                </h3>
-                <div>
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={formData.isActive === 1}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          isActive: e.target.checked ? 1 : 0,
-                        })
-                      }
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700"
-                    />
-                    <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                      Active
-                    </span>
-                  </label>
-                </div>
-              </div>
+              <StatusToggle
+                label="Category Status"
+                description="Toggle to control whether this category is active and visible across the POS."
+                value={formData.isActive === 1}
+                onChange={(val) =>
+                  setFormData({ ...formData, isActive: val ? 1 : 0 })
+                }
+              />
             </div>
 
             {/* Footer */}

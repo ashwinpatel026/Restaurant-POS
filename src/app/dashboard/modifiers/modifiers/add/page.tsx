@@ -12,23 +12,19 @@ export default function AddModifierPage() {
 
   const handleSave = async (formData: any) => {
     try {
+      const {
+        modifierItems: formItems = [],
+        removedItemIds: _removed = [],
+        ...groupData
+      } = formData || {};
+
       // 1) Create modifier group
       const groupRes = await fetch("/api/modifier-groups", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          groupName: formData.groupName,
-          labelName: formData.labelName,
-          isRequired: formData.isRequired,
-          isMultiselect: formData.isMultiselect,
-          minSelection: formData.minSelection,
-          maxSelection: formData.maxSelection,
-          showDefaultTop: formData.showDefaultTop,
-          inheritFromMenuGroup: formData.inheritFromMenuGroup,
-          menuCategoryCode: formData.menuCategoryCode || null,
-          priceStrategy: formData.priceStrategy,
-          price: formData.priceStrategy === 3 ? formData.price : null,
-          isActive: formData.isActive,
+          ...groupData,
+          price: groupData.priceStrategy === 3 ? groupData.price ?? 0 : null,
         }),
       });
 
@@ -40,8 +36,8 @@ export default function AddModifierPage() {
       const createdGroup = await groupRes.json();
 
       // 2) Create modifier items (if any)
-      if (Array.isArray(formData.modifierItems)) {
-        for (const item of formData.modifierItems) {
+      if (Array.isArray(formItems)) {
+        for (const item of formItems) {
           if (!item.name?.trim()) continue;
           const itemRes = await fetch("/api/modifier-items", {
             method: "POST",

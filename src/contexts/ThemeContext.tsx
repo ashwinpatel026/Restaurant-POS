@@ -1,30 +1,37 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
 
-type Theme = "light" | "dark";
+export type Theme = "light" | "dark";
 
 interface ThemeContextType {
   theme: Theme;
   toggleTheme: () => void;
+  setTheme: (value: Theme) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>("light");
+  const [theme, setThemeState] = useState<Theme>("light");
 
   useEffect(() => {
     // Check for saved theme preference or default to 'light'
     const savedTheme = localStorage.getItem("theme") as Theme;
     if (savedTheme) {
-      setTheme(savedTheme);
+      setThemeState(savedTheme);
     } else {
       // Check system preference
       const prefersDark = window.matchMedia(
         "(prefers-color-scheme: dark)"
       ).matches;
-      setTheme(prefersDark ? "dark" : "light");
+      setThemeState(prefersDark ? "dark" : "light");
     }
   }, []);
 
@@ -41,12 +48,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme((prevTheme) => (prevTheme === "light" ? "dark" : "light"));
-  };
+  const toggleTheme = useCallback(() => {
+    setThemeState((prevTheme) => (prevTheme === "light" ? "dark" : "light"));
+  }, []);
+
+  const setTheme = useCallback((value: Theme) => {
+    setThemeState(value);
+  }, []);
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
       {children}
     </ThemeContext.Provider>
   );

@@ -11,7 +11,7 @@ export const authOptions: NextAuthOptions = {
         email: { label: 'Email', type: 'text' },
         password: { label: 'Password', type: 'password' }
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
           throw new Error('Invalid credentials')
         }
@@ -31,6 +31,34 @@ export const authOptions: NextAuthOptions = {
 
         if (!isPasswordValid) {
           throw new Error('Invalid credentials')
+        }
+
+        const userAgent = req?.headers?.['user-agent'] || null
+        const forwardedFor = req?.headers?.['x-forwarded-for'] as
+          | string
+          | string[]
+          | undefined
+        const realIp = req?.headers?.['x-real-ip'] as string | undefined
+
+        const ipAddress = Array.isArray(forwardedFor)
+          ? forwardedFor[0]
+          : forwardedFor?.split(',')[0]?.trim() || realIp || null
+
+        const storeCode = process.env.STORE_CODE || null
+
+        try {
+          await (prisma as any).userLoginActivity.create({
+            data: {
+              userId: user.id,
+              email: user.email,
+              storeCode,
+              userAgent,
+              ipAddress,
+              success: 1,
+            },
+          })
+        } catch (error) {
+          console.error('Failed to record user login activity:', error)
         }
 
         return {

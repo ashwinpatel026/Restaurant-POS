@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import {
   PlusIcon,
@@ -33,12 +33,8 @@ interface ModifierGroup {
 
 export default function ModifiersPage() {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [modifiers, setModifiers] = useState<ModifierGroup[]>([]);
   const [loading, setLoading] = useState(true);
-  const fetchingRef = useRef(false);
-  const lastRefreshRef = useRef<string | null>(null);
 
   // Modal states
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -51,34 +47,12 @@ export default function ModifiersPage() {
     fetchData();
   }, []);
 
-  // Refetch when refresh parameter is present (only once per refresh token)
-  useEffect(() => {
-    const refreshToken = searchParams.get("refresh");
-    if (
-      pathname === "/dashboard/modifiers/modifiers" &&
-      refreshToken &&
-      refreshToken !== lastRefreshRef.current &&
-      !fetchingRef.current
-    ) {
-      lastRefreshRef.current = refreshToken;
-      fetchData();
-      // Clean up the refresh parameter after a delay to avoid re-triggering
-      setTimeout(() => {
-        router.replace("/dashboard/modifiers/modifiers", { scroll: false });
-      }, 100);
-    }
-  }, [pathname, searchParams, router]);
-
   const fetchData = async () => {
-    // Prevent duplicate calls
-    if (fetchingRef.current) {
-      return;
-    }
-    fetchingRef.current = true;
-
     try {
       setLoading(true);
-      const modifiersRes = await fetch("/api/modifier-groups");
+      const modifiersRes = await fetch("/api/modifier-groups", {
+        cache: "no-store",
+      });
 
       if (modifiersRes.ok) {
         const modifiersData = await modifiersRes.json();
@@ -91,7 +65,6 @@ export default function ModifiersPage() {
       console.error("Error:", error);
     } finally {
       setLoading(false);
-      fetchingRef.current = false;
     }
   };
 

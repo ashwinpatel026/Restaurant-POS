@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import {
   PlusIcon,
@@ -35,13 +35,9 @@ interface MenuMaster {
 
 export default function MenuCategoriesPage() {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [menuMasters, setMenuMasters] = useState<MenuMaster[]>([]);
   const [loading, setLoading] = useState(true);
-  const fetchingRef = useRef(false);
-  const lastRefreshRef = useRef<string | null>(null);
 
   // Delete modal state
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -60,24 +56,6 @@ export default function MenuCategoriesPage() {
   useEffect(() => {
     fetchData();
   }, []);
-
-  // Refetch when refresh parameter is present (only once per refresh token)
-  useEffect(() => {
-    const refreshToken = searchParams.get("refresh");
-    if (
-      pathname === "/dashboard/menu/categories" &&
-      refreshToken &&
-      refreshToken !== lastRefreshRef.current &&
-      !fetchingRef.current
-    ) {
-      lastRefreshRef.current = refreshToken;
-      fetchData();
-      // Clean up the refresh parameter after a delay to avoid re-triggering
-      setTimeout(() => {
-        router.replace("/dashboard/menu/categories", { scroll: false });
-      }, 100);
-    }
-  }, [pathname, searchParams, router]);
 
   // Filter effect
   useEffect(() => {
@@ -113,17 +91,11 @@ export default function MenuCategoriesPage() {
   };
 
   const fetchData = async () => {
-    // Prevent duplicate calls
-    if (fetchingRef.current) {
-      return;
-    }
-    fetchingRef.current = true;
-
     try {
       setLoading(true);
       const [categoriesRes, mastersRes] = await Promise.all([
-        fetch("/api/menu/categories"),
-        fetch("/api/menu/masters"),
+        fetch("/api/menu/categories", { cache: "no-store" }),
+        fetch("/api/menu/masters", { cache: "no-store" }),
       ]);
 
       if (categoriesRes.ok) {
@@ -140,7 +112,6 @@ export default function MenuCategoriesPage() {
       console.error("Error:", error);
     } finally {
       setLoading(false);
-      fetchingRef.current = false;
     }
   };
 

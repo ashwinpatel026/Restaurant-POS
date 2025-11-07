@@ -24,6 +24,17 @@ interface Category {
   name: string;
 }
 
+interface ModifierItemState {
+  id?: string;
+  name: string;
+  labelName: string;
+  colorCode: string;
+  price: number;
+  isDefault: number;
+  displayOrder: number;
+  isActive: number;
+}
+
 interface ModifierFormProps {
   modifier?: ModifierGroupData | null;
   onSave: (data: any) => void;
@@ -49,8 +60,9 @@ export default function ModifierForm({
     isActive: 1,
   });
 
-  const [modifierItems, setModifierItems] = useState([
+  const [modifierItems, setModifierItems] = useState<ModifierItemState[]>([
     {
+      id: undefined,
       name: "",
       labelName: "",
       colorCode: "#3B82F6",
@@ -60,6 +72,7 @@ export default function ModifierForm({
       isActive: 1,
     },
     {
+      id: undefined,
       name: "",
       labelName: "",
       colorCode: "#3B82F6",
@@ -69,6 +82,7 @@ export default function ModifierForm({
       isActive: 1,
     },
   ]);
+  const [removedItemIds, setRemovedItemIds] = useState<string[]>([]);
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
@@ -92,13 +106,18 @@ export default function ModifierForm({
         price: (modifier as any).price ?? 0,
         isActive: modifier.isActive ?? 1,
       });
+      setRemovedItemIds([]);
       // Load items if provided in modifier data
       if ((modifier as any).items && Array.isArray((modifier as any).items)) {
         const loadedItems = (modifier as any).items.map((item: any) => ({
+          id: item.id,
           name: item.name || "",
           labelName: item.labelName || "",
           colorCode: item.colorCode || "#3B82F6",
-          price: typeof item.price === "number" ? item.price : 0,
+          price:
+            typeof item.price === "number"
+              ? item.price
+              : parseFloat(item.price) || 0,
           isDefault: item.isDefault || 0,
           displayOrder:
             typeof item.displayOrder === "number" ? item.displayOrder : 1,
@@ -109,6 +128,7 @@ export default function ModifierForm({
             ? loadedItems
             : [
                 {
+                  id: undefined,
                   name: "",
                   labelName: "",
                   colorCode: "#3B82F6",
@@ -124,6 +144,7 @@ export default function ModifierForm({
       // Reset to default 2 empty rows for new modifier
       setModifierItems([
         {
+          id: undefined,
           name: "",
           labelName: "",
           colorCode: "#3B82F6",
@@ -133,6 +154,7 @@ export default function ModifierForm({
           isActive: 1,
         },
         {
+          id: undefined,
           name: "",
           labelName: "",
           colorCode: "#3B82F6",
@@ -142,6 +164,7 @@ export default function ModifierForm({
           isActive: 1,
         },
       ]);
+      setRemovedItemIds([]);
     }
   }, [modifier]);
 
@@ -153,6 +176,7 @@ export default function ModifierForm({
     setModifierItems([
       ...modifierItems,
       {
+        id: undefined,
         name: "",
         labelName: "",
         colorCode: "#3B82F6",
@@ -179,6 +203,12 @@ export default function ModifierForm({
 
   const confirmRemoveModifierItem = () => {
     if (deletingIndex !== null && modifierItems.length > 1) {
+      const itemToRemove = modifierItems[deletingIndex];
+      if (itemToRemove?.id) {
+        setRemovedItemIds((prev) =>
+          prev.includes(itemToRemove.id!) ? prev : [...prev, itemToRemove.id!]
+        );
+      }
       const updated = modifierItems.filter((_, i) => i !== deletingIndex);
       setModifierItems(updated);
     }
@@ -194,14 +224,6 @@ export default function ModifierForm({
       const submitData = {
         groupName: formData.groupName,
         labelName: formData.labelName,
-        isRequired: parseInt(String(formData.isRequired)),
-        isMultiselect: parseInt(String(formData.isMultiselect)),
-        minSelection: formData.minSelection
-          ? parseInt(String(formData.minSelection))
-          : null,
-        maxSelection: formData.maxSelection
-          ? parseInt(String(formData.maxSelection))
-          : null,
         showDefaultTop: parseInt(String(formData.showDefaultTop)),
         inheritFromMenuGroup: parseInt(String(formData.inheritFromMenuGroup)),
         priceStrategy: parseInt(String(formData.priceStrategy)),
@@ -213,10 +235,16 @@ export default function ModifierForm({
         modifierItems: modifierItems
           .filter((item) => item.name.trim() !== "")
           .map((item, idx) => ({
+            id: item.id,
             name: item.name,
             labelName: item.labelName || null,
             colorCode: item.colorCode || null,
-            price: typeof item.price === "number" ? item.price : null,
+            price:
+              formData.priceStrategy === 2
+                ? typeof item.price === "number"
+                  ? item.price
+                  : parseFloat(String(item.price)) || 0
+                : null,
             isDefault: item.isDefault ? 1 : 0,
             displayOrder:
               typeof item.displayOrder === "number"
@@ -224,6 +252,7 @@ export default function ModifierForm({
                 : idx + 1,
             isActive: typeof item.isActive === "number" ? item.isActive : 1,
           })),
+        removedItemIds,
       };
 
       console.log("Submitting modifier data:", submitData);
@@ -450,101 +479,6 @@ export default function ModifierForm({
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="0.00"
                   />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Advanced Settings Section */}
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Advanced Settings
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Configure selection requirements and behavior
-              </p>
-            </div>
-
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Required?
-                  </label>
-                  <select
-                    value={formData.isRequired}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        isRequired: parseInt(e.target.value),
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value={0}>Optional</option>
-                    <option value={1}>Required</option>
-                    <option value={2}>Optional but Force Show</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Selection Type
-                  </label>
-                  <select
-                    value={formData.isMultiselect}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        isMultiselect: parseInt(e.target.value),
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value={0}>Single Select</option>
-                    <option value={1}>Multi Select</option>
-                  </select>
-                </div>
-              </div>
-
-              {formData.isMultiselect === 1 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Min Selection
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={formData.minSelection}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          minSelection: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Max Selection
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={formData.maxSelection}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          maxSelection: e.target.value,
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
                 </div>
               )}
             </div>

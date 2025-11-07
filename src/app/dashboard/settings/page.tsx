@@ -4,40 +4,101 @@ import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
-import { useTheme } from "@/contexts/ThemeContext";
-import ColorCodeField from "@/components/ui/ColorCodeField";
+import { useTheme, Theme } from "@/contexts/ThemeContext";
+
+const DEFAULT_PALETTE = [
+  "#3B82F6",
+  "#10B981",
+  "#F59E0B",
+  "#EF4444",
+  "#8B5CF6",
+  "#14B8A6",
+];
 
 export default function SettingsPage() {
   const { data: session } = useSession();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // System palette of exactly six colors used across app
-  const defaultPalette = [
-    "#3B82F6",
-    "#10B981",
-    "#F59E0B",
-    "#EF4444",
-    "#8B5CF6",
-    "#14B8A6",
-  ];
-  const [allowedColors, setAllowedColors] = useState<string[]>(defaultPalette);
-  const [primaryColor, setPrimaryColor] = useState<string>(defaultPalette[0]);
+  const [allowedColors, setAllowedColors] = useState<string[]>(DEFAULT_PALETTE);
+  const [primaryColor, setPrimaryColor] = useState<string>(DEFAULT_PALETTE[0]);
+  const [uiTheme, setUiTheme] = useState<Theme>(theme);
 
   useEffect(() => {
-    try {
-      const storedPalette = JSON.parse(
-        localStorage.getItem("allowedColors") || "null"
-      );
-      const storedPrimary = localStorage.getItem("primaryColor");
-      if (Array.isArray(storedPalette) && storedPalette.length === 6) {
-        setAllowedColors(storedPalette);
-        if (storedPrimary && storedPalette.includes(storedPrimary)) {
-          setPrimaryColor(storedPrimary);
+    let isMounted = true;
+
+    const loadSettings = async () => {
+      try {
+        const response = await fetch("/api/settings/system", {
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null);
+          throw new Error(errorData?.error || "Failed to load settings");
+        }
+
+        const data = await response.json();
+        if (!isMounted) return;
+
+        if (
+          Array.isArray(data.allowedColors) &&
+          data.allowedColors.length === 6
+        ) {
+          setAllowedColors(data.allowedColors);
+        }
+
+        if (data.primaryColor) {
+          setPrimaryColor(data.primaryColor);
+        }
+
+        if (data.theme && ["light", "dark"].includes(data.theme)) {
+          setUiTheme(data.theme as Theme);
+        }
+
+        // Cache locally for quick access elsewhere if needed
+        localStorage.setItem(
+          "allowedColors",
+          JSON.stringify(data.allowedColors ?? DEFAULT_PALETTE)
+        );
+        localStorage.setItem(
+          "primaryColor",
+          data.primaryColor ?? DEFAULT_PALETTE[0]
+        );
+        if (data.theme) {
+          localStorage.setItem("theme", data.theme);
+        }
+      } catch (error) {
+        console.error(error);
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Unable to load system settings"
+        );
+      } finally {
+        if (isMounted) {
+          setLoading(false);
         }
       }
-    } catch {}
+    };
+
+    loadSettings();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  useEffect(() => {
+    setUiTheme(theme);
+  }, [theme]);
+
+  useEffect(() => {
+    setTheme(uiTheme);
+    localStorage.setItem("theme", uiTheme);
+  }, [uiTheme, setTheme]);
 
   const handleColorChange = (index: number, value: string) => {
     const next = [...allowedColors];
@@ -49,11 +110,47 @@ export default function SettingsPage() {
   const handleSaveSystemSettings = async () => {
     setSaving(true);
     try {
-      localStorage.setItem("allowedColors", JSON.stringify(allowedColors));
-      localStorage.setItem("primaryColor", primaryColor);
+      const response = await fetch("/api/settings/system", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          allowedColors,
+          primaryColor,
+          theme: uiTheme,
+        }),
+      });
+
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Failed to save settings");
+      }
+
+      if (payload?.allowedColors && Array.isArray(payload.allowedColors)) {
+        setAllowedColors(payload.allowedColors);
+        localStorage.setItem(
+          "allowedColors",
+          JSON.stringify(payload.allowedColors)
+        );
+      }
+
+      if (payload?.primaryColor) {
+        setPrimaryColor(payload.primaryColor);
+        localStorage.setItem("primaryColor", payload.primaryColor);
+      }
+
+      if (payload?.theme && ["light", "dark"].includes(payload.theme)) {
+        setUiTheme(payload.theme as Theme);
+      }
+
       toast.success("System settings saved");
-    } catch (e) {
-      toast.error("Failed to save settings");
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to save settings"
+      );
     } finally {
       setSaving(false);
     }
@@ -83,8 +180,14 @@ export default function SettingsPage() {
                 Switch between light and dark mode
               </p>
             </div>
-            <button onClick={toggleTheme} className="btn">
-              {theme === "light" ? "Enable Dark Mode" : "Enable Light Mode"}
+            <button
+              type="button"
+              onClick={() =>
+                setUiTheme((prev) => (prev === "light" ? "dark" : "light"))
+              }
+              className="btn"
+            >
+              {uiTheme === "light" ? "Enable Dark Mode" : "Enable Light Mode"}
             </button>
           </div>
         </div>
@@ -160,10 +263,14 @@ export default function SettingsPage() {
             <div className="flex justify-end">
               <button
                 onClick={handleSaveSystemSettings}
-                disabled={saving}
+                disabled={saving || loading}
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
               >
-                {saving ? "Saving..." : "Save System Settings"}
+                {saving
+                  ? "Saving..."
+                  : loading
+                  ? "Loading settings..."
+                  : "Save System Settings"}
               </button>
             </div>
           </div>
