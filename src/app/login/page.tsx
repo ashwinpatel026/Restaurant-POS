@@ -64,7 +64,7 @@ export default function LoginPage() {
                     ? "/assets/image/logo-light.png"
                     : "/assets/image/logo.png"
                 }
-                alt="Restaurant POS Logo"
+                alt="Acute-RPOS Logo"
                 width={280}
                 height={280}
                 className="object-contain"
