@@ -7,7 +7,7 @@ import { Providers } from "@/components/Providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Restaurant POS System",
+  title: "Acute RPOS System",
   description: "Comprehensive Point of Sale System for Restaurant Chain",
   icons: {
     icon: [

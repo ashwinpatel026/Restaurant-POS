@@ -206,7 +206,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <div className="flex items-center space-x-3 flex-1 min-w-0">
               <Link href="/dashboard" className="flex items-center flex-1">
                 <div className="relative">
-                  <Image
+                  {/* <Image
                     src={
                       theme === "dark"
                         ? "/assets/image/logo-light.png"
@@ -217,6 +217,18 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     height={40}
                     className="object-contain"
                     priority
+                  /> */}
+                  <img
+                    src={
+                      theme === "dark"
+                        ? "/assets/image/logo-light.png"
+                        : "/assets/image/logo.png"
+                    }
+                    alt="Acute-RPOS Logo"
+                    width={280}
+                    height={280}
+                    className="object-contain"
+                    
                   />
                 </div>
               </Link>
