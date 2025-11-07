@@ -54,7 +54,7 @@ export default function LoginPage() {
             : "linear-gradient(145deg, #193E72 0%, #FEB203 100%)",
       }}
     >
-      {/* login form */}
+      {/* login form start*/}
       <div className="max-w-md w-full">
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8">
           <div className="text-center mb-8">
