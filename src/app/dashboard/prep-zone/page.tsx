@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import {
   PlusIcon,
@@ -56,15 +55,11 @@ interface Station {
 }
 
 export default function PrepZonePage() {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const router = useRouter();
   const [prepZones, setPrepZones] = useState<PrepZone[]>([]);
   const [printers, setPrinters] = useState<Printer[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(true);
   const fetchingRef = useRef(false);
-  const lastRefreshRef = useRef<string | null>(null);
 
   // Modal states
   const [showModal, setShowModal] = useState(false);
@@ -76,23 +71,6 @@ export default function PrepZonePage() {
     fetchData();
   }, []);
 
-  // Refetch when refresh parameter is present (only once per refresh token)
-  useEffect(() => {
-    const refreshToken = searchParams.get("refresh");
-    if (
-      pathname === "/dashboard/prep-zone" &&
-      refreshToken &&
-      refreshToken !== lastRefreshRef.current &&
-      !fetchingRef.current
-    ) {
-      lastRefreshRef.current = refreshToken;
-      fetchData();
-      // Clean up the refresh parameter after a delay to avoid re-triggering
-      setTimeout(() => {
-        router.replace("/dashboard/prep-zone", { scroll: false });
-      }, 100);
-    }
-  }, [pathname, searchParams, router]);
 
   const fetchData = async () => {
     // Prevent duplicate calls

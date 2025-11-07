@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     // This will work with the simplified schema (Users + Outlets only)
     
     const totalUsers = await prisma.user.count()
-    const totalOutlets = await prisma.outlet.count()
+    const totalOutlets = await (prisma as any).outlet.count()
     
     // Get users by role for reports
     const usersByRole = await prisma.user.groupBy({

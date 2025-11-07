@@ -24,7 +24,7 @@ export async function PATCH(
       body.password = await bcrypt.hash(body.password, 10)
     }
 
-    const user = await prisma.user.update({
+    const user = await (prisma as any).user.update({
       where: { id: userId },
       data: body,
       include: { outlet: true }

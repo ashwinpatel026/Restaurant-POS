@@ -66,7 +66,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: `${user.firstName} ${user.lastName}`,
           role: user.role,
-          outletId: user.outletId?.toString() || null,
+          outletId: (user as any).outletId?.toString() || null,
         }
       }
     })

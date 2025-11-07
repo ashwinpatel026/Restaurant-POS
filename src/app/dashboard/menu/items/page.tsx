@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import {
   PlusIcon,
@@ -54,13 +54,10 @@ interface MenuCategory {
 
 export default function MenuItemsPage() {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const fetchingRef = useRef(false);
-  const lastRefreshRef = useRef<string | null>(null);
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState("");
@@ -80,23 +77,6 @@ export default function MenuItemsPage() {
     fetchData();
   }, []);
 
-  // Refetch when refresh parameter is present (only once per refresh token)
-  useEffect(() => {
-    const refreshToken = searchParams.get("refresh");
-    if (
-      pathname === "/dashboard/menu/items" &&
-      refreshToken &&
-      refreshToken !== lastRefreshRef.current &&
-      !fetchingRef.current
-    ) {
-      lastRefreshRef.current = refreshToken;
-      fetchData();
-      // Clean up the refresh parameter after a delay to avoid re-triggering
-      setTimeout(() => {
-        router.replace("/dashboard/menu/items", { scroll: false });
-      }, 100);
-    }
-  }, [pathname, searchParams, router]);
 
   // Filter effect
   useEffect(() => {

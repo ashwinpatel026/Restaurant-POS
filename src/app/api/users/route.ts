@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const users = await prisma.user.findMany({
+    const users = await (prisma as any).user.findMany({
       include: {
         outlet: true,
       },
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     })
 
     // Remove password from response
-    const usersWithoutPassword = users.map(user => {
+    const usersWithoutPassword = users.map((user: any) => {
       const { password, ...userWithoutPassword } = user
       return userWithoutPassword
     })
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     const bcrypt = require('bcryptjs')
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    const user = await prisma.user.create({
+    const newUser = await (prisma as any).user.create({
       data: {
         email,
         username,
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Remove password from response
-    const { password: _, ...userWithoutPassword } = user
+    const { password: _, ...userWithoutPassword } = newUser
 
     return NextResponse.json(userWithoutPassword, { status: 201 })
   } catch (error) {

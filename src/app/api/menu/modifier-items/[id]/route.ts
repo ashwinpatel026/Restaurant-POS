@@ -17,7 +17,7 @@ export async function GET(
     const resolvedParams = await params
     const itemId = parseInt(resolvedParams.id)
 
-    const modifierItem = await prisma.modifierItem.findUnique({
+    const modifierItem = await (prisma as any).modifierItem.findUnique({
       where: { tblModifierItemId: itemId },
       include: {
         modifier: {
@@ -67,7 +67,7 @@ export async function PUT(
 
     const { name, labelName, colorCode, price, tblModifierId } = body;
 
-    const modifierItem = await prisma.modifierItem.update({
+    const modifierItem = await (prisma as any).modifierItem.update({
       where: { tblModifierItemId: itemId },
       data: {
         name,
@@ -79,7 +79,7 @@ export async function PUT(
     })
 
     // Fetch modifier data for the updated item
-    const modifier = await prisma.modifier.findUnique({
+    const modifier = await (prisma as any).modifier.findUnique({
       where: { tblModifierId: modifierItem.tblModifierId },
       select: {
         tblModifierId: true,
@@ -96,24 +96,26 @@ export async function PUT(
     return NextResponse.json(itemWithModifier)
   } catch (error) {
     console.error('Error updating modifier item:', error)
-    
+
+    const err = error as { code?: string; message?: string } | undefined
+
     // Provide more specific error messages
-    if (error.code === 'P2025') {
+    if (err?.code === 'P2025') {
       return NextResponse.json(
         { error: 'Modifier item not found' },
         { status: 404 }
       )
     }
-    
-    if (error.code === 'P2002') {
+
+    if (err?.code === 'P2002') {
       return NextResponse.json(
         { error: 'A modifier item with this name already exists' },
         { status: 400 }
       )
     }
-    
+
     return NextResponse.json(
-      { error: 'Internal server error', details: error.message },
+      { error: 'Internal server error', details: err?.message ?? 'Unknown error' },
       { status: 500 }
     )
   }
@@ -133,7 +135,7 @@ export async function DELETE(
     const resolvedParams = await params
     const itemId = parseInt(resolvedParams.id)
 
-    await prisma.modifierItem.delete({
+    await (prisma as any).modifierItem.delete({
       where: { tblModifierItemId: itemId }
     })
 

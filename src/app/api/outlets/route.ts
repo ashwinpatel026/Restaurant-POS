@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const outlets = await prisma.outlet.findMany({
+    const outlets = await (prisma as any).outlet.findMany({
       include: {
         users: true,
       },
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { name, code, address, city, state, zipCode, phone, email, openingTime, closingTime } = body
 
-    const outlet = await prisma.outlet.create({
+    const outlet = await (prisma as any).outlet.create({
       data: {
         name,
         code,

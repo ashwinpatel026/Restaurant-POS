@@ -7,12 +7,13 @@ import { prisma } from './database'
  * @returns Next sequential code (e.g., W001, W002, W003...)
  */
 export async function generateNextCode(
-  model: 'printer' | 'prepStation' | 'availability' | 'tax' | 'menuMaster' | 'menuCategory' | 'menuItem' | 'modifierGroup' | 'modifierItem',
+  model: 'printer' | 'prepStation' | 'availability' | 'tax' | 'menuMaster' | 'menuCategory' | 'menuItem' | 'modifierGroup' | 'modifierItem' | 'prepZone',
   codeField: string
 ): Promise<string> {
   try {
     // Get the last record with W prefix, ordered by code descending
-    const lastRecord = await (prisma[model] as any).findFirst({
+    const client = ((prisma as unknown) as Record<string, any>)[model]
+    const lastRecord = await client.findFirst({
       where: {
         [codeField]: {
           startsWith: 'W'
@@ -50,7 +51,7 @@ export async function generateNextCode(
  * @returns Unique sequential code
  */
 export async function generateUniqueCode(
-  model: 'printer' | 'prepStation' | 'availability' | 'tax' | 'menuMaster' | 'menuCategory' | 'menuItem' | 'modifierGroup' | 'modifierItem',
+  model: 'printer' | 'prepStation' | 'availability' | 'tax' | 'menuMaster' | 'menuCategory' | 'menuItem' | 'modifierGroup' | 'modifierItem' | 'prepZone',
   codeField: string,
   maxRetries: number = 3
 ): Promise<string> {
@@ -61,7 +62,8 @@ export async function generateUniqueCode(
       const code = await generateNextCode(model, codeField)
       
       // Verify uniqueness
-      const existing = await (prisma[model] as any).findFirst({
+      const client = ((prisma as unknown) as Record<string, any>)[model]
+      const existing = await client.findFirst({
         where: {
           [codeField]: code
         }

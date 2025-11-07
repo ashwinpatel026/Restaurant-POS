@@ -17,7 +17,7 @@ export async function GET(
     const resolvedParams = await params
     const taxId = parseInt(resolvedParams.id)
 
-    const tax = await prisma.tax.findUnique({
+    const tax = await (prisma as any).tax.findUnique({
       where: { tblTaxId: taxId },
       include: {
         menuMasters: true
@@ -55,7 +55,7 @@ export async function PUT(
 
     const { taxname, taxrate } = body
 
-    const tax = await prisma.tax.update({
+    const tax = await (prisma as any).tax.update({
       where: { tblTaxId: taxId },
       data: {
         taxname,
