@@ -59,7 +59,7 @@ export default function LoginPage() {
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8">
           <div className="text-center mb-8">
             <div className="mx-auto mb-8 mt-8 flex items-center justify-center">
-              <Image
+              {/* <Image
                 src={
                   theme === "dark"
                     ? "/assets/image/logo-light.png"
@@ -70,6 +70,18 @@ export default function LoginPage() {
                 height={280}
                 className="object-contain"
                 priority
+              /> */}
+              <img
+                src={
+                  theme === "dark"
+                    ? "/assets/image/logo-light.png"
+                    : "/assets/image/logo.png"
+                }
+                alt="Acute-RPOS Logo"
+                width={280}
+                height={280}
+                className="object-contain"
+                
               />
             </div>
             <p className="text-gray-600 dark:text-gray-400 mt-2">
