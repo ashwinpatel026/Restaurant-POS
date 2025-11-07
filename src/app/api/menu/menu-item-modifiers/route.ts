@@ -19,21 +19,21 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all modifier assignments for the menu item
-    const assignments = await prisma.menuItemModifier.findMany({
+    const assignments = await (prisma as any).menuItemModifierGroup.findMany({
       where: {
-        tblMenuItemId: parseInt(menuItemId)
+        menuItemCode: menuItemId
       },
       include: {
-        modifier: {
+        modifierGroup: {
           include: {
             modifierItems: {
               where: { isActive: 1 },
-              orderBy: { tblModifierItemId: 'asc' }
+              orderBy: { displayOrder: 'asc' }
             }
           }
         }
       },
-      orderBy: { modifier: { name: 'asc' } }
+      orderBy: { modifierGroup: { groupName: 'asc' } }
     })
 
     return NextResponse.json(assignments)
@@ -68,38 +68,37 @@ export async function POST(request: NextRequest) {
     })
 
     // Remove existing assignments
-    await prisma.menuItemModifier.deleteMany({
-      where: { tblMenuItemId: parseInt(menuItemId) }
+    await (prisma as any).menuItemModifierGroup.deleteMany({
+      where: { menuItemCode: menuItemId }
     })
 
     // Add new assignments
     if (modifierIds && modifierIds.length > 0) {
-      const assignments = modifierIds.map((modifierId: number) => ({
-        tblMenuItemId: parseInt(menuItemId),
-        tblModifierId: modifierId,
-        isInherited: 0, // These are item-level assignments
-        additionalChargeType: 'price_set_on_individual_modifiers',
+      const assignments = modifierIds.map((modifierCode: string) => ({
+        menuItemCode: menuItemId,
+        modifierGroupCode: modifierCode,
+        assignmentType: 'ITEM',
         storeCode: process.env.STORE_CODE || null
       }))
 
-      await prisma.menuItemModifier.createMany({
+      await (prisma as any).menuItemModifierGroup.createMany({
         data: assignments
       })
     }
 
     // If inheritance is enabled, add inherited modifiers from category
     if (inheritModifiers) {
-      const menuItem = await prisma.menuItem.findUnique({
+      const menuItem = await (prisma as any).menuItem.findUnique({
         where: { tblMenuItemId: parseInt(menuItemId) },
-        include: { menuItemModifiers: true }
+        include: { menuItemModifierGroups: true }
       })
 
       if (menuItem) {
         // Get category-level modifiers
-        const categoryModifiers = await prisma.modifier.findMany({
+        const categoryModifiers = await (prisma as any).modifierGroup.findMany({
           where: {
-            tblMenuCategoryId: menuItem.tblMenuCategoryId,
-            tblModifierId: {
+            menuCategoryCode: menuItem.menuCategoryCode,
+            modifierGroupCode: {
               notIn: modifierIds || [] // Exclude already assigned item-level modifiers
             }
           }
@@ -107,14 +106,13 @@ export async function POST(request: NextRequest) {
 
         if (categoryModifiers.length > 0) {
           const inheritedAssignments = categoryModifiers.map((modifier) => ({
-            tblMenuItemId: parseInt(menuItemId),
-            tblModifierId: modifier.tblModifierId,
-            isInherited: 1, // These are inherited from category
-            additionalChargeType: modifier.additionalChargeType || 'price_set_on_individual_modifiers',
+            menuItemCode: menuItem.menuItemCode,
+            modifierGroupCode: modifier.modifierGroupCode,
+            assignmentType: 'CATEGORY',
             storeCode: process.env.STORE_CODE || null
           }))
 
-          await prisma.menuItemModifier.createMany({
+          await (prisma as any).menuItemModifierGroup.createMany({
             data: inheritedAssignments
           })
         }
