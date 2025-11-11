@@ -157,7 +157,6 @@ export default function MenuMastersPage() {
           menuMasters.filter((master) => master.menuMasterId !== deletingId)
         );
         toast.success("Menu master deleted successfully");
-        fetchData(); // Refresh data
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to delete menu master");

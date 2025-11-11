@@ -82,9 +82,9 @@ export default function PrepZonePage() {
     try {
       setLoading(true);
       const [zonesRes, printersRes, stationsRes] = await Promise.all([
-        fetch("/api/menu/prep-zone"),
-        fetch("/api/printer"),
-        fetch("/api/station"),
+        fetch("/api/menu/prep-zone", { cache: "no-store" }),
+        fetch("/api/printer", { cache: "no-store" }),
+        fetch("/api/station", { cache: "no-store" }),
       ]);
 
       if (zonesRes.ok) {
@@ -138,7 +138,13 @@ export default function PrepZonePage() {
       });
 
       if (response.ok) {
-        const result = await response.json();
+        let updatedZone: PrepZone | null = null;
+        try {
+          updatedZone = await response.json();
+        } catch (jsonError) {
+          updatedZone = null;
+        }
+
         toast.success(
           editingZone
             ? "Prep Zone updated successfully!"
@@ -146,7 +152,26 @@ export default function PrepZonePage() {
         );
         setShowModal(false);
         setEditingZone(null);
-        fetchData(); // Refresh data
+
+        if (updatedZone) {
+          const zoneData = updatedZone;
+          setPrepZones((prev) => {
+            if (editingZone) {
+              return prev.map((zone) =>
+                zone.prepZoneId === editingZone.prepZoneId
+                  ? { ...zone, ...zoneData }
+                  : zone
+              );
+            }
+            // ensure no duplicates if API returns existing zone
+            const exists = prev.some(
+              (zone) => zone.prepZoneId === zoneData.prepZoneId
+            );
+            return exists ? prev : [...prev, zoneData];
+          });
+        } else {
+          fetchData();
+        }
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to save prep zone");

@@ -91,7 +91,7 @@ export default function AddMenuMasterPage() {
 
       if (response.ok) {
         toast.success("Menu master created successfully!");
-        router.push(`/dashboard/menu/masters?refresh=${Date.now()}`);
+        router.push("/dashboard/menu/masters");
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to create menu master");

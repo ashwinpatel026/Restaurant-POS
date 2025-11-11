@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/database'
+import { Prisma } from '@prisma/client'
 
 // Helper function to generate unique station code
 async function generateStationCode(): Promise<string> {
@@ -25,6 +26,47 @@ async function generateStationCode(): Promise<string> {
   return `S${String(nextNumber).padStart(3, '0')}`
 }
 
+function sanitizeStationGroups(input: unknown): string[] {
+  if (!input) {
+    return []
+  }
+
+  const values = Array.isArray(input)
+    ? input
+    : typeof input === 'string'
+      ? input.split(',')
+      : []
+
+  const unique = new Set<string>()
+
+  for (const value of values) {
+    if (typeof value === 'string') {
+      const trimmed = value.trim()
+      if (trimmed) {
+        unique.add(trimmed)
+      }
+    }
+  }
+
+  return Array.from(unique)
+}
+
+function mapStationResponse(station: any) {
+  const rawGroups = station?.stationGroups as Prisma.JsonValue | null | undefined
+  const groups =
+    Array.isArray(rawGroups)
+      ? rawGroups
+          .map((item) => (typeof item === 'string' ? item.trim() : ''))
+          .filter((item): item is string => item.length > 0)
+      : []
+
+  return {
+    ...station,
+    tblStationId: station.tblStationId.toString(),
+    stationGroups: groups,
+  }
+}
+
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
@@ -37,11 +79,7 @@ export async function GET() {
       orderBy: { stationname: 'asc' }
     })
 
-    // Convert BigInt to string for JSON serialization
-    const stationsWithStringId = stations.map(station => ({
-      ...station,
-      tblStationId: station.tblStationId.toString()
-    }))
+    const stationsWithStringId = stations.map(mapStationResponse)
 
     // Cache response for 60 seconds
     return NextResponse.json(stationsWithStringId, {
@@ -67,25 +105,31 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { stationname, isActive } = body
+    const { stationname, isActive, stationGroups } = body
+
+    const groups = sanitizeStationGroups(stationGroups)
 
     // Generate unique station code
     const stationCode = await generateStationCode()
 
+    const stationData: Record<string, unknown> = {
+      stationCode: stationCode,
+      stationname,
+      isActive: isActive ?? 1,
+      storeCode: process.env.STORE_CODE || null,
+    }
+
+    if (groups.length > 0) {
+      stationData.stationGroups = groups
+    } else {
+      stationData.stationGroups = Prisma.JsonNull
+    }
+
     const station = await prisma.station.create({
-      data: {
-        stationCode: stationCode,
-        stationname,
-        isActive: isActive ?? 1,
-        storeCode: process.env.STORE_CODE || null
-      }
+      data: stationData as Prisma.StationCreateInput
     })
 
-    // Convert BigInt to string for JSON serialization
-    return NextResponse.json({
-      ...station,
-      tblStationId: station.tblStationId.toString()
-    }, { status: 201 })
+    return NextResponse.json(mapStationResponse(station), { status: 201 })
   } catch (error) {
     console.error('Error creating station:', error)
     return NextResponse.json(

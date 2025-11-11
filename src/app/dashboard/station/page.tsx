@@ -19,10 +19,45 @@ interface Station {
   stationCode: string;
   stationname: string | null;
   isActive: number | null;
+  stationGroups?: string[];
   isSyncToWeb: number;
   isSyncToLocal: number;
   storeCode: string | null;
 }
+
+interface StationFormData {
+  stationname: string;
+  isActive: number;
+  stationGroups: string[];
+}
+
+const normalizeStationGroups = (value: unknown): string[] => {
+  if (!value) return [];
+  const values = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+    ? value.split(",")
+    : [];
+
+  const unique = new Set<string>();
+  for (const entry of values) {
+    if (typeof entry === "string") {
+      const trimmed = entry.trim();
+      if (trimmed) unique.add(trimmed);
+    }
+  }
+
+  return Array.from(unique);
+};
+
+const mapStation = (station: any): Station => ({
+  ...station,
+  tblStationId:
+    typeof station.tblStationId === "string"
+      ? station.tblStationId
+      : station.tblStationId?.toString?.() ?? String(station.tblStationId),
+  stationGroups: normalizeStationGroups(station.stationGroups),
+});
 
 export default function StationManagementPage() {
   const [stations, setStations] = useState<Station[]>([]);
@@ -40,11 +75,12 @@ export default function StationManagementPage() {
 
   const fetchData = async () => {
     try {
-      const response = await fetch("/api/station");
+      setLoading(true);
+      const response = await fetch("/api/station", { cache: "no-store" });
 
       if (response.ok) {
         const data = await response.json();
-        setStations(data);
+        setStations(data.map(mapStation));
       }
     } catch (error) {
       toast.error("Error loading data");
@@ -65,7 +101,7 @@ export default function StationManagementPage() {
     setShowModal(true);
   };
 
-  const handleSave = async (formData: any) => {
+  const handleSave = async (formData: StationFormData) => {
     try {
       const url = editingStation
         ? `/api/station/${editingStation.tblStationId}`
@@ -83,6 +119,7 @@ export default function StationManagementPage() {
 
       if (response.ok) {
         const result = await response.json();
+        const mappedStation = mapStation(result);
         toast.success(
           editingStation
             ? "Station updated successfully!"
@@ -90,7 +127,15 @@ export default function StationManagementPage() {
         );
         setShowModal(false);
         setEditingStation(null);
-        fetchData(); // Refresh data
+        setStations((prev) =>
+          editingStation
+            ? prev.map((station) =>
+                station.tblStationId === mappedStation.tblStationId
+                  ? mappedStation
+                  : station
+              )
+            : [...prev, mappedStation]
+        );
       } else {
         throw new Error("Failed to save station");
       }
@@ -117,8 +162,8 @@ export default function StationManagementPage() {
       );
 
       if (response.ok) {
-        setStations(
-          stations.filter(
+        setStations((prev) =>
+          prev.filter(
             (station) => station.tblStationId !== stationToDelete.tblStationId
           )
         );
@@ -299,6 +344,29 @@ export default function StationManagementPage() {
                   ),
                 },
                 {
+                  header: "Groups",
+                  accessor: "stationGroups",
+                  cell: (station: Station) => (
+                    <div className="flex flex-wrap gap-1">
+                      {station.stationGroups &&
+                      station.stationGroups.length > 0 ? (
+                        station.stationGroups.map((group) => (
+                          <span
+                            key={`${station.tblStationId}-${group}`}
+                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+                          >
+                            {group}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-sm text-gray-400 dark:text-gray-500">
+                          None
+                        </span>
+                      )}
+                    </div>
+                  ),
+                },
+                {
                   header: "Status",
                   accessor: "isActive",
                   cell: (station: Station) => (
@@ -387,23 +455,33 @@ function StationForm({
   onCancel,
 }: {
   station?: Station | null;
-  onSave: (data: any) => void;
+  onSave: (data: StationFormData) => void;
   onCancel: () => void;
 }) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<StationFormData>({
     stationname: "",
     isActive: 1,
+    stationGroups: [],
   });
 
   const [loading, setLoading] = useState(false);
+  const [groupInput, setGroupInput] = useState("");
 
   useEffect(() => {
     if (station) {
       setFormData({
         stationname: station.stationname || "",
         isActive: station.isActive ?? 1,
+        stationGroups: normalizeStationGroups(station.stationGroups),
+      });
+    } else {
+      setFormData({
+        stationname: "",
+        isActive: 1,
+        stationGroups: [],
       });
     }
+    setGroupInput("");
   }, [station]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -411,11 +489,53 @@ function StationForm({
     setLoading(true);
 
     try {
-      await onSave(formData);
+      await onSave({
+        ...formData,
+        stationGroups: normalizeStationGroups(formData.stationGroups),
+      });
     } catch (error) {
       console.error("Error:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGroupAdd = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    setFormData((prev) => {
+      if (prev.stationGroups.includes(trimmed)) {
+        return prev;
+      }
+      return {
+        ...prev,
+        stationGroups: [...prev.stationGroups, trimmed],
+      };
+    });
+  };
+
+  const handleGroupRemove = (group: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      stationGroups: prev.stationGroups.filter((item) => item !== group),
+    }));
+  };
+
+  const handleGroupKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      if (groupInput.trim()) {
+        handleGroupAdd(groupInput);
+        setGroupInput("");
+      }
+    } else if (e.key === "Backspace" && groupInput === "") {
+      setFormData((prev) => ({
+        ...prev,
+        stationGroups: prev.stationGroups.slice(
+          0,
+          Math.max(prev.stationGroups.length - 1, 0)
+        ),
+      }));
     }
   };
 
@@ -451,6 +571,45 @@ function StationForm({
           <option value={1}>Active</option>
           <option value={0}>Inactive</option>
         </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Station Groups
+        </label>
+        <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-white dark:bg-gray-700">
+          {formData.stationGroups.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2">
+              {formData.stationGroups.map((group) => (
+                <span
+                  key={group}
+                  className="inline-flex items-center bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium px-2 py-1 rounded-full"
+                >
+                  {group}
+                  <button
+                    type="button"
+                    onClick={() => handleGroupRemove(group)}
+                    className="ml-1 text-blue-500 hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200"
+                    aria-label={`Remove ${group}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <input
+            type="text"
+            value={groupInput}
+            onChange={(e) => setGroupInput(e.target.value)}
+            onKeyDown={handleGroupKeyDown}
+            placeholder="Type a group name and press Enter"
+            className="w-full px-3 py-2 border border-gray-200 dark:border-gray-500 rounded-lg bg-white dark:bg-gray-600 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+        </div>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          Press Enter or comma to add a group. Use the × icon to remove a group.
+        </p>
       </div>
 
       <div className="flex justify-end space-x-3 pt-4">

@@ -2,6 +2,48 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/database'
+import { Prisma } from '@prisma/client'
+
+function sanitizeStationGroups(input: unknown): string[] {
+  if (!input) {
+    return []
+  }
+
+  const values = Array.isArray(input)
+    ? input
+    : typeof input === 'string'
+      ? input.split(',')
+      : []
+
+  const unique = new Set<string>()
+
+  for (const value of values) {
+    if (typeof value === 'string') {
+      const trimmed = value.trim()
+      if (trimmed) {
+        unique.add(trimmed)
+      }
+    }
+  }
+
+  return Array.from(unique)
+}
+
+function mapStationResponse(station: any) {
+  const rawGroups = station?.stationGroups as Prisma.JsonValue | null | undefined
+  const groups =
+    Array.isArray(rawGroups)
+      ? rawGroups
+          .map((item) => (typeof item === 'string' ? item.trim() : ''))
+          .filter((item): item is string => item.length > 0)
+      : []
+
+  return {
+    ...station,
+    tblStationId: station.tblStationId.toString(),
+    stationGroups: groups,
+  }
+}
 
 export async function GET(
   request: NextRequest,
@@ -25,11 +67,7 @@ export async function GET(
       return NextResponse.json({ error: 'Station not found' }, { status: 404 })
     }
 
-    // Convert BigInt to string for JSON serialization
-    return NextResponse.json({
-      ...station,
-      tblStationId: station.tblStationId.toString()
-    })
+    return NextResponse.json(mapStationResponse(station))
   } catch (error) {
     console.error('Error fetching station:', error)
     return NextResponse.json(
@@ -54,22 +92,27 @@ export async function PUT(
     const stationId = BigInt(idParam)
     const body = await request.json()
 
-    const { stationname, isActive } = body
+    const { stationname, isActive, stationGroups } = body
+    const groups = sanitizeStationGroups(stationGroups)
+
+    const updateData: Record<string, unknown> = {
+      stationname,
+      isActive,
+      storeCode: process.env.STORE_CODE || null,
+    }
+
+    if (groups.length > 0) {
+      updateData.stationGroups = groups
+    } else {
+      updateData.stationGroups = Prisma.JsonNull
+    }
 
     const station = await prisma.station.update({
       where: { tblStationId: stationId },
-      data: {
-        stationname,
-        isActive,
-        storeCode: process.env.STORE_CODE || null
-      }
+      data: updateData as Prisma.StationUpdateInput
     })
 
-    // Convert BigInt to string for JSON serialization
-    return NextResponse.json({
-      ...station,
-      tblStationId: station.tblStationId.toString()
-    })
+    return NextResponse.json(mapStationResponse(station))
   } catch (error) {
     console.error('Error updating station:', error)
     return NextResponse.json(

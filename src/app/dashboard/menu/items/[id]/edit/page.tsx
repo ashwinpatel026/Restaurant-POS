@@ -107,7 +107,7 @@ export default function EditMenuItemPage() {
 
       if (response.ok) {
         toast.success("Menu item updated successfully!");
-        router.push(`/dashboard/menu/items?refresh=${Date.now()}`);
+        router.push("/dashboard/menu/items");
       } else {
         const errorData = await response.json();
         throw new Error(errorData.error || "Failed to update menu item");

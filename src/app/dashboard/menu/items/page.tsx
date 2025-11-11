@@ -136,8 +136,8 @@ export default function MenuItemsPage() {
     try {
       setLoading(true);
       const [itemsRes, categoriesRes] = await Promise.all([
-        fetch("/api/menu/items"),
-        fetch("/api/menu/categories"),
+        fetch("/api/menu/items", { cache: "no-store" }),
+        fetch("/api/menu/categories", { cache: "no-store" }),
       ]);
 
       let itemsData = [];
