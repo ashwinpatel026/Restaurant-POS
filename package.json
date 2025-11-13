@@ -4,9 +4,10 @@
   "description": "Comprehensive POS System for Restaurant Chain",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
+    "postinstall": "prisma generate",
     "seed": "node scripts/seed.mjs",
     "seed:simple": "node scripts/seed-simple.mjs",
     "seed:sequential": "node scripts/seed-sequential.mjs",

@@ -133,19 +133,21 @@ export async function POST(request: NextRequest) {
     const menuMasterCode = await generateUniqueCode('menuMaster', 'menuMasterCode')
 
     // Create menu master
+    const createData = {
+      menuMasterCode,
+      name,
+      labelName: labelName || null,
+      colorCode: colorCode || null,
+      prepZoneCode: prepZoneCodes && prepZoneCodes.length > 0 ? prepZoneCodes : null,
+      stationCode: stationCodes && stationCodes.length > 0 ? stationCodes : null,
+      isEventMenu: isEventMenu || 0,
+      isActive: isActive ?? 1,
+      createdBy: parseInt(session.user.id),
+      storeCode: process.env.STORE_CODE || null
+    }
+
     const menuMaster = await prisma.menuMaster.create({
-      data: {
-        menuMasterCode,
-        name,
-        labelName: labelName || null,
-        colorCode: colorCode || null,
-        prepZoneCode: prepZoneCodes && prepZoneCodes.length > 0 ? prepZoneCodes : null,
-        stationCode: stationCodes && stationCodes.length > 0 ? stationCodes : null,
-        isEventMenu: isEventMenu || 0,
-        isActive: isActive ?? 1,
-        createdBy: parseInt(session.user.id),
-        storeCode: process.env.STORE_CODE || null
-      }
+      data: createData
     })
 
     // If this is an event menu, create the association
