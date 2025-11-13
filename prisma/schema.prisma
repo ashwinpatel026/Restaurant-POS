@@ -369,11 +369,12 @@ model Station {
   stationCode   String  @unique @map("station_code") @db.VarChar(100)
   stationname   String? @map("stationname") @db.VarChar(100)
   isActive      Int?    @map("is_active")
-  stationGroups Json?   @map("station_groups")
+  stationGroups Json?   @map("station_groups") 
   isSyncToWeb   Int     @default(0) @map("is_sync_to_web")
   isSyncToLocal Int     @default(0) @map("is_sync_to_local")
   storeCode     String? @map("store_code") @db.VarChar(100)
 
+  //use station group as jsonb type
   // Relationship
   shifts Shift[]
 
