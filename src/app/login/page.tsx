@@ -81,7 +81,6 @@ export default function LoginPage() {
                 width={280}
                 height={280}
                 className="object-contain"
-                
               />
             </div>
             <p className="text-gray-600 dark:text-gray-400 mt-2">
