@@ -95,7 +95,7 @@ export async function PUT(
       data: updateData
     })
 
-    // Handle event associations
+    // Handle event association
     if (currentEventCode && currentEventCode !== eventCode) {
       // Remove old event association
       await prisma.menuMasterEvent.deleteMany({
