@@ -374,7 +374,6 @@ model Station {
   isSyncToLocal Int     @default(0) @map("is_sync_to_local")
   storeCode     String? @map("store_code") @db.VarChar(100)
 
-  //use station group as jsonb type
   // Relationship
   shifts Shift[]
 
