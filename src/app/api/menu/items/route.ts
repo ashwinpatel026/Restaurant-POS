@@ -66,12 +66,7 @@ export async function GET(request: NextRequest) {
       skuPlu: item.skuPlu ? item.skuPlu.toString() : null,
     }))
 
-    // Cache response for 60 seconds
-    return NextResponse.json(itemsWithStringIds, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
-      },
-    })
+    return NextResponse.json(itemsWithStringIds)
   } catch (error) {
     console.error('Error fetching menu items:', error)
     return NextResponse.json(
@@ -102,7 +97,8 @@ export async function POST(request: NextRequest) {
       itemContainAlcohol,
       menuImg,
       priceStrategy,
-      basePrice,
+      cardPrice,
+      cashPrice,
       isPrice,
       isOutStock,
       isPosVisible,
@@ -124,7 +120,7 @@ export async function POST(request: NextRequest) {
       inheritModifiers,
       modifierAssignments,
       // Prep time fields
-      prepZoneCode,
+      prepZoneCodes,
       dimension,
       weight,
       prepTimeMinutes
@@ -157,7 +153,8 @@ export async function POST(request: NextRequest) {
           itemContainAlcohol: itemContainAlcohol ? 1 : 0,
           menuImg: menuImg || null,
           priceStrategy: priceStrategy ? parseInt(priceStrategy) : null,
-          basePrice: basePrice != null ? parseFloat(basePrice) : null,
+          cardPrice: cardPrice !== undefined && cardPrice !== null ? parseFloat(cardPrice.toString()) : null,
+          cashPrice: cashPrice !== undefined && cashPrice !== null ? parseFloat(cashPrice.toString()) : null,
           isPrice: isPrice !== undefined ? (isPrice ? 1 : 0) : 1,
           isActive: isActive !== undefined ? (isActive ? 1 : 0) : 1,
           stockinhand: stockinhand ? parseFloat(stockinhand) : null,
@@ -174,6 +171,7 @@ export async function POST(request: NextRequest) {
           diningTaxEffect: diningTaxEffect || 'No Effect',
           disqualifyDiningTaxExemption: disqualifyDiningTaxExemption !== undefined ? disqualifyDiningTaxExemption : false,
           inheritModifierGroup: inheritModifiers !== undefined ? inheritModifiers : true,
+          prepZoneCode: prepZoneCodes && prepZoneCodes.length > 0 ? prepZoneCodes : null,
           createdBy: parseInt(session.user.id),
           storeCode: process.env.STORE_CODE || null
         }
@@ -183,11 +181,11 @@ export async function POST(request: NextRequest) {
     // Create prep time record if any prep time field is provided
     try {
       const createdItemCode: string | null = (menuItem as any).menuItemCode || null
-      if (createdItemCode && (prepZoneCode || dimension || weight || prepTimeMinutes)) {
+      if (createdItemCode && (prepZoneCodes || dimension || weight || prepTimeMinutes)) {
         await (prisma as any).menuItemPrepTime.create({
           data: {
             menuItemCode: createdItemCode,
-            prepZoneCode: prepZoneCode || null,
+            prepZoneCode: prepZoneCodes && prepZoneCodes.length > 0 ? prepZoneCodes : null,
             dimension: dimension || null,
             weight: weight || null,
             prepTimeMinutes: prepTimeMinutes ? parseInt(prepTimeMinutes.toString()) : 0,

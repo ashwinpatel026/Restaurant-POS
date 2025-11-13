@@ -17,6 +17,13 @@ interface PrepZone {
   isActive: number;
 }
 
+interface Station {
+  tblStationId: string;
+  stationCode: string;
+  stationname: string | null;
+  isActive: number;
+}
+
 interface TimeEvent {
   id: string;
   eventCode: string;
@@ -30,7 +37,8 @@ interface MenuMaster {
   name: string;
   labelName: string | null;
   colorCode: string | null;
-  prepZoneCode: string | null;
+  prepZoneCode: string | string[] | null;
+  stationCode: string | string[] | null;
   isEventMenu: number;
   isActive: number;
 }
@@ -47,15 +55,21 @@ export default function EditMenuMasterPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [prepZones, setPrepZones] = useState<PrepZone[]>([]);
+  const [stations, setStations] = useState<Station[]>([]);
   const [timeEvents, setTimeEvents] = useState<TimeEvent[]>([]);
   const [menuMaster, setMenuMaster] = useState<MenuMaster | null>(null);
   const [currentEventCode, setCurrentEventCode] = useState<string>("");
+  const [selectedPrepZones, setSelectedPrepZones] = useState<Set<string>>(
+    new Set()
+  );
+  const [selectedStations, setSelectedStations] = useState<Set<string>>(
+    new Set()
+  );
 
   const [formData, setFormData] = useState({
     name: "",
     labelName: "",
     colorCode: "#3B82F6",
-    prepZoneCode: "",
     eventCode: "",
     isEventMenu: 0,
     isActive: 1,
@@ -69,8 +83,9 @@ export default function EditMenuMasterPage() {
 
   const fetchData = async () => {
     try {
-      const [prepZonesRes, eventsRes, masterRes] = await Promise.all([
+      const [prepZonesRes, stationsRes, eventsRes, masterRes] = await Promise.all([
         fetch("/api/menu/prep-zone", { cache: "no-store" }),
+        fetch("/api/station", { cache: "no-store" }),
         fetch("/api/events", { cache: "no-store" }),
         fetch(`/api/menu/masters/${masterId}`, { cache: "no-store" }),
       ]);
@@ -78,6 +93,11 @@ export default function EditMenuMasterPage() {
       if (prepZonesRes.ok) {
         const prepZonesData = await prepZonesRes.json();
         setPrepZones(prepZonesData);
+      }
+
+      if (stationsRes.ok) {
+        const stationsData = await stationsRes.json();
+        setStations(stationsData.filter((s: Station) => s.isActive === 1));
       }
 
       if (eventsRes.ok) {
@@ -105,11 +125,46 @@ export default function EditMenuMasterPage() {
           }
         }
 
+        // Parse prepZoneCode from JSON if it exists
+        let prepZoneCodes: string[] = [];
+        if (masterData.prepZoneCode) {
+          try {
+            if (typeof masterData.prepZoneCode === "string") {
+              // Try to parse if it's a JSON string
+              prepZoneCodes = JSON.parse(masterData.prepZoneCode);
+            } else if (Array.isArray(masterData.prepZoneCode)) {
+              // Already an array
+              prepZoneCodes = masterData.prepZoneCode;
+            }
+          } catch (e) {
+            // If parsing fails, treat as single value (backward compatibility)
+            prepZoneCodes = [masterData.prepZoneCode];
+          }
+        }
+        setSelectedPrepZones(new Set(prepZoneCodes));
+
+        // Parse stationCode from JSON if it exists
+        let stationCodes: string[] = [];
+        if (masterData.stationCode) {
+          try {
+            if (typeof masterData.stationCode === "string") {
+              // Try to parse if it's a JSON string
+              stationCodes = JSON.parse(masterData.stationCode);
+            } else if (Array.isArray(masterData.stationCode)) {
+              // Already an array
+              stationCodes = masterData.stationCode;
+            }
+          } catch (e) {
+            // If parsing fails, treat as single value (backward compatibility)
+            stationCodes = [masterData.stationCode];
+          }
+        }
+        setSelectedStations(new Set(stationCodes));
+
         setFormData({
           name: masterData.name || "",
           labelName: masterData.labelName || "",
           colorCode: masterData.colorCode || "#3B82F6",
-          prepZoneCode: masterData.prepZoneCode || "",
           eventCode: eventCode,
           isEventMenu: masterData.isEventMenu ? 1 : 0,
           isActive:
@@ -124,11 +179,51 @@ export default function EditMenuMasterPage() {
     }
   };
 
+  const handlePrepZoneToggle = (prepZoneCode: string) => {
+    const updated = new Set(selectedPrepZones);
+    if (updated.has(prepZoneCode)) {
+      updated.delete(prepZoneCode);
+    } else {
+      updated.add(prepZoneCode);
+    }
+    setSelectedPrepZones(updated);
+  };
+
+  const handleSelectAllPrepZones = () => {
+    if (selectedPrepZones.size === prepZones.length) {
+      setSelectedPrepZones(new Set());
+    } else {
+      const allCodes = new Set(prepZones.map((z) => z.prepZoneCode));
+      setSelectedPrepZones(allCodes);
+    }
+  };
+
+  const handleStationToggle = (stationCode: string) => {
+    const updated = new Set(selectedStations);
+    if (updated.has(stationCode)) {
+      updated.delete(stationCode);
+    } else {
+      updated.add(stationCode);
+    }
+    setSelectedStations(updated);
+  };
+
+  const handleSelectAllStations = () => {
+    if (selectedStations.size === stations.length) {
+      setSelectedStations(new Set());
+    } else {
+      const allCodes = new Set(stations.map((s) => s.stationCode));
+      setSelectedStations(allCodes);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
 
     try {
+      const prepZoneCodes = Array.from(selectedPrepZones);
+      const stationCodes = Array.from(selectedStations);
       const response = await fetch(`/api/menu/masters/${masterId}`, {
         method: "PUT",
         headers: {
@@ -138,7 +233,8 @@ export default function EditMenuMasterPage() {
           name: formData.name,
           labelName: formData.labelName,
           colorCode: formData.colorCode,
-          prepZoneCode: formData.prepZoneCode || null,
+          prepZoneCodes: prepZoneCodes.length > 0 ? prepZoneCodes : null,
+          stationCodes: stationCodes.length > 0 ? stationCodes : null,
           eventCode: formData.eventCode || null,
           currentEventCode: currentEventCode || null,
           isEventMenu: formData.eventCode ? 1 : 0,
@@ -263,54 +359,119 @@ export default function EditMenuMasterPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Select Prep Zone
-                    </label>
-                    <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700">
-                      <div className="flex flex-wrap gap-2">
+                    <div className="flex items-center gap-2 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Select Prep Zones
+                      </label>
+                      {prepZones.length > 0 && (
                         <button
                           type="button"
-                          onClick={() =>
-                            setFormData({
-                              ...formData,
-                              prepZoneCode: "",
-                            })
-                          }
-                          className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
-                            formData.prepZoneCode === ""
-                              ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
-                              : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                          }`}
+                          onClick={handleSelectAllPrepZones}
+                          className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium px-3 py-1 border border-blue-600 dark:border-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                         >
-                          None
-                          {formData.prepZoneCode === "" && (
-                            <CheckIcon className="w-4 h-4 inline-block ml-2" />
-                          )}
+                          {selectedPrepZones.size === prepZones.length
+                            ? "Deselect All"
+                            : "Select All"}
                         </button>
-                        {prepZones.map((zone) => (
-                          <button
-                            key={zone.prepZoneId}
-                            type="button"
-                            onClick={() =>
-                              setFormData({
-                                ...formData,
-                                prepZoneCode: zone.prepZoneCode,
-                              })
-                            }
-                            className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
-                              formData.prepZoneCode === zone.prepZoneCode
-                                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
-                                : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                            }`}
-                          >
-                            {zone.prepZoneName}
-                            {formData.prepZoneCode === zone.prepZoneCode && (
-                              <CheckIcon className="w-4 h-4 inline-block ml-2" />
-                            )}
-                          </button>
-                        ))}
-                      </div>
+                      )}
                     </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                      Select one or more prep zones for this menu master
+                    </p>
+                    {prepZones.length === 0 ? (
+                      <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700">
+                        <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                          No prep zones available
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700">
+                        <div className="flex flex-wrap gap-2">
+                          {prepZones.map((zone) => {
+                            const isSelected = selectedPrepZones.has(
+                              zone.prepZoneCode
+                            );
+                            return (
+                              <button
+                                key={zone.prepZoneId}
+                                type="button"
+                                onClick={() =>
+                                  handlePrepZoneToggle(zone.prepZoneCode)
+                                }
+                                className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
+                                  isSelected
+                                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                                    : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                                }`}
+                              >
+                                {zone.prepZoneName}
+                                {isSelected && (
+                                  <CheckIcon className="w-4 h-4 inline-block ml-2" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Select Stations
+                      </label>
+                      {stations.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleSelectAllStations}
+                          className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium px-3 py-1 border border-blue-600 dark:border-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                        >
+                          {selectedStations.size === stations.length
+                            ? "Deselect All"
+                            : "Select All"}
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                      Select one or more stations for this menu master
+                    </p>
+                    {stations.length === 0 ? (
+                      <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700">
+                        <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                          No stations available
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700">
+                        <div className="flex flex-wrap gap-2">
+                          {stations.map((station) => {
+                            const isSelected = selectedStations.has(
+                              station.stationCode
+                            );
+                            return (
+                              <button
+                                key={station.tblStationId}
+                                type="button"
+                                onClick={() =>
+                                  handleStationToggle(station.stationCode)
+                                }
+                                className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
+                                  isSelected
+                                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                                    : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                                }`}
+                              >
+                                {station.stationname || station.stationCode}
+                                {isSelected && (
+                                  <CheckIcon className="w-4 h-4 inline-block ml-2" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

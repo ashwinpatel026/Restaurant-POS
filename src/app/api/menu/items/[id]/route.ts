@@ -107,7 +107,7 @@ export async function GET(
       })
       if (prepTime) {
         prepTimeData = {
-          prepZoneCode: prepTime.prepZoneCode,
+          prepZoneCode: prepTime.prepZoneCode, // This will be parsed in the form component
           dimension: prepTime.dimension,
           weight: prepTime.weight,
           prepTimeMinutes: prepTime.prepTimeMinutes
@@ -122,6 +122,8 @@ export async function GET(
       skuPlu: (menuItem as any).skuPlu ? (menuItem as any).skuPlu.toString() : null,
       assignedModifiers: assignedModifierGroups,
       inheritModifiers: inheritModifiersFlag,
+      // Use prepZoneCode from MenuItem if available, otherwise from MenuItemPrepTime
+      prepZoneCode: (menuItem as any).prepZoneCode || prepTimeData?.prepZoneCode || null,
       ...(prepTimeData || {})
     }
 
@@ -162,7 +164,8 @@ export async function PUT(
       itemContainAlcohol,
       menuImg,
       priceStrategy,
-      basePrice,
+      cardPrice,
+      cashPrice,
       isPrice,
       isOutStock,
       isPosVisible,
@@ -184,7 +187,7 @@ export async function PUT(
     inheritModifiers,
     modifierAssignments,
     // Prep time fields
-    prepZoneCode,
+    prepZoneCodes,
     dimension,
     weight,
     prepTimeMinutes
@@ -213,7 +216,8 @@ export async function PUT(
           itemContainAlcohol: itemContainAlcohol !== undefined ? (itemContainAlcohol ? 1 : 0) : undefined,
           menuImg: menuImg || null,
           priceStrategy: priceStrategy ? parseInt(priceStrategy) : null,
-          basePrice: basePrice ? parseFloat(basePrice) : null,
+          cardPrice: cardPrice !== undefined && cardPrice !== null ? parseFloat(cardPrice.toString()) : null,
+          cashPrice: cashPrice !== undefined && cashPrice !== null ? parseFloat(cashPrice.toString()) : null,
           isPrice: isPrice !== undefined ? (isPrice ? 1 : 0) : undefined,
           isActive: isActive !== undefined ? (isActive ? 1 : 0) : undefined,
           stockinhand: stockinhand ? parseFloat(stockinhand) : null,
@@ -230,6 +234,7 @@ export async function PUT(
           diningTaxEffect: diningTaxEffect || null,
           disqualifyDiningTaxExemption: disqualifyDiningTaxExemption !== undefined ? disqualifyDiningTaxExemption : undefined,
           inheritModifierGroup: inheritModifiers !== undefined ? inheritModifiers : undefined,
+          prepZoneCode: prepZoneCodes && prepZoneCodes.length > 0 ? prepZoneCodes : null,
           menuCategoryCode: menuCategoryCode || null
         }
       })
@@ -245,13 +250,13 @@ export async function PUT(
           where: { menuItemCode }
         })
 
-        if (prepZoneCode || dimension || weight || prepTimeMinutes) {
+        if (prepZoneCodes || dimension || weight || prepTimeMinutes) {
           // Update or create prep time record if any prep time field is provided
           if (existingPrepTime) {
             await (prisma as any).menuItemPrepTime.update({
               where: { id: existingPrepTime.id },
               data: {
-                prepZoneCode: prepZoneCode || null,
+                prepZoneCode: prepZoneCodes && prepZoneCodes.length > 0 ? prepZoneCodes : null,
                 dimension: dimension || null,
                 weight: weight || null,
                 prepTimeMinutes: prepTimeMinutes ? parseInt(prepTimeMinutes.toString()) : 0,
@@ -263,7 +268,7 @@ export async function PUT(
             await (prisma as any).menuItemPrepTime.create({
               data: {
                 menuItemCode: menuItemCode,
-                prepZoneCode: prepZoneCode || null,
+                prepZoneCode: prepZoneCodes && prepZoneCodes.length > 0 ? prepZoneCodes : null,
                 dimension: dimension || null,
                 weight: weight || null,
                 prepTimeMinutes: prepTimeMinutes ? parseInt(prepTimeMinutes.toString()) : 0,

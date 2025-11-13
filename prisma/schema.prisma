@@ -92,7 +92,6 @@ model PrepZone {
 
   // Relationships
   printer Printer? @relation(fields: [printerCode], references: [printerCode])
-  menuMasters MenuMaster[]
 
   @@map("tbl_prep_zone")
 }
@@ -103,7 +102,8 @@ model MenuMaster {
   name              String?   @map("name") @db.VarChar(500)
   labelName         String?   @map("label_name") @db.VarChar(500)
   colorCode         String?   @map("color_code") @db.VarChar(100)
-  prepZoneCode      String?   @map("prep_zone_code") @db.VarChar(100)
+  prepZoneCode      Json?     @map("prep_zone_code")
+  stationCode       Json?     @map("station_code")
   isEventMenu       Int?      @map("is_event_menu")
   isActive          Int       @default(1) @map("is_active")
   createdBy         Int?      @map("createdby")
@@ -116,7 +116,6 @@ model MenuMaster {
   storeCode         String?   @map("store_code") @db.VarChar(100)
 
   // Relationships
-  prepZone          PrepZone? @relation(fields: [prepZoneCode], references: [prepZoneCode])
   menuMasterEvents  MenuMasterEvent[]
   menuCategories    MenuCategory[]
 
@@ -192,8 +191,9 @@ model MenuItem {
   skuPlu                         BigInt?   @map("sku_plu")
   isAlcohol                      Int       @default(0) @map("is_alcohol")
   menuImg                        String?   @map("menu_img")
-  priceStrategy                  Int?      @map("price_strategy")
-  basePrice                      Decimal?  @map("base_price") @db.Decimal(10, 2)
+  priceStrategy                  Int?      @map("price_strategy") // 1=Base Price, 3=Open Price
+  cardPrice                      Decimal?  @map("card_price") @db.Decimal(10, 2)
+  cashPrice                      Decimal?  @map("cash_price") @db.Decimal(10, 2)
   isPrice                        Int       @default(1) @map("is_price")
   isActive                       Int       @default(1) @map("is_active")
   stockinhand                    Decimal?  @map("stockinhand") @db.Decimal(18, 2)
@@ -211,6 +211,7 @@ model MenuItem {
   diningTaxEffect                String?   @default("No Effect") @map("dining_tax_effect") @db.VarChar(50)
   disqualifyDiningTaxExemption   Boolean   @default(false) @map("disqualify_dining_tax_exemption")
   inheritModifierGroup           Boolean   @default(true) @map("inherit_modifier_group")
+  prepZoneCode                   Json?     @map("prep_zone_code")
   createdBy                      Int?      @map("createdby")
   createdOn                      DateTime  @default(now()) @map("createdon")
   isSyncToWeb                    Int       @default(0) @map("is_sync_to_web")
@@ -258,7 +259,7 @@ model UserLoginActivity {
 model MenuItemPrepTime {
   id                 BigInt    @id @default(autoincrement()) @map("id")
   menuItemCode       String    @map("menu_item_code") @db.VarChar(100)
-  prepZoneCode       String?   @map("prep_zone_code") @db.VarChar(100)
+  prepZoneCode       Json?     @map("prep_zone_code")
   dimension          String?   @map("dimension") @db.VarChar(100)
   weight             String?   @map("weight") @db.VarChar(100)
   prepTimeMinutes    Int       @default(0) @map("prep_time_minutes")

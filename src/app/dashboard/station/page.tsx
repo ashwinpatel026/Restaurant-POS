@@ -466,6 +466,39 @@ function StationForm({
 
   const [loading, setLoading] = useState(false);
   const [groupInput, setGroupInput] = useState("");
+  const [allGroups, setAllGroups] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
+
+  // Fetch all stations to get unique groups
+  useEffect(() => {
+    const fetchAllGroups = async () => {
+      try {
+        const response = await fetch("/api/station", { cache: "no-store" });
+        if (response.ok) {
+          const stations = await response.json();
+          const allStationGroups: string[] = [];
+
+          stations.forEach((s: Station) => {
+            if (s.stationGroups && Array.isArray(s.stationGroups)) {
+              allStationGroups.push(...s.stationGroups);
+            }
+          });
+
+          // Remove duplicates and sort
+          const uniqueGroups = Array.from(new Set(allStationGroups))
+            .filter((g) => g && g.trim())
+            .sort();
+
+          setAllGroups(uniqueGroups);
+        }
+      } catch (error) {
+        console.error("Error fetching groups:", error);
+      }
+    };
+
+    fetchAllGroups();
+  }, []);
 
   useEffect(() => {
     if (station) {
@@ -483,6 +516,23 @@ function StationForm({
     }
     setGroupInput("");
   }, [station]);
+
+  // Filter suggestions based on input
+  useEffect(() => {
+    if (groupInput.trim()) {
+      const filtered = allGroups.filter(
+        (group) =>
+          group.toLowerCase().includes(groupInput.toLowerCase()) &&
+          !formData.stationGroups.includes(group)
+      );
+      setFilteredSuggestions(filtered);
+      setShowSuggestions(filtered.length > 0);
+    } else {
+      // When input is empty, don't show suggestions automatically
+      setShowSuggestions(false);
+      setFilteredSuggestions([]);
+    }
+  }, [groupInput, allGroups, formData.stationGroups]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -527,6 +577,7 @@ function StationForm({
       if (groupInput.trim()) {
         handleGroupAdd(groupInput);
         setGroupInput("");
+        setShowSuggestions(false);
       }
     } else if (e.key === "Backspace" && groupInput === "") {
       setFormData((prev) => ({
@@ -536,7 +587,42 @@ function StationForm({
           Math.max(prev.stationGroups.length - 1, 0)
         ),
       }));
+    } else if (e.key === "Escape") {
+      setShowSuggestions(false);
     }
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    handleGroupAdd(suggestion);
+    setGroupInput("");
+    setShowSuggestions(false);
+  };
+
+  const handleGroupInputFocus = () => {
+    if (groupInput.trim()) {
+      // If there's input, show filtered suggestions
+      const filtered = allGroups.filter(
+        (group) =>
+          group.toLowerCase().includes(groupInput.toLowerCase()) &&
+          !formData.stationGroups.includes(group)
+      );
+      setFilteredSuggestions(filtered);
+      setShowSuggestions(filtered.length > 0);
+    } else {
+      // When input is empty and focused, show all available groups
+      const available = allGroups.filter(
+        (group) => !formData.stationGroups.includes(group)
+      );
+      setFilteredSuggestions(available);
+      setShowSuggestions(available.length > 0);
+    }
+  };
+
+  const handleGroupInputBlur = () => {
+    // Delay hiding suggestions to allow clicking on them
+    setTimeout(() => {
+      setShowSuggestions(false);
+    }, 200);
   };
 
   return (
@@ -577,38 +663,59 @@ function StationForm({
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Station Groups
         </label>
-        <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-white dark:bg-gray-700">
-          {formData.stationGroups.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-2">
-              {formData.stationGroups.map((group) => (
-                <span
-                  key={group}
-                  className="inline-flex items-center bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium px-2 py-1 rounded-full"
-                >
-                  {group}
-                  <button
-                    type="button"
-                    onClick={() => handleGroupRemove(group)}
-                    className="ml-1 text-blue-500 hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200"
-                    aria-label={`Remove ${group}`}
+        <div className="relative">
+          <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-white dark:bg-gray-700">
+            {formData.stationGroups.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {formData.stationGroups.map((group) => (
+                  <span
+                    key={group}
+                    className="inline-flex items-center bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium px-2 py-1 rounded-full"
                   >
-                    ×
-                  </button>
-                </span>
+                    {group}
+                    <button
+                      type="button"
+                      onClick={() => handleGroupRemove(group)}
+                      className="ml-1 text-blue-500 hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200"
+                      aria-label={`Remove ${group}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <input
+              type="text"
+              value={groupInput}
+              onChange={(e) => setGroupInput(e.target.value)}
+              onKeyDown={handleGroupKeyDown}
+              onFocus={handleGroupInputFocus}
+              onBlur={handleGroupInputBlur}
+              placeholder="Type a group name and press Enter or select from suggestions"
+              className="w-full px-3 py-2 border border-gray-200 dark:border-gray-500 rounded-lg bg-white dark:bg-gray-600 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Suggestions Dropdown */}
+          {showSuggestions && filteredSuggestions.length > 0 && (
+            <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+              {filteredSuggestions.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => handleSuggestionClick(suggestion)}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                >
+                  {suggestion}
+                </button>
               ))}
             </div>
           )}
-          <input
-            type="text"
-            value={groupInput}
-            onChange={(e) => setGroupInput(e.target.value)}
-            onKeyDown={handleGroupKeyDown}
-            placeholder="Type a group name and press Enter"
-            className="w-full px-3 py-2 border border-gray-200 dark:border-gray-500 rounded-lg bg-white dark:bg-gray-600 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
         </div>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Press Enter or comma to add a group. Use the × icon to remove a group.
+          Press Enter or comma to add a group. Click suggestions to select. Use
+          the × icon to remove a group.
         </p>
       </div>
 

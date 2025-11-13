@@ -33,8 +33,10 @@ export default function MenuItemTabbedForm({
     skuPlu: "",
     itemContainAlcohol: 0,
     menuImg: "",
-    priceStrategy: 1,
+    priceStrategy: 1, // 1=Base Price, 3=Open Price
     basePrice: 0,
+    cardPrice: 0,
+    cashPrice: 0,
     isPrice: 1,
     menuCategoryCode: "",
     isActive: 1,
@@ -51,7 +53,6 @@ export default function MenuItemTabbedForm({
     isOnlineOrderByApp: 0,
     isOnlineOrdering: 0,
     isCustomerInvoice: 0,
-    prepZoneCode: "",
     dimension: "",
     weight: "",
     prepTimeMinutes: 0,
@@ -86,6 +87,9 @@ export default function MenuItemTabbedForm({
   const [taxes, setTaxes] = useState<any[]>([]);
   const [inheritedModifiers, setInheritedModifiers] = useState<any[]>([]);
   const [prepZones, setPrepZones] = useState<any[]>([]);
+  const [selectedPrepZones, setSelectedPrepZones] = useState<Set<string>>(
+    new Set()
+  );
 
   useEffect(() => {
     fetchModifiers();
@@ -109,6 +113,18 @@ export default function MenuItemTabbedForm({
         menuImg: menuItem.menuImg || "",
         priceStrategy: menuItem.priceStrategy || 1,
         basePrice: menuItem.basePrice ?? menuItem.price ?? 0,
+        cardPrice:
+          menuItem.cardPrice !== null && menuItem.cardPrice !== undefined
+            ? parseFloat(menuItem.cardPrice.toString())
+            : menuItem.priceStrategy === 3
+            ? 0
+            : menuItem.basePrice ?? menuItem.price ?? 0,
+        cashPrice:
+          menuItem.cashPrice !== null && menuItem.cashPrice !== undefined
+            ? parseFloat(menuItem.cashPrice.toString())
+            : menuItem.priceStrategy === 3
+            ? 0
+            : menuItem.basePrice ?? menuItem.price ?? 0,
         isPrice: menuItem.isPrice ?? 1,
         menuCategoryCode: menuItem.menuCategoryCode || "",
         isActive: menuItem.isActive ?? 1,
@@ -135,11 +151,28 @@ export default function MenuItemTabbedForm({
         isOnlineOrderByApp: menuItem.isOnlineOrderByApp ?? 0,
         isOnlineOrdering: menuItem.isOnlineOrdering ?? 0,
         isCustomerInvoice: menuItem.isCustomerInvoice ?? 0,
-        prepZoneCode: menuItem.prepZoneCode || "",
         dimension: menuItem.dimension || "",
         weight: menuItem.weight || "",
         prepTimeMinutes: menuItem.prepTimeMinutes ?? 0,
       });
+
+      // Parse prepZoneCode from JSON if it exists
+      let prepZoneCodes: string[] = [];
+      if (menuItem.prepZoneCode) {
+        try {
+          if (typeof menuItem.prepZoneCode === "string") {
+            // Try to parse if it's a JSON string
+            prepZoneCodes = JSON.parse(menuItem.prepZoneCode);
+          } else if (Array.isArray(menuItem.prepZoneCode)) {
+            // Already an array
+            prepZoneCodes = menuItem.prepZoneCode;
+          }
+        } catch (e) {
+          // If parsing fails, treat as single value (backward compatibility)
+          prepZoneCodes = [menuItem.prepZoneCode];
+        }
+      }
+      setSelectedPrepZones(new Set(prepZoneCodes));
 
       // Set selected modifiers if editing (ONLY explicit rows: inherit_from_menu_group = 0)
       if (
@@ -233,12 +266,26 @@ export default function MenuItemTabbedForm({
       const submitData = {
         ...formData,
         skuPlu: formData.skuPlu ? formData.skuPlu : null,
-        basePrice: formData.basePrice
-          ? parseFloat(formData.basePrice.toString())
-          : null,
         priceStrategy: formData.priceStrategy
           ? parseInt(formData.priceStrategy.toString())
           : null,
+        // Card and Cash prices
+        cardPrice:
+          formData.priceStrategy === 1
+            ? formData.cardPrice
+              ? parseFloat(formData.cardPrice.toString())
+              : null
+            : formData.priceStrategy === 3
+            ? 0
+            : null,
+        cashPrice:
+          formData.priceStrategy === 1
+            ? formData.cashPrice
+              ? parseFloat(formData.cashPrice.toString())
+              : null
+            : formData.priceStrategy === 3
+            ? 0
+            : null,
         menuCategoryCode: formData.menuCategoryCode || null,
         itemContainAlcohol: formData.itemContainAlcohol === 1 ? 1 : 0,
         isPrice: formData.isPrice === 1 ? 1 : 0,
@@ -259,7 +306,10 @@ export default function MenuItemTabbedForm({
         })),
         inheritModifiers,
         // Prep time fields
-        prepZoneCode: formData.prepZoneCode || null,
+        prepZoneCodes:
+          Array.from(selectedPrepZones).length > 0
+            ? Array.from(selectedPrepZones)
+            : null,
         dimension: formData.dimension || null,
         weight: formData.weight || null,
         prepTimeMinutes: formData.prepTimeMinutes
@@ -507,84 +557,93 @@ export default function MenuItemTabbedForm({
             <div className="space-y-6">
               {/* Prep Zone Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  Prep Zone
-                </label>
-                <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50">
-                  <div className="max-h-64 overflow-y-auto pr-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-track]:dark:bg-gray-800 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:dark:bg-gray-600 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-gray-400 [&::-webkit-scrollbar-thumb]:dark:hover:bg-gray-500">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                      {/* None Option */}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setFormData({ ...formData, prepZoneCode: "" })
+                <div className="flex items-center gap-2 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Select Prep Zones
+                  </label>
+                  {prepZones.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedPrepZones.size === prepZones.length) {
+                          setSelectedPrepZones(new Set());
+                        } else {
+                          const allCodes = new Set(
+                            prepZones.map((z) => z.prepZoneCode).filter(Boolean)
+                          );
+                          setSelectedPrepZones(allCodes);
                         }
-                        className={`relative p-4 rounded-lg border-2 transition-all text-left ${
-                          formData.prepZoneCode === ""
-                            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md"
-                            : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span
-                            className={`text-sm font-medium ${
-                              formData.prepZoneCode === ""
-                                ? "text-blue-700 dark:text-blue-300"
-                                : "text-gray-700 dark:text-gray-300"
-                            }`}
-                          >
-                            None
-                          </span>
-                          {formData.prepZoneCode === "" && (
-                            <CheckIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                          )}
-                        </div>
-                      </button>
-
-                      {/* Prep Zone Cards */}
-                      {prepZones.map((prepZone) => {
-                        const prepZoneValue = prepZone.prepZoneCode || "";
-                        const isSelected =
-                          formData.prepZoneCode === prepZoneValue;
-                        return (
-                          <button
-                            key={prepZone.prepZoneCode || prepZone.prepZoneId}
-                            type="button"
-                            onClick={() =>
-                              setFormData({
-                                ...formData,
-                                prepZoneCode: prepZoneValue,
-                              })
-                            }
-                            className={`relative p-4 rounded-lg border-2 transition-all text-left ${
-                              isSelected
-                                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md"
-                                : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1 min-w-0">
-                                <p
-                                  className={`text-sm font-medium truncate ${
-                                    isSelected
-                                      ? "text-blue-700 dark:text-blue-300"
-                                      : "text-gray-700 dark:text-gray-300"
-                                  }`}
-                                  title={prepZone.prepZoneName || prepZoneValue}
-                                >
-                                  {prepZone.prepZoneName || prepZoneValue}
-                                </p>
+                      }}
+                      className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium px-3 py-1 border border-blue-600 dark:border-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                    >
+                      {selectedPrepZones.size === prepZones.length
+                        ? "Deselect All"
+                        : "Select All"}
+                    </button>
+                  )}
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                  Select one or more prep zones for this menu item
+                </p>
+                {prepZones.length === 0 ? (
+                  <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                      No prep zones available
+                    </p>
+                  </div>
+                ) : (
+                  <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700">
+                    <div className="max-h-64 overflow-y-auto pr-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-track]:dark:bg-gray-800 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:dark:bg-gray-600 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-gray-400 [&::-webkit-scrollbar-thumb]:dark:hover:bg-gray-500">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                        {prepZones.map((prepZone) => {
+                          const prepZoneValue = prepZone.prepZoneCode || "";
+                          const isSelected =
+                            selectedPrepZones.has(prepZoneValue);
+                          return (
+                            <button
+                              key={prepZone.prepZoneCode || prepZone.prepZoneId}
+                              type="button"
+                              onClick={() => {
+                                const updated = new Set(selectedPrepZones);
+                                if (updated.has(prepZoneValue)) {
+                                  updated.delete(prepZoneValue);
+                                } else {
+                                  updated.add(prepZoneValue);
+                                }
+                                setSelectedPrepZones(updated);
+                              }}
+                              className={`relative p-4 rounded-lg border-2 transition-all text-left ${
+                                isSelected
+                                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md"
+                                  : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1 min-w-0">
+                                  <p
+                                    className={`text-sm font-medium truncate ${
+                                      isSelected
+                                        ? "text-blue-700 dark:text-blue-300"
+                                        : "text-gray-700 dark:text-gray-300"
+                                    }`}
+                                    title={
+                                      prepZone.prepZoneName || prepZoneValue
+                                    }
+                                  >
+                                    {prepZone.prepZoneName || prepZoneValue}
+                                  </p>
+                                </div>
+                                {isSelected && (
+                                  <CheckIcon className="w-5 h-5 text-blue-600 dark:text-blue-400 ml-2 flex-shrink-0" />
+                                )}
                               </div>
-                              {isSelected && (
-                                <CheckIcon className="w-5 h-5 text-blue-600 dark:text-blue-400 ml-2 flex-shrink-0" />
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Prep Time Fields */}
@@ -648,53 +707,164 @@ export default function MenuItemTabbedForm({
                 Pricing
               </h3>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Set pricing strategy and tax options
+                Set pricing strategy and prices
               </p>
             </div>
 
             <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Base Price *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    step="0.01"
-                    min="0"
-                    value={formData.basePrice}
-                    onChange={(e) =>
+              {/* Price Strategy Selection - Buttons */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                  Price Strategy *
+                </label>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
                       setFormData({
                         ...formData,
-                        basePrice: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="0.00"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Price Strategy
-                  </label>
-                  <select
-                    value={formData.priceStrategy}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        priceStrategy: parseInt(e.target.value),
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        priceStrategy: 1,
+                        // Keep existing prices when switching to Base Price
+                      });
+                    }}
+                    className={`relative px-6 py-3 rounded-lg border-2 transition-all font-medium ${
+                      formData.priceStrategy === 1
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                    }`}
                   >
-                    <option value={1}>Base Price</option>
-                    <option value={2}>Size Price</option>
-                    <option value={3}>Open Price</option>
-                  </select>
+                    Base Price
+                    {formData.priceStrategy === 1 && (
+                      <CheckIcon className="w-5 h-5 inline-block ml-2" />
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData({
+                        ...formData,
+                        priceStrategy: 3,
+                        cardPrice: 0,
+                        cashPrice: 0,
+                      });
+                    }}
+                    className={`relative px-6 py-3 rounded-lg border-2 transition-all font-medium ${
+                      formData.priceStrategy === 3
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                    }`}
+                  >
+                    Open Price
+                    {formData.priceStrategy === 3 && (
+                      <CheckIcon className="w-5 h-5 inline-block ml-2" />
+                    )}
+                  </button>
                 </div>
               </div>
+
+              {/* Conditional Price Inputs */}
+              {formData.priceStrategy === 1 ? (
+                <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                    Base Price Configuration
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Card Price *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.cardPrice || ""}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            cardPrice: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Cash Price *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.cashPrice || ""}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            cashPrice: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    * At least one price (Card or Cash) must be provided
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0">
+                      <svg
+                        className="w-5 h-5 text-yellow-600 dark:text-yellow-400"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                        Open Price Strategy
+                      </h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        This item uses open pricing. Prices will be set at the
+                        point of sale. Card Price and Cash Price are set to 0.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Card Price (Read-only)
+                      </label>
+                      <input
+                        type="number"
+                        value="0.00"
+                        disabled
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Cash Price (Read-only)
+                      </label>
+                      <input
+                        type="number"
+                        value="0.00"
+                        disabled
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -968,7 +1138,7 @@ export default function MenuItemTabbedForm({
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 dark:file:bg-blue-900/20 dark:file:text-blue-400 hover:file:bg-blue-100 dark:hover:file:bg-blue-900/30"
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Supported formats: JPG, PNG, GIF (Max size: 1MB)
+                  Supported formats: JPG, PNG (Max size: 1MB)
                 </p>
                 {imageLoading && (
                   <div className="flex items-center space-x-2 text-sm text-blue-600 dark:text-blue-400 mt-2">

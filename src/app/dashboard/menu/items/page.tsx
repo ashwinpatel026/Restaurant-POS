@@ -34,9 +34,11 @@ interface MenuItem {
   itemContainAlcohol?: number;
   isAlcohol?: number;
   menuImg?: string;
-  priceStrategy?: number;
+  priceStrategy?: number; // 1=Base Price, 3=Open Price
   basePrice?: number;
   price?: number;
+  cardPrice?: number;
+  cashPrice?: number;
   isPrice?: number;
   isActive: number;
   stockinhand?: number;
@@ -77,7 +79,6 @@ export default function MenuItemsPage() {
     fetchData();
   }, []);
 
-
   // Filter effect
   useEffect(() => {
     applyFilters();
@@ -102,18 +103,20 @@ export default function MenuItemsPage() {
       );
     }
 
-    // Filter by price range (basePrice preferred)
+    // Filter by price range (use cardPrice or cashPrice, fallback to basePrice/price)
     if (priceRange.min) {
-      filtered = filtered.filter(
-        (item) =>
-          (item.basePrice ?? item.price ?? 0) >= parseFloat(priceRange.min)
-      );
+      filtered = filtered.filter((item) => {
+        const price =
+          item.cardPrice ?? item.cashPrice ?? item.basePrice ?? item.price ?? 0;
+        return price >= parseFloat(priceRange.min);
+      });
     }
     if (priceRange.max) {
-      filtered = filtered.filter(
-        (item) =>
-          (item.basePrice ?? item.price ?? 0) <= parseFloat(priceRange.max)
-      );
+      filtered = filtered.filter((item) => {
+        const price =
+          item.cardPrice ?? item.cashPrice ?? item.basePrice ?? item.price ?? 0;
+        return price <= parseFloat(priceRange.max);
+      });
     }
 
     // Filter by SKU/PLU
@@ -136,7 +139,14 @@ export default function MenuItemsPage() {
     try {
       setLoading(true);
       const [itemsRes, categoriesRes] = await Promise.all([
-        fetch("/api/menu/items", { cache: "no-store" }),
+        fetch("/api/menu/items", {
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        }),
         fetch("/api/menu/categories", { cache: "no-store" }),
       ]);
 
@@ -195,12 +205,16 @@ export default function MenuItemsPage() {
     try {
       const response = await fetch(`/api/menu/items/${deletingId}`, {
         method: "DELETE",
+        cache: "no-store",
       });
 
       if (response.ok) {
-        setMenuItems(
-          menuItems.filter((item) => item.tblMenuItemId !== deletingId)
-        );
+        // Filter out the deleted item by checking both tblMenuItemId and menuItemId
+        const updatedItems = menuItems.filter((item) => {
+          const itemId = item.tblMenuItemId ?? parseInt(item.menuItemId || "0");
+          return itemId !== deletingId;
+        });
+        setMenuItems(updatedItems);
         toast.success("Menu item deleted successfully");
       } else {
         const errorData = await response.json();
@@ -431,7 +445,10 @@ export default function MenuItemsPage() {
                       Category
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Price
+                      Price Strategy
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Prices
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       SKU/PLU
@@ -503,8 +520,54 @@ export default function MenuItemsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {formatPrice(
-                            (item.basePrice ?? item.price) as number
+                          {item.priceStrategy === 1
+                            ? "Base Price"
+                            : item.priceStrategy === 3
+                            ? "Open Price"
+                            : "N/A"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm space-y-1">
+                          {item.priceStrategy === 1 ? (
+                            <>
+                              {item.cardPrice !== null &&
+                                item.cardPrice !== undefined && (
+                                  <div className="text-gray-900 dark:text-white">
+                                    <span className="text-gray-600 dark:text-gray-400">
+                                      Card:
+                                    </span>{" "}
+                                    {formatPrice(item.cardPrice)}
+                                  </div>
+                                )}
+                              {item.cashPrice !== null &&
+                                item.cashPrice !== undefined && (
+                                  <div className="text-gray-900 dark:text-white">
+                                    <span className="text-gray-600 dark:text-gray-400">
+                                      Cash:
+                                    </span>{" "}
+                                    {formatPrice(item.cashPrice)}
+                                  </div>
+                                )}
+                              {(!item.cardPrice || !item.cashPrice) &&
+                                (item.basePrice || item.price) && (
+                                  <div className="text-gray-900 dark:text-white">
+                                    {formatPrice(
+                                      (item.basePrice ?? item.price) as number
+                                    )}
+                                  </div>
+                                )}
+                            </>
+                          ) : item.priceStrategy === 3 ? (
+                            <div className="text-gray-500 dark:text-gray-400 italic">
+                              Open Price
+                            </div>
+                          ) : (
+                            <div className="text-gray-900 dark:text-white">
+                              {formatPrice(
+                                (item.basePrice ?? item.price ?? 0) as number
+                              )}
+                            </div>
                           )}
                         </div>
                       </td>
@@ -618,10 +681,52 @@ export default function MenuItemsPage() {
                             : c.tblMenuCategoryId === item.tblMenuCategoryId
                         )?.name || "N/A"}
                       </p>
-                      <p>
-                        <strong>Price:</strong>{" "}
-                        {formatPrice((item.basePrice ?? item.price) as number)}
-                      </p>
+                      <div>
+                        <strong>Price Strategy:</strong>{" "}
+                        {item.priceStrategy === 1
+                          ? "Base Price"
+                          : item.priceStrategy === 3
+                          ? "Open Price"
+                          : "N/A"}
+                      </div>
+                      {item.priceStrategy === 1 ? (
+                        <div className="space-y-1">
+                          {item.cardPrice !== null &&
+                            item.cardPrice !== undefined && (
+                              <p>
+                                <strong>Card Price:</strong>{" "}
+                                {formatPrice(item.cardPrice)}
+                              </p>
+                            )}
+                          {item.cashPrice !== null &&
+                            item.cashPrice !== undefined && (
+                              <p>
+                                <strong>Cash Price:</strong>{" "}
+                                {formatPrice(item.cashPrice)}
+                              </p>
+                            )}
+                          {(!item.cardPrice || !item.cashPrice) &&
+                            (item.basePrice || item.price) && (
+                              <p>
+                                <strong>Price:</strong>{" "}
+                                {formatPrice(
+                                  (item.basePrice ?? item.price) as number
+                                )}
+                              </p>
+                            )}
+                        </div>
+                      ) : item.priceStrategy === 3 ? (
+                        <p className="text-gray-500 dark:text-gray-400 italic">
+                          Open Price
+                        </p>
+                      ) : (
+                        <p>
+                          <strong>Price:</strong>{" "}
+                          {formatPrice(
+                            (item.basePrice ?? item.price ?? 0) as number
+                          )}
+                        </p>
+                      )}
                       {(item.description || item.descrip) && (
                         <p>
                           <strong>Description:</strong>{" "}

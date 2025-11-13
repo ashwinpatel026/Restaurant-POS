@@ -13,6 +13,9 @@ const DEFAULT_PALETTE = [
   "#EF4444",
   "#8B5CF6",
   "#14B8A6",
+  "#EC4899",
+  "#06B6D4",
+  "#84CC16",
 ];
 
 export default function SettingsPage() {
@@ -45,7 +48,7 @@ export default function SettingsPage() {
 
         if (
           Array.isArray(data.allowedColors) &&
-          data.allowedColors.length === 6
+          data.allowedColors.length === 9
         ) {
           setAllowedColors(data.allowedColors);
         }
@@ -198,13 +201,13 @@ export default function SettingsPage() {
             System Settings
           </h2>
           <div className="space-y-6">
-            {/* Allowed Color Palette (6 colors) */}
+            {/* Allowed Color Palette (9 colors) */}
             <div>
               <p className="font-medium text-gray-900 dark:text-white mb-2">
-                Allowed Colors (6)
+                Allowed Colors (9)
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                These six colors will be the only options for all color pickers
+                These nine colors will be the only options for all color pickers
                 across the app.
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

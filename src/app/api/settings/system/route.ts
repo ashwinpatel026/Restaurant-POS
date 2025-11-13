@@ -11,6 +11,9 @@ const DEFAULT_ALLOWED_COLORS = [
   "#EF4444",
   "#8B5CF6",
   "#14B8A6",
+  "#EC4899",
+  "#06B6D4",
+  "#84CC16",
 ];
 
 const DEFAULT_PRIMARY_COLOR = DEFAULT_ALLOWED_COLORS[0];
@@ -96,9 +99,9 @@ export async function PUT(request: NextRequest) {
       theme?: string;
     };
 
-    if (!Array.isArray(allowedColors) || allowedColors.length !== 6) {
+    if (!Array.isArray(allowedColors) || allowedColors.length !== 9) {
       return NextResponse.json(
-        { error: "allowedColors must be an array of 6 values" },
+        { error: "allowedColors must be an array of 9 values" },
         { status: 400 }
       );
     }

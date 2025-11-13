@@ -22,7 +22,8 @@ interface MenuMaster {
   labelName?: string;
   colorCode?: string;
   isActive: number;
-  prepZoneCode?: string;
+  prepZoneCode?: string | string[] | null;
+  stationCode?: string | string[] | null;
   isEventMenu?: number;
 }
 
@@ -33,10 +34,18 @@ interface PrepZone {
   isActive: number;
 }
 
+interface Station {
+  tblStationId: string;
+  stationCode: string;
+  stationname: string | null;
+  isActive: number;
+}
+
 export default function MenuMastersPage() {
   const router = useRouter();
   const [menuMasters, setMenuMasters] = useState<MenuMaster[]>([]);
   const [prepZones, setPrepZones] = useState<PrepZone[]>([]);
+  const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(true);
   const fetchingRef = useRef(false);
 
@@ -57,7 +66,6 @@ export default function MenuMastersPage() {
     fetchData();
   }, []);
 
-
   // Filter effect
   useEffect(() => {
     applyFilters();
@@ -75,9 +83,30 @@ export default function MenuMastersPage() {
 
     // Filter by prep zone
     if (selectedPrepZone) {
-      filtered = filtered.filter(
-        (master) => master.prepZoneCode === selectedPrepZone
-      );
+      filtered = filtered.filter((master) => {
+        if (!master.prepZoneCode) return false;
+
+        // Handle array (new format)
+        if (Array.isArray(master.prepZoneCode)) {
+          return master.prepZoneCode.includes(selectedPrepZone);
+        }
+
+        // Handle string (old format for backward compatibility)
+        if (typeof master.prepZoneCode === "string") {
+          try {
+            // Try to parse as JSON array
+            const parsed = JSON.parse(master.prepZoneCode);
+            if (Array.isArray(parsed)) {
+              return parsed.includes(selectedPrepZone);
+            }
+          } catch (e) {
+            // Not JSON, treat as single string
+          }
+          return master.prepZoneCode === selectedPrepZone;
+        }
+
+        return false;
+      });
     }
 
     // Filter by event menu
@@ -91,11 +120,72 @@ export default function MenuMastersPage() {
     setFilteredMasters(filtered);
   };
 
-  // Helper function to get prep zone name by code
-  const getPrepZoneName = (prepZoneCode?: string) => {
+  // Helper function to get prep zone names by code(s)
+  const getPrepZoneNames = (prepZoneCode?: string | string[] | null) => {
     if (!prepZoneCode) return "None";
-    const zone = prepZones.find((g) => g.prepZoneCode === prepZoneCode);
-    return zone?.prepZoneName || "Unknown";
+
+    // Handle array (new format)
+    if (Array.isArray(prepZoneCode)) {
+      if (prepZoneCode.length === 0) return "None";
+      const names = prepZoneCode
+        .map((code) => {
+          const zone = prepZones.find((z) => z.prepZoneCode === code);
+          return zone?.prepZoneName || code;
+        })
+        .filter(Boolean);
+      return names.length > 0 ? names.join(", ") : "None";
+    }
+
+    // Handle string (old format for backward compatibility)
+    if (typeof prepZoneCode === "string") {
+      try {
+        // Try to parse as JSON array
+        const parsed = JSON.parse(prepZoneCode);
+        if (Array.isArray(parsed)) {
+          return getPrepZoneNames(parsed);
+        }
+      } catch (e) {
+        // Not JSON, treat as single string
+      }
+      const zone = prepZones.find((z) => z.prepZoneCode === prepZoneCode);
+      return zone?.prepZoneName || prepZoneCode || "Unknown";
+    }
+
+    return "None";
+  };
+
+  // Helper function to get station names by code(s)
+  const getStationNames = (stationCode?: string | string[] | null) => {
+    if (!stationCode) return "None";
+
+    // Handle array (new format)
+    if (Array.isArray(stationCode)) {
+      if (stationCode.length === 0) return "None";
+      const names = stationCode
+        .map((code) => {
+          const station = stations.find((s) => s.stationCode === code);
+          return station?.stationname || code;
+        })
+        .filter(Boolean);
+      return names.length > 0 ? names.join(", ") : "None";
+    }
+
+    // Handle string (old format for backward compatibility)
+    if (typeof stationCode === "string") {
+      try {
+        // Try to parse as JSON array
+        const parsed = JSON.parse(stationCode);
+        if (Array.isArray(parsed)) {
+          return getStationNames(parsed);
+        }
+      } catch (e) {
+        // Not JSON, treat as single string
+      }
+      const station = stations.find((s) => s.stationCode === stationCode);
+      return station?.stationname || stationCode || "Unknown";
+    }
+
+    return "None";
   };
 
   const fetchData = async () => {
@@ -107,9 +197,10 @@ export default function MenuMastersPage() {
 
     try {
       setLoading(true);
-      const [mastersRes, prepZonesRes] = await Promise.all([
+      const [mastersRes, prepZonesRes, stationsRes] = await Promise.all([
         fetch("/api/menu/masters", { cache: "no-store" }),
         fetch("/api/menu/prep-zone", { cache: "no-store" }),
+        fetch("/api/station", { cache: "no-store" }),
       ]);
 
       if (mastersRes.ok) {
@@ -120,6 +211,11 @@ export default function MenuMastersPage() {
       if (prepZonesRes.ok) {
         const prepZonesData = await prepZonesRes.json();
         setPrepZones(prepZonesData);
+      }
+
+      if (stationsRes.ok) {
+        const stationsData = await stationsRes.json();
+        setStations(stationsData);
       }
     } catch (error) {
       toast.error("Error loading data");
@@ -349,6 +445,9 @@ export default function MenuMastersPage() {
                       Prep Zone
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Stations
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Menu Type
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -392,7 +491,12 @@ export default function MenuMastersPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-600 dark:text-gray-400">
-                          {getPrepZoneName(master.prepZoneCode)}
+                          {getPrepZoneNames(master.prepZoneCode)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          {getStationNames(master.stationCode)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -480,7 +584,11 @@ export default function MenuMastersPage() {
                       </p>
                       <p>
                         <strong>Prep Zone:</strong>{" "}
-                        {getPrepZoneName(master.prepZoneCode)}
+                        {getPrepZoneNames(master.prepZoneCode)}
+                      </p>
+                      <p>
+                        <strong>Stations:</strong>{" "}
+                        {getStationNames(master.stationCode)}
                       </p>
                       {master.isEventMenu === 1 && (
                         <p>
