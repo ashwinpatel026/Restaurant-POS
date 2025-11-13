@@ -78,19 +78,21 @@ export async function PUT(
     }
 
     // Update menu master
+    const updateData = {
+      name,
+      labelName: labelName || null,
+      colorCode: colorCode || null,
+      prepZoneCode: prepZoneCodes && prepZoneCodes.length > 0 ? prepZoneCodes : null,
+      stationCode: stationCodes && stationCodes.length > 0 ? stationCodes : null,
+      isEventMenu: isEventMenu || 0,
+      isActive: isActive ?? 1,
+      updatedBy: parseInt(session.user.id),
+      updatedOn: new Date()
+    }
+
     const menuMaster = await prisma.menuMaster.update({
       where: { menuMasterId: masterId },
-      data: {
-        name,
-        labelName: labelName || null,
-        colorCode: colorCode || null,
-        prepZoneCode: prepZoneCodes && prepZoneCodes.length > 0 ? prepZoneCodes : null,
-        stationCode: stationCodes && stationCodes.length > 0 ? stationCodes : null,
-        isEventMenu: isEventMenu || 0,
-        isActive: isActive ?? 1,
-        updatedBy: parseInt(session.user.id),
-        updatedOn: new Date()
-      }
+      data: updateData
     })
 
     // Handle event associations
