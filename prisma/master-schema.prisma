@@ -1,0 +1,451 @@
+// Master Database Schema for Multi-Tenant Architecture
+// This database manages companies, dealers, locations, users, and master data templates
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/@prisma/master-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("MASTER_DATABASE_URL")
+}
+
+model Company {
+  companyId        BigInt    @id @default(autoincrement()) @map("company_id")
+  companyCode      String    @unique @map("company_code") @db.VarChar(100)
+  companyName      String    @map("company_name") @db.VarChar(500)
+  address          String?   @map("address") @db.VarChar(1000)
+  phone            String?   @map("phone") @db.VarChar(50)
+  email            String?   @map("email") @db.VarChar(255)
+  isActive         Int       @default(1) @map("is_active")
+  createdOn        DateTime  @default(now()) @map("created_on")
+  updatedOn        DateTime? @map("updated_on")
+
+  dealers          Dealer[]
+  locations        Location[]
+  users            User[]
+
+  @@map("tbl_company")
+}
+
+model Dealer {
+  dealerId         BigInt    @id @default(autoincrement()) @map("dealer_id")
+  dealerCode       String    @unique @map("dealer_code") @db.VarChar(100)
+  dealerName       String    @map("dealer_name") @db.VarChar(500)
+  companyId        BigInt    @map("company_id")
+  address          String?   @map("address") @db.VarChar(1000)
+  phone            String?   @map("phone") @db.VarChar(50)
+  email            String?   @map("email") @db.VarChar(255)
+  isActive         Int       @default(1) @map("is_active")
+  createdOn        DateTime  @default(now()) @map("created_on")
+  updatedOn        DateTime? @map("updated_on")
+
+  company          Company   @relation(fields: [companyId], references: [companyId], onDelete: Cascade)
+  locations        Location[]
+  users            User[]
+
+  @@index([companyId])
+  @@map("tbl_dealer")
+}
+
+model Location {
+  locationId       BigInt    @id @default(autoincrement()) @map("location_id")
+  locationCode     String    @unique @map("location_code") @db.VarChar(100)
+  locationName     String    @map("location_name") @db.VarChar(500)
+  companyId        BigInt    @map("company_id")
+  dealerId         BigInt?   @map("dealer_id")
+  storeCode        String    @unique @map("store_code") @db.VarChar(100) // Used to filter data in location DB
+  address          String?   @map("address") @db.VarChar(1000)
+  phone            String?   @map("phone") @db.VarChar(50)
+  email            String?   @map("email") @db.VarChar(255)
+  isActive         Int       @default(1) @map("is_active")
+  syncEnabled      Int       @default(1) @map("sync_enabled")
+  lastSyncAt       DateTime? @map("last_sync_at")
+  createdOn        DateTime  @default(now()) @map("created_on")
+  updatedOn        DateTime? @map("updated_on")
+
+  company          Company   @relation(fields: [companyId], references: [companyId], onDelete: Cascade)
+  dealer           Dealer?   @relation(fields: [dealerId], references: [dealerId], onDelete: SetNull)
+  users            User[]
+  syncLogs         SyncLog[]
+
+  @@index([companyId])
+  @@index([dealerId])
+  @@index([storeCode])
+  @@map("tbl_location")
+}
+
+// Master Admin for Master Dashboard Authentication
+model Admin {
+  adminId         BigInt      @id @default(autoincrement()) @map("admin_id")
+  email           String      @unique @map("email") @db.VarChar(255)
+  username        String      @unique @map("username") @db.VarChar(100)
+  password        String      @map("password")
+  firstName       String      @map("first_name") @db.VarChar(100)
+  lastName        String      @map("last_name") @db.VarChar(100)
+  role            AdminRole   @map("role")
+  isActive        Boolean     @default(true) @map("is_active")
+  lastLoginAt     DateTime?   @map("last_login_at")
+  createdOn       DateTime    @default(now()) @map("created_on")
+  updatedOn       DateTime?   @map("updated_on")
+
+  @@index([email])
+  @@index([username])
+  @@map("tbl_admin")
+}
+
+model User {
+  userId          BigInt      @id @default(autoincrement()) @map("user_id")
+  email           String      @unique @map("email") @db.VarChar(255)
+  username        String      @unique @map("username") @db.VarChar(100)
+  password        String      @map("password")
+  firstName       String      @map("first_name") @db.VarChar(100)
+  lastName        String      @map("last_name") @db.VarChar(100)
+  companyId       BigInt?     @map("company_id")
+  dealerId        BigInt?     @map("dealer_id")
+  locationId      BigInt?     @map("location_id")
+  role            UserRole    @map("role")
+  accessLevel     AccessLevel  @map("access_level")
+  isActive        Boolean     @default(true) @map("is_active")
+  createdOn       DateTime    @default(now()) @map("created_on")
+  updatedOn       DateTime?   @map("updated_on")
+
+  company         Company?    @relation(fields: [companyId], references: [companyId], onDelete: SetNull)
+  dealer          Dealer?      @relation(fields: [dealerId], references: [dealerId], onDelete: SetNull)
+  location        Location?    @relation(fields: [locationId], references: [locationId], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([dealerId])
+  @@index([locationId])
+  @@index([email])
+  @@index([username])
+  @@map("tbl_user")
+}
+
+// Master Data Templates (for syncing to locations)
+model MasterDataTemplate {
+  templateId      BigInt    @id @default(autoincrement()) @map("template_id")
+  templateName    String    @map("template_name") @db.VarChar(255)
+  templateType    String    @map("template_type") @db.VarChar(100) // MENU_MASTER, CATEGORIES, ITEMS, MODIFIERS, etc.
+  templateData    Json      @map("template_data") // Template configuration/data
+  isActive        Int       @default(1) @map("is_active")
+  createdOn       DateTime  @default(now()) @map("created_on")
+  updatedOn       DateTime? @map("updated_on")
+
+  @@index([templateType])
+  @@index([isActive])
+  @@map("tbl_master_data_template")
+}
+
+// Sync Logs for tracking data synchronization
+model SyncLog {
+  syncLogId       BigInt    @id @default(autoincrement()) @map("sync_log_id")
+  locationId      BigInt    @map("location_id")
+  storeCode       String    @map("store_code") @db.VarChar(100)
+  syncType        String    @map("sync_type") @db.VarChar(50) // FULL, INCREMENTAL
+  status          String    @map("status") @db.VarChar(50) // SUCCESS, FAILED, IN_PROGRESS
+  recordsSynced   Int?      @map("records_synced")
+  errorMessage    String?   @map("error_message") @db.Text
+  startedAt       DateTime  @default(now()) @map("started_at")
+  completedAt     DateTime? @map("completed_at")
+
+  location        Location  @relation(fields: [locationId], references: [locationId], onDelete: Cascade)
+
+  @@index([locationId])
+  @@index([storeCode])
+  @@index([status])
+  @@index([startedAt])
+  @@map("tbl_sync_log")
+}
+
+enum AccessLevel {
+  COMPANY   // Access all locations in company
+  DEALER    // Access all locations in dealer
+  LOCATION  // Access only specific location
+}
+
+enum AdminRole {
+  SUPER_ADMIN      // Full access to all master operations
+  COMPANY_ADMIN    // Manage companies, dealers, locations, users
+  DEALER_ADMIN     // Manage dealers, locations, users
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  COMPANY_ADMIN
+  DEALER_ADMIN
+  OUTLET_MANAGER
+  CAPTAIN
+  CASHIER
+  KITCHEN_STAFF
+}
+
+// Master Data Models (without storeCode - these are templates synced to locations)
+
+model MasterTimeEvent {
+  id                     BigInt    @id @default(autoincrement()) @map("id")
+  eventCode              String    @unique @map("Event_code") @db.VarChar(100)
+  eventName              String    @map("EventName") @db.VarChar(100)
+  globalPriceAmountAdd   Decimal?  @map("GlobalPrice_Amount_Add") @db.Decimal(18, 2)
+  globalPriceAmountDisc  Decimal?  @map("GlobalPrice_Amount_Disc") @db.Decimal(18, 2)
+  globalPricePerAdd      Decimal?  @map("GlobalPrice_Per_Add") @db.Decimal(18, 2)
+  globalPricePerDisc     Decimal?  @map("GlobalPrice_Per_Disc") @db.Decimal(18, 2)
+  monday                 String?   @map("Monday") @db.VarChar(50)
+  monStartTime           String?   @map("Mon_StartTime") @db.VarChar(10)
+  monEndTime             String?   @map("Mon_EndTime") @db.VarChar(10)
+  tuesday                String?   @map("Tuesday") @db.VarChar(50)
+  tueStartTime           String?   @map("Tue_StartTime") @db.VarChar(10)
+  tueEndTime             String?   @map("Tue_EndTime") @db.VarChar(10)
+  wednesday              String?   @map("Wednesday") @db.VarChar(50)
+  wedStartTime           String?   @map("Wed_StartTime") @db.VarChar(10)
+  wedEndTime             String?   @map("Wed_EndTime") @db.VarChar(10)
+  thursday               String?   @map("Thursday") @db.VarChar(50)
+  thuStartTime           String?   @map("Thu_StartTime") @db.VarChar(10)
+  thuEndTime             String?   @map("Thu_EndTime") @db.VarChar(10)
+  friday                 String?   @map("FriDay") @db.VarChar(50)
+  friStartTime           String?   @map("Fri_StartTime") @db.VarChar(10)
+  friEndTime             String?   @map("Fri_EndTime") @db.VarChar(10)
+  saturday               String?   @map("Saturday") @db.VarChar(50)
+  satStartTime           String?   @map("Sat_StartTime") @db.VarChar(10)
+  satEndTime             String?   @map("Sat_EndTime") @db.VarChar(10)
+  sunday                 String?   @map("SunDay") @db.VarChar(50)
+  sunStartTime           String?   @map("Sun_StartTime") @db.VarChar(10)
+  sunEndTime             String?   @map("Sun_EndTime") @db.VarChar(10)
+  eventStartDate         DateTime? @map("Event_Start_Date") @db.Date
+  eventEndDate           DateTime? @map("Event_End_Date") @db.Date
+  isActive               Int       @default(1) @map("is_active")
+  createdDate            DateTime  @default(now()) @map("Created_date")
+  createdBy              BigInt?   @map("Created_by")
+  updatedOn              DateTime? @map("updated_on")
+
+  menuMasterEvents       MasterMenuMasterEvent[]
+
+  @@map("tbl_master_time_events")
+}
+
+model MasterPrepZone {
+  prepZoneId         BigInt    @id @default(autoincrement()) @map("prep_zone_id")
+  prepZoneCode       String    @unique @map("prep_zone_code") @db.VarChar(100)
+  prepZoneName       String?   @map("prep_zone_name") @db.VarChar(500)
+  stationCode        String?   @map("station_code") @db.VarChar(100)
+  isActive           Int       @default(1) @map("is_active")
+  sendToExpediter    Int?      @map("send_to_expediter")
+  alwaysPrintTicket  Int?      @map("always_print_ticket")
+  printerCode        String?   @map("printer_code") @db.VarChar(100)
+  backupPrinterCode  String?   @map("backup_printer_code") @db.VarChar(100)
+  createdBy          BigInt?   @map("createdby")
+  createdOn          DateTime  @default(now()) @map("createdon")
+  updatedBy          BigInt?   @map("updatedby")
+  updatedOn          DateTime? @map("updatedon")
+
+  @@map("tbl_master_prep_zone")
+}
+
+model MasterMenuMaster {
+  menuMasterId      BigInt    @id @default(autoincrement()) @map("menu_master_id")
+  menuMasterCode    String    @unique @map("menu_master_code") @db.VarChar(100)
+  name              String?   @map("name") @db.VarChar(500)
+  labelName         String?   @map("label_name") @db.VarChar(500)
+  colorCode         String?   @map("color_code") @db.VarChar(100)
+  prepZoneCode      Json?     @map("prep_zone_code")
+  stationCode       Json?     @map("station_code")
+  isEventMenu       Int?      @map("is_event_menu")
+  isActive          Int       @default(1) @map("is_active")
+  createdBy         BigInt?   @map("createdby")
+  createdOn         DateTime  @default(now()) @map("createdon")
+  updatedBy         BigInt?   @map("updatedby")
+  updatedOn         DateTime? @map("updatedon")
+
+  menuMasterEvents  MasterMenuMasterEvent[]
+  menuCategories    MasterMenuCategory[]
+
+  @@map("tbl_master_menu_master")
+}
+
+model MasterMenuMasterEvent {
+  id              BigInt    @id @default(autoincrement()) @map("id")
+  menuMasterCode  String    @map("menu_master_code") @db.VarChar(100)
+  eventCode       String    @map("event_code") @db.VarChar(100)
+  createdBy       BigInt?   @map("createdby")
+  createdOn       DateTime  @default(now()) @map("createdon")
+
+  menuMaster      MasterMenuMaster @relation(fields: [menuMasterCode], references: [menuMasterCode])
+  timeEvent       MasterTimeEvent  @relation(fields: [eventCode], references: [eventCode])
+
+  @@unique([menuMasterCode, eventCode])
+  @@map("tbl_master_menu_master_event")
+}
+
+model MasterMenuCategory {
+  menuCategoryId    BigInt    @id @default(autoincrement()) @map("menu_category_id")
+  menuMasterCode    String    @map("menu_master_code") @db.VarChar(100)
+  menuCategoryCode  String    @unique @map("menu_category_code") @db.VarChar(100)
+  name              String?   @map("name") @db.VarChar(200)
+  colorCode         String?   @map("color_code") @db.VarChar(100)
+  isActive          Int       @default(1) @map("is_active")
+  createdBy         BigInt?   @map("createdby")
+  createdOn         DateTime  @default(now()) @map("createdon")
+  updatedBy         BigInt?   @map("updatedby")
+  updatedOn         DateTime? @map("updatedon")
+
+  menuMaster        MasterMenuMaster @relation(fields: [menuMasterCode], references: [menuMasterCode])
+  menuCategoryModifiers MasterMenuCategoryModifier[]
+  menuItems         MasterMenuItem[]
+
+  @@map("tbl_master_menu_category")
+}
+
+model MasterMenuCategoryModifier {
+  id                   BigInt    @id @default(autoincrement()) @map("id")
+  menuCategoryCode     String    @map("menu_category_code") @db.VarChar(100)
+  modifierGroupCode    String    @map("modifier_group_code") @db.VarChar(100)
+  createdBy            BigInt?   @map("createdby")
+  createdOn            DateTime  @default(now()) @map("createdon")
+
+  menuCategory         MasterMenuCategory @relation(fields: [menuCategoryCode], references: [menuCategoryCode])
+  modifierGroup        MasterModifierGroup @relation(fields: [modifierGroupCode], references: [modifierGroupCode])
+
+  @@unique([menuCategoryCode, modifierGroupCode])
+  @@map("tbl_master_menu_category_modifier")
+}
+
+model MasterMenuItem {
+  menuItemId                     BigInt    @id @default(autoincrement()) @map("menu_item_id")
+  menuItemCode                   String    @unique @map("menu_item_code") @db.VarChar(100)
+  menuCategoryCode               String?   @map("menu_category_code") @db.VarChar(100)
+  name                           String?   @map("name") @db.VarChar(500)
+  kitchenName                    String?   @map("kitchen_name") @db.VarChar(150)
+  labelName                      String?   @map("label_name") @db.VarChar(500)
+  colorCode                      String?   @map("color_code") @db.VarChar(100)
+  calories                       String?   @map("calories") @db.VarChar(100)
+  description                    String?   @map("description")
+  itemSize                       String?   @map("item_size") @db.VarChar(50)
+  skuPlu                         BigInt?   @map("sku_plu")
+  isAlcohol                      Int       @default(0) @map("is_alcohol")
+  menuImg                        String?   @map("menu_img")
+  priceStrategy                  Int?      @map("price_strategy") // 1=Base Price, 3=Open Price
+  cardPrice                      Decimal?  @map("card_price") @db.Decimal(10, 2)
+  cashPrice                      Decimal?  @map("cash_price") @db.Decimal(10, 2)
+  isPrice                        Int       @default(1) @map("is_price")
+  isActive                       Int       @default(1) @map("is_active")
+  stockinhand                    Decimal?  @map("stockinhand") @db.Decimal(18, 2)
+  isOutStock                     Int?      @map("is_out_stock")
+  itemContainAlcohol             Int?      @map("item_contain_alcohol")
+  isPosVisible                   Int?      @map("is_pos_visible")
+  isKioskOrderPay                Int?      @map("is_kiosk_order_pay")
+  isOnlineOrderByApp             Int?      @map("is_online_order_by_app")
+  isOnlineOrdering               Int?      @map("is_online_ordering")
+  isCustomerInvoice              Int?      @map("is_customer_invoice")
+  taxCode                        String?   @map("tax_code") @db.VarChar(50)
+  inheritTaxInclusion            Boolean   @default(true) @map("inherit_tax_inclusion")
+  isTaxIncluded                  Boolean   @default(false) @map("is_tax_included")
+  inheritDiningTax               Boolean   @default(true) @map("inherit_dining_tax")
+  diningTaxEffect                String?   @default("No Effect") @map("dining_tax_effect") @db.VarChar(50)
+  disqualifyDiningTaxExemption   Boolean   @default(false) @map("disqualify_dining_tax_exemption")
+  inheritModifierGroup           Boolean   @default(true) @map("inherit_modifier_group")
+  prepZoneCode                   Json?     @map("prep_zone_code")
+  createdBy                      BigInt?   @map("createdby")
+  createdOn                      DateTime  @default(now()) @map("createdon")
+  updatedBy                      BigInt?   @map("updatedby")
+  updatedOn                      DateTime? @map("updatedon")
+
+  menuCategory                   MasterMenuCategory? @relation(fields: [menuCategoryCode], references: [menuCategoryCode])
+  menuItemModifierGroups         MasterMenuItemModifierGroup[]
+
+  @@map("tbl_master_menu_item")
+}
+
+model MasterModifierGroup {
+  id                      BigInt   @id @default(autoincrement()) @map("id")
+  modifierGroupCode       String   @unique @map("modifier_group_code") @db.VarChar(100)
+  groupName               String?  @map("group_name") @db.VarChar(200)
+  labelName               String?  @map("label_name") @db.VarChar(100)
+  isRequired              Int      @default(0) @map("is_required")
+  isMultiselect           Int      @default(0) @map("is_multiselect")
+  minSelection            Int?     @map("min_selection")
+  maxSelection            Int?     @map("max_selection")
+  showDefaultTop          Int      @default(0) @map("show_default_top")
+  inheritFromMenuGroup    Int      @default(0) @map("inherit_from_menu_group")
+  priceStrategy           Int      @default(1) @map("price_strategy")
+  price                   Decimal? @map("price") @db.Decimal(10, 2)
+  isActive                Int      @default(1) @map("is_active")
+  createdBy               BigInt?  @map("createdby")
+  createdOn               DateTime @default(now()) @map("createdon")
+  updatedBy               BigInt?  @map("updatedby")
+  updatedOn               DateTime? @map("updatedon")
+
+  modifierItems           MasterModifierItem[]
+  menuItemModifierGroups  MasterMenuItemModifierGroup[]
+  menuCategoryModifiers   MasterMenuCategoryModifier[]
+
+  @@index([modifierGroupCode])
+  @@map("tbl_master_modifier_group")
+}
+
+model MasterModifierItem {
+  id                 BigInt   @id @default(autoincrement()) @map("id")
+  modifierItemCode   String   @unique @map("modifier_item_code") @db.VarChar(100)
+  modifierGroupCode  String?  @map("modifier_group_code") @db.VarChar(100)
+  name               String?  @map("name") @db.VarChar(500)
+  labelName          String?  @map("label_name") @db.VarChar(100)
+  colorCode          String?  @map("color_code") @db.VarChar(100)
+  price              Decimal? @map("price") @db.Decimal(10, 2)
+  isDefault          Int      @default(0) @map("is_default")
+  displayOrder       Int?     @map("display_order")
+  isActive           Int      @default(1) @map("is_active")
+  createdBy          BigInt?  @map("createdby")
+  createdOn          DateTime @default(now()) @map("createdon")
+  updatedBy          BigInt?  @map("updatedby")
+  updatedOn          DateTime? @map("updatedon")
+
+  modifierGroup      MasterModifierGroup? @relation(fields: [modifierGroupCode], references: [modifierGroupCode])
+
+  @@map("tbl_master_modifier_item")
+}
+
+model MasterMenuItemModifierGroup {
+  id                         BigInt    @id @default(autoincrement()) @map("id")
+  menuItemCode               String?   @map("menu_item_code") @db.VarChar(100)
+  modifierGroupCode          String?   @map("modifier_group_code") @db.VarChar(100)
+  inheritFromMenuGroup       Int       @default(1) @map("inherit_from_menu_group")
+  isInheritFromMenuCategory  Int       @default(1) @map("is_inherit_from_menu_category")
+  isRequired                 Int       @default(0) @map("is_required")
+  isMultiselect              Int       @default(0) @map("is_multiselect")
+  minSelection               Int?      @map("min_selection")
+  maxSelection               Int?      @map("max_selection")
+  createdBy                  BigInt?   @map("createdby")
+  createdOn                  DateTime  @default(now()) @map("createdon")
+
+  menuItem                   MasterMenuItem? @relation(fields: [menuItemCode], references: [menuItemCode])
+  modifierGroup              MasterModifierGroup? @relation(fields: [modifierGroupCode], references: [modifierGroupCode])
+
+  @@unique([menuItemCode, modifierGroupCode])
+  @@map("tbl_master_menu_item_modifier_group")
+}
+
+model MasterTax {
+  tblTaxId      BigInt   @id @default(autoincrement()) @map("tbl_tax_id")
+  taxCode       String   @unique @map("tax_code") @db.VarChar(100)
+  taxname       String   @map("taxname") @db.VarChar(30)
+  taxrate       Decimal  @map("taxrate") @db.Decimal(22, 2) @default(0.00)
+  createdBy     BigInt?  @map("created_by")
+  createdDate   DateTime @default(now()) @map("created_date")
+  updatedOn     DateTime? @map("updated_on")
+
+  @@map("tbl_master_tax")
+}
+
+model MasterStation {
+  tblStationId  BigInt  @id @default(autoincrement()) @map("tbl_station_id")
+  stationCode   String  @unique @map("station_code") @db.VarChar(100)
+  stationname   String? @map("stationname") @db.VarChar(100)
+  isActive      Int     @default(1) @map("is_active")
+  stationGroups Json?   @map("station_groups")
+  createdOn     DateTime @default(now()) @map("created_on")
+  updatedOn     DateTime? @map("updated_on")
+
+  @@map("tbl_master_station")
+}
+
+

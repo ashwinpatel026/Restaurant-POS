@@ -319,6 +319,7 @@ model Order {
    ```
 
 3. **Master Data Sync Service:**
+
    ```typescript
    // services/syncService.ts
    export async function syncMasterData(storeCode: string) {

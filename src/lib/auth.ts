@@ -92,6 +92,8 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: '/login',
   },
+  // Use custom API route for dashboard auth
+  // This ensures separation from master auth
   session: {
     strategy: 'jwt',
   },
