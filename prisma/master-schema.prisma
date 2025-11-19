@@ -448,4 +448,17 @@ model MasterStation {
   @@map("tbl_master_station")
 }
 
+model MasterPrinter {
+  printerId     BigInt    @id @default(autoincrement()) @map("printer_id")
+  printerCode   String    @unique @map("printer_code") @db.VarChar(100)
+  printerName   String?   @map("printer_name") @db.VarChar(200)
+  isActive      Int       @default(1) @map("is_active")
+  createdBy     BigInt?   @map("createdby")
+  createdOn     DateTime  @default(now()) @map("createdon")
+  updatedBy     BigInt?   @map("updatedby")
+  updatedOn     DateTime? @map("updatedon")
+
+  @@map("tbl_master_printer")
+}
+
 

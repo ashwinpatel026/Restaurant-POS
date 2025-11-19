@@ -20,6 +20,8 @@ import {
   ChevronRightIcon,
   CubeIcon,
   CalculatorIcon,
+  PrinterIcon,
+  ClockIcon,
 } from "@heroicons/react/24/outline";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -74,6 +76,24 @@ const navigation: MenuItem[] = [
     icon: CalculatorIcon,
     roles: ["SUPER_ADMIN", "COMPANY_ADMIN", "DEALER_ADMIN"],
   },
+  {
+    name: "Printer",
+    href: "/master/printer",
+    icon: PrinterIcon,
+    roles: ["SUPER_ADMIN", "COMPANY_ADMIN", "DEALER_ADMIN"],
+  },
+  {
+    name: "Time Event",
+    href: "/master/time-event",
+    icon: ClockIcon,
+    roles: ["SUPER_ADMIN", "COMPANY_ADMIN", "DEALER_ADMIN"],
+  },
+  {
+    name: "Prep Zone",
+    href: "/master/prep-zone",
+    icon: CubeIcon,
+    roles: ["SUPER_ADMIN", "COMPANY_ADMIN", "DEALER_ADMIN"],
+  },
 ];
 
 export default function MasterDashboardLayout({ children }: { children: ReactNode }) {
@@ -99,11 +119,21 @@ export default function MasterDashboardLayout({ children }: { children: ReactNod
   };
 
   const isMenuActive = (item: MenuItem): boolean => {
-    if (
-      item.href &&
-      (pathname === item.href || pathname.startsWith(item.href + "/"))
-    )
+    if (!item.href) return false;
+    
+    // Exact match
+    if (pathname === item.href) return true;
+    
+    // For parent routes like "/master", only match exactly, not child routes
+    if (item.href === "/master") {
+      return pathname === item.href;
+    }
+    
+    // For other routes, match exact or child routes
+    if (pathname.startsWith(item.href + "/")) {
       return true;
+    }
+    
     if (item.children) {
       return item.children.some(
         (child) =>
