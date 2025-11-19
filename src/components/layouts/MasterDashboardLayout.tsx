@@ -22,6 +22,9 @@ import {
   CalculatorIcon,
   PrinterIcon,
   ClockIcon,
+  CogIcon,
+  DocumentTextIcon,
+  FolderIcon,
 } from "@heroicons/react/24/outline";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -93,6 +96,34 @@ const navigation: MenuItem[] = [
     href: "/master/prep-zone",
     icon: CubeIcon,
     roles: ["SUPER_ADMIN", "COMPANY_ADMIN", "DEALER_ADMIN"],
+  },
+  {
+    name: "Modifiers",
+    href: "/master/modifiers",
+    icon: CogIcon,
+    roles: ["SUPER_ADMIN", "COMPANY_ADMIN", "DEALER_ADMIN"],
+  },
+  {
+    name: "Menu",
+    icon: CubeIcon,
+    roles: ["SUPER_ADMIN", "COMPANY_ADMIN", "DEALER_ADMIN"],
+    children: [
+      {
+        name: "Menu Master",
+        href: "/master/menu/masters",
+        icon: DocumentTextIcon,
+      },
+      {
+        name: "Menu Category",
+        href: "/master/menu/categories",
+        icon: FolderIcon,
+      },
+      {
+        name: "Menu Items",
+        href: "/master/menu/items",
+        icon: CubeIcon,
+      },
+    ],
   },
 ];
 
