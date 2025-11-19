@@ -21,8 +21,8 @@ export default function ModifiersDashboardPage() {
   const fetchStats = async () => {
     try {
       const [modifiersRes, modifierItemsRes] = await Promise.all([
-        fetch("/api/modifier-groups"),
-        fetch("/api/modifier-items"),
+        fetch("/api/dashboard/modifier-groups"),
+        fetch("/api/dashboard/modifier-items"),
       ]);
 
       const newStats = {

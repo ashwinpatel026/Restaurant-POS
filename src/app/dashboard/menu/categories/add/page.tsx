@@ -47,8 +47,8 @@ export default function AddCategoryPage() {
   const fetchData = async () => {
     try {
       const [mastersRes, modifierGroupsRes] = await Promise.all([
-        fetch("/api/menu/masters", { cache: "no-store" }),
-        fetch("/api/modifier-groups", { cache: "no-store" }),
+        fetch("/api/dashboard/menu/masters", { cache: "no-store" }),
+        fetch("/api/dashboard/modifier-groups", { cache: "no-store" }),
       ]);
 
       if (mastersRes.ok) {
@@ -98,7 +98,7 @@ export default function AddCategoryPage() {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/menu/categories", {
+      const response = await fetch("/api/dashboard/menu/categories", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

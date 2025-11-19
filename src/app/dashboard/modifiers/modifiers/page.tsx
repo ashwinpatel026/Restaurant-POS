@@ -50,7 +50,7 @@ export default function ModifiersPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const modifiersRes = await fetch("/api/modifier-groups", {
+      const modifiersRes = await fetch("/api/dashboard/modifier-groups", {
         cache: "no-store",
       });
 
@@ -88,7 +88,7 @@ export default function ModifiersPage() {
     if (!deletingId) return;
 
     try {
-      const response = await fetch(`/api/modifier-groups/${deletingId}`, {
+      const response = await fetch(`/api/dashboard/modifier-groups/${deletingId}`, {
         method: "DELETE",
       });
 

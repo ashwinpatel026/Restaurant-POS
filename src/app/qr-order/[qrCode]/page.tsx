@@ -70,7 +70,7 @@ export default function QROrderPage() {
   const fetchMenuData = async () => {
     try {
       // Fetch menu data as public (no auth required for QR orders)
-      const response = await fetch("/api/menu/masters?public=true");
+      const response = await fetch("/api/dashboard/menu/masters?public=true");
       if (response.ok) {
         const data = await response.json();
         setMenuMasters(data || []);
@@ -166,7 +166,7 @@ export default function QROrderPage() {
         notes: null,
       }));
 
-      const response = await fetch("/api/orders", {
+      const response = await fetch("/api/dashboard/orders", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

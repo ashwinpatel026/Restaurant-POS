@@ -65,8 +65,8 @@ export default function CreateOrderModal({
   const fetchData = async () => {
     try {
       const [menuRes, tablesRes] = await Promise.all([
-        fetch("/api/menu"),
-        fetch("/api/tables?status=AVAILABLE"),
+        fetch("/api/dashboard/menu"),
+        fetch("/api/dashboard/tables?status=AVAILABLE"),
       ]);
 
       if (menuRes.ok) {
@@ -150,7 +150,7 @@ export default function CreateOrderModal({
     try {
       const { subtotal, tax, total } = calculateTotal();
 
-      const response = await fetch("/api/orders", {
+      const response = await fetch("/api/dashboard/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

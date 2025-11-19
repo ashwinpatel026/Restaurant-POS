@@ -10,7 +10,7 @@ import SystemColorPicker, {
 } from "@/components/ui/SystemColorPicker";
 import { CheckIcon } from "@heroicons/react/24/solid";
 import StatusToggle from "@/components/forms/StatusToggle";
-import { PageSkeleton } from "@/components/ui/SkeletonLoader";
+import { FormSkeleton } from "@/components/ui/SkeletonLoader";
 
 interface MenuMaster {
   menuMasterId: string;
@@ -178,20 +178,23 @@ export default function EditCategoryPage() {
 
     try {
       const token = localStorage.getItem("master_admin_token");
-      const response = await fetch(`/api/master/menu-categories/${categoryId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          colorCode: formData.colorCode,
-          menuMasterId: formData.menuMasterId,
-          isActive: formData.isActive,
-          modifierGroupCodes: Array.from(selectedModifierGroups),
-        }),
-      });
+      const response = await fetch(
+        `/api/master/menu-categories/${categoryId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            name: formData.name,
+            colorCode: formData.colorCode,
+            menuMasterId: formData.menuMasterId,
+            isActive: formData.isActive,
+            modifierGroupCodes: Array.from(selectedModifierGroups),
+          }),
+        }
+      );
 
       if (response.ok) {
         toast.success("Category updated successfully!");
@@ -211,7 +214,7 @@ export default function EditCategoryPage() {
   if (fetchLoading) {
     return (
       <MasterDashboardLayout>
-        <PageSkeleton />
+        <FormSkeleton />
       </MasterDashboardLayout>
     );
   }
@@ -441,4 +444,3 @@ export default function EditCategoryPage() {
     </MasterDashboardLayout>
   );
 }
-

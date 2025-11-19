@@ -66,8 +66,8 @@ export default function EditMenuItemPage() {
   const fetchData = async () => {
     try {
       const [itemRes, categoriesRes] = await Promise.all([
-        fetch(`/api/menu/items/${itemId}`),
-        fetch("/api/menu/categories"),
+        fetch(`/api/dashboard/menu/items/${itemId}`),
+        fetch("/api/dashboard/menu/categories"),
       ]);
 
       if (itemRes.ok) {
@@ -97,7 +97,7 @@ export default function EditMenuItemPage() {
 
   const handleSave = async (formData: any) => {
     try {
-      const response = await fetch(`/api/menu/items/${itemId}`, {
+      const response = await fetch(`/api/dashboard/menu/items/${itemId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

@@ -139,7 +139,7 @@ export default function MenuItemsPage() {
     try {
       setLoading(true);
       const [itemsRes, categoriesRes] = await Promise.all([
-        fetch("/api/menu/items", {
+        fetch("/api/dashboard/menu/items", {
           cache: "no-store",
           headers: {
             "Cache-Control": "no-cache, no-store, must-revalidate",
@@ -147,7 +147,7 @@ export default function MenuItemsPage() {
             Expires: "0",
           },
         }),
-        fetch("/api/menu/categories", { cache: "no-store" }),
+        fetch("/api/dashboard/menu/categories", { cache: "no-store" }),
       ]);
 
       let itemsData = [];
@@ -203,7 +203,7 @@ export default function MenuItemsPage() {
     if (!deletingId) return;
 
     try {
-      const response = await fetch(`/api/menu/items/${deletingId}`, {
+      const response = await fetch(`/api/dashboard/menu/items/${deletingId}`, {
         method: "DELETE",
         cache: "no-store",
       });

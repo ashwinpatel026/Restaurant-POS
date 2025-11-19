@@ -62,9 +62,9 @@ export default function AddMenuMasterPage() {
   const fetchData = async () => {
     try {
       const [prepZonesRes, stationsRes, eventsRes] = await Promise.all([
-        fetch("/api/menu/prep-zone", { cache: "no-store" }),
-        fetch("/api/station", { cache: "no-store" }),
-        fetch("/api/events", { cache: "no-store" }),
+        fetch("/api/dashboard/menu/prep-zone", { cache: "no-store" }),
+        fetch("/api/dashboard/station", { cache: "no-store" }),
+        fetch("/api/dashboard/events", { cache: "no-store" }),
       ]);
 
       if (prepZonesRes.ok) {
@@ -132,7 +132,7 @@ export default function AddMenuMasterPage() {
     try {
       const prepZoneCodes = Array.from(selectedPrepZones);
       const stationCodes = Array.from(selectedStations);
-      const response = await fetch("/api/menu/masters", {
+      const response = await fetch("/api/dashboard/menu/masters", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

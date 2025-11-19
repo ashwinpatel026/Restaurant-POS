@@ -224,7 +224,7 @@ export default function MenuItemTabbedForm({
 
   const fetchModifiers = async () => {
     try {
-      const response = await fetch("/api/menu/modifiers");
+      const response = await fetch("/api/dashboard/menu/modifiers");
       if (response.ok) {
         const modifiersData = await response.json();
         setModifiers(modifiersData);
@@ -236,7 +236,7 @@ export default function MenuItemTabbedForm({
 
   const fetchTaxes = async () => {
     try {
-      const res = await fetch("/api/tax");
+      const res = await fetch("/api/dashboard/tax");
       if (res.ok) {
         const data = await res.json();
         setTaxes(data);
@@ -248,7 +248,7 @@ export default function MenuItemTabbedForm({
 
   const fetchPrepZones = async () => {
     try {
-      const res = await fetch("/api/menu/prep-zone");
+      const res = await fetch("/api/dashboard/menu/prep-zone");
       if (res.ok) {
         const data = await res.json();
         setPrepZones(data);

@@ -50,7 +50,7 @@ export default function QROrdersPage() {
   const fetchOrders = async () => {
     try {
       const response = await fetch(
-        "/api/orders?type=QR_ORDER&status=PENDING,CONFIRMED"
+        "/api/dashboard/orders?type=QR_ORDER&status=PENDING,CONFIRMED"
       );
       if (response.ok) {
         const data = await response.json();
@@ -65,7 +65,7 @@ export default function QROrdersPage() {
 
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
     try {
-      const response = await fetch(`/api/orders/${orderId}`, {
+      const response = await fetch(`/api/dashboard/orders/${orderId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),

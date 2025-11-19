@@ -25,7 +25,7 @@ export default function AddModifierItemPage() {
 
   const fetchModifiers = async () => {
     try {
-      const response = await fetch("/api/modifier-groups");
+      const response = await fetch("/api/dashboard/modifier-groups");
       if (response.ok) {
         const data = await response.json();
         setModifiers(data);
@@ -39,7 +39,7 @@ export default function AddModifierItemPage() {
 
   const handleSave = async (formData: any) => {
     try {
-      const response = await fetch("/api/modifier-items", {
+      const response = await fetch("/api/dashboard/modifier-items", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),

@@ -79,7 +79,7 @@ export default function MenuItemModal({
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch("/api/menu/categories");
+      const response = await fetch("/api/dashboard/menu/categories");
       if (response.ok) {
         const data = await response.json();
         setCategories(data);
@@ -94,7 +94,7 @@ export default function MenuItemModal({
     setLoading(true);
 
     try {
-      const url = item ? `/api/menu/items/${item.id}` : "/api/menu/items";
+      const url = item ? `/api/dashboard/menu/items/${item.id}` : "/api/dashboard/menu/items";
       const method = item ? "PUT" : "POST";
 
       const response = await fetch(url, {

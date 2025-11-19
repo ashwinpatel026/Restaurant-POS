@@ -84,10 +84,10 @@ export default function EditMenuMasterPage() {
   const fetchData = async () => {
     try {
       const [prepZonesRes, stationsRes, eventsRes, masterRes] = await Promise.all([
-        fetch("/api/menu/prep-zone", { cache: "no-store" }),
-        fetch("/api/station", { cache: "no-store" }),
-        fetch("/api/events", { cache: "no-store" }),
-        fetch(`/api/menu/masters/${masterId}`, { cache: "no-store" }),
+        fetch("/api/dashboard/menu/prep-zone", { cache: "no-store" }),
+        fetch("/api/dashboard/station", { cache: "no-store" }),
+        fetch("/api/dashboard/events", { cache: "no-store" }),
+        fetch(`/api/dashboard/menu/masters/${masterId}`, { cache: "no-store" }),
       ]);
 
       if (prepZonesRes.ok) {
@@ -113,7 +113,7 @@ export default function EditMenuMasterPage() {
         let eventCode = "";
         if (masterData.isEventMenu === 1 && masterData.menuMasterCode) {
           const eventAssocRes = await fetch(
-            `/api/menu/masters/${masterId}/events`,
+            `/api/dashboard/menu/masters/${masterId}/events`,
             { cache: "no-store" }
           );
           if (eventAssocRes.ok) {
@@ -224,7 +224,7 @@ export default function EditMenuMasterPage() {
     try {
       const prepZoneCodes = Array.from(selectedPrepZones);
       const stationCodes = Array.from(selectedStations);
-      const response = await fetch(`/api/menu/masters/${masterId}`, {
+      const response = await fetch(`/api/dashboard/menu/masters/${masterId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

@@ -42,7 +42,7 @@ export default function ReportsPage() {
 
   const fetchReportData = async () => {
     try {
-      let url = `/api/reports?range=${dateRange}`;
+      let url = `/api/dashboard/reports?range=${dateRange}`;
       if (dateRange === "custom" && startDate && endDate) {
         url += `&startDate=${startDate}&endDate=${endDate}`;
       }

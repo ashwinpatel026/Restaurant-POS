@@ -59,9 +59,9 @@ export default function EditCategoryPage() {
   const fetchData = async () => {
     try {
       const [categoryRes, mastersRes, modifierGroupsRes] = await Promise.all([
-        fetch(`/api/menu/categories/${categoryId}`, { cache: "no-store" }),
-        fetch("/api/menu/masters", { cache: "no-store" }),
-        fetch("/api/modifier-groups", { cache: "no-store" }),
+        fetch(`/api/dashboard/menu/categories/${categoryId}`, { cache: "no-store" }),
+        fetch("/api/dashboard/menu/masters", { cache: "no-store" }),
+        fetch("/api/dashboard/modifier-groups", { cache: "no-store" }),
       ]);
 
       if (categoryRes.ok) {
@@ -160,7 +160,7 @@ export default function EditCategoryPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(`/api/menu/categories/${categoryId}`, {
+      const response = await fetch(`/api/dashboard/menu/categories/${categoryId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

@@ -28,7 +28,7 @@ export default function UsersPage() {
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch("/api/users");
+      const response = await fetch("/api/dashboard/users");
       if (response.ok) {
         const data = await response.json();
         setUsers(data);
@@ -42,7 +42,7 @@ export default function UsersPage() {
 
   const handleToggleStatus = async (userId: string, isActive: boolean) => {
     try {
-      const response = await fetch(`/api/users/${userId}`, {
+      const response = await fetch(`/api/dashboard/users/${userId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: !isActive }),

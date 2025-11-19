@@ -24,9 +24,9 @@ export default function MenuManagementPage() {
     const fetchCounts = async () => {
       try {
         const [mastersRes, categoriesRes, itemsRes] = await Promise.all([
-          fetch("/api/menu/masters"),
-          fetch("/api/menu/categories"),
-          fetch("/api/menu/items"),
+          fetch("/api/dashboard/menu/masters"),
+          fetch("/api/dashboard/menu/categories"),
+          fetch("/api/dashboard/menu/items"),
         ]);
 
         setStats({

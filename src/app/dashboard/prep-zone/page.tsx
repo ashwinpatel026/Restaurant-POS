@@ -82,9 +82,9 @@ export default function PrepZonePage() {
     try {
       setLoading(true);
       const [zonesRes, printersRes, stationsRes] = await Promise.all([
-        fetch("/api/menu/prep-zone", { cache: "no-store" }),
-        fetch("/api/printer", { cache: "no-store" }),
-        fetch("/api/station", { cache: "no-store" }),
+        fetch("/api/dashboard/menu/prep-zone", { cache: "no-store" }),
+        fetch("/api/dashboard/printer", { cache: "no-store" }),
+        fetch("/api/dashboard/station", { cache: "no-store" }),
       ]);
 
       if (zonesRes.ok) {
@@ -124,8 +124,8 @@ export default function PrepZonePage() {
   const handleSave = async (formData: any) => {
     try {
       const url = editingZone
-        ? `/api/menu/prep-zone/${editingZone.prepZoneId}`
-        : "/api/menu/prep-zone";
+        ? `/api/dashboard/menu/prep-zone/${editingZone.prepZoneId}`
+        : "/api/dashboard/menu/prep-zone";
 
       const method = editingZone ? "PUT" : "POST";
 
@@ -192,7 +192,7 @@ export default function PrepZonePage() {
 
     try {
       const response = await fetch(
-        `/api/menu/prep-zone/${zoneToDelete.prepZoneId}`,
+        `/api/dashboard/menu/prep-zone/${zoneToDelete.prepZoneId}`,
         {
           method: "DELETE",
         }

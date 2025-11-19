@@ -28,7 +28,7 @@ export default function AddMenuItemPage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch("/api/menu/categories");
+      const response = await fetch("/api/dashboard/menu/categories");
       if (response.ok) {
         const categoriesData = await response.json();
         setCategories(categoriesData);
@@ -43,7 +43,7 @@ export default function AddMenuItemPage() {
 
   const handleSave = async (formData: any) => {
     try {
-      const response = await fetch("/api/menu/items", {
+      const response = await fetch("/api/dashboard/menu/items", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

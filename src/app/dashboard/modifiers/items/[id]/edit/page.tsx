@@ -46,7 +46,7 @@ export default function EditModifierItemPage() {
     try {
       const [itemRes, groupsRes] = await Promise.all([
         fetch(`/api/modifier-items/${id}`),
-        fetch("/api/modifier-groups"),
+        fetch("/api/dashboard/modifier-groups"),
       ]);
 
       if (itemRes.ok) {

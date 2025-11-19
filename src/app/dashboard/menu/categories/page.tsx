@@ -94,8 +94,8 @@ export default function MenuCategoriesPage() {
     try {
       setLoading(true);
       const [categoriesRes, mastersRes] = await Promise.all([
-        fetch("/api/menu/categories", { cache: "no-store" }),
-        fetch("/api/menu/masters", { cache: "no-store" }),
+        fetch("/api/dashboard/menu/categories", { cache: "no-store" }),
+        fetch("/api/dashboard/menu/masters", { cache: "no-store" }),
       ]);
 
       if (categoriesRes.ok) {
@@ -133,7 +133,7 @@ export default function MenuCategoriesPage() {
     if (!deletingId) return;
 
     try {
-      const response = await fetch(`/api/menu/categories/${deletingId}`, {
+      const response = await fetch(`/api/dashboard/menu/categories/${deletingId}`, {
         method: "DELETE",
       });
 

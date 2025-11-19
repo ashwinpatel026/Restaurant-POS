@@ -38,7 +38,7 @@ export default function OrdersPage() {
 
   const fetchOrders = async () => {
     try {
-      const response = await fetch(`/api/orders?status=${filter}`);
+      const response = await fetch(`/api/dashboard/orders?status=${filter}`);
       if (response.ok) {
         const data = await response.json();
         setOrders(data);
@@ -52,7 +52,7 @@ export default function OrdersPage() {
 
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
     try {
-      const response = await fetch(`/api/orders/${orderId}`, {
+      const response = await fetch(`/api/dashboard/orders/${orderId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),

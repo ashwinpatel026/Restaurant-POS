@@ -38,7 +38,7 @@ export default function EditModifierPage() {
       if (!id) return;
       setLoading(true);
       try {
-        const response = await fetch(`/api/menu/modifiers/${id}`);
+        const response = await fetch(`/api/dashboard/menu/modifiers/${id}`);
         if (response.ok) {
           const modifierData = await response.json();
           setModifier(modifierData);
@@ -67,7 +67,7 @@ export default function EditModifierPage() {
       } = formData || {};
 
       // 1) Update modifier group
-      const groupResponse = await fetch(`/api/menu/modifiers/${id}`, {
+      const groupResponse = await fetch(`/api/dashboard/menu/modifiers/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -93,7 +93,7 @@ export default function EditModifierPage() {
       if (Array.isArray(removedItemIds)) {
         for (const itemId of removedItemIds) {
           if (!itemId) continue;
-          const deleteRes = await fetch(`/api/modifier-items/${itemId}`, {
+          const deleteRes = await fetch(`/api/dashboard/modifier-items/${itemId}`, {
             method: "DELETE",
           });
           if (!deleteRes.ok) {
@@ -121,7 +121,7 @@ export default function EditModifierPage() {
           };
 
           if (item.id) {
-            const updateRes = await fetch(`/api/modifier-items/${item.id}`, {
+            const updateRes = await fetch(`/api/dashboard/modifier-items/${item.id}`, {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payload),
@@ -131,7 +131,7 @@ export default function EditModifierPage() {
               throw new Error(err.error || "Failed to update modifier item");
             }
           } else {
-            const createRes = await fetch("/api/modifier-items", {
+            const createRes = await fetch("/api/dashboard/modifier-items", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payload),

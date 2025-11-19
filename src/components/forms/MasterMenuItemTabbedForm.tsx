@@ -1580,6 +1580,7 @@ export default function MasterMenuItemTabbedForm({
           onConfirm={handleModifierModalConfirm}
           selectedModifierIds={selectedModifiers}
           menuItemId={menuItem?.tblMenuItemId}
+          useMasterApi={true}
         />
       </div>
     </LoadingOverlay>

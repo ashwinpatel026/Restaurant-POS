@@ -42,7 +42,7 @@ export default function CategoryModal({
 
   const fetchModifierGroups = async () => {
     try {
-      const response = await fetch("/api/modifier-groups");
+      const response = await fetch("/api/dashboard/modifier-groups");
       if (response.ok) {
         const data = await response.json();
         setModifierGroups(data);
@@ -80,7 +80,7 @@ export default function CategoryModal({
     setLoading(true);
 
     try {
-      const response = await fetch("/api/menu/categories", {
+      const response = await fetch("/api/dashboard/menu/categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -37,6 +37,7 @@ interface ModifierSelectionModalProps {
   onConfirm: (selectedModifierIds: number[]) => void;
   selectedModifierIds: number[];
   menuItemId?: number;
+  useMasterApi?: boolean; // If true, use /api/master, otherwise use /api/dashboard
 }
 
 export default function ModifierSelectionModal({
@@ -45,6 +46,7 @@ export default function ModifierSelectionModal({
   onConfirm,
   selectedModifierIds,
   menuItemId,
+  useMasterApi = false,
 }: ModifierSelectionModalProps) {
   const [modifiers, setModifiers] = useState<ModifierGroup[]>([]);
   const [loading, setLoading] = useState(false);
@@ -62,7 +64,7 @@ export default function ModifierSelectionModal({
     if (isOpen) {
       fetchModifiers();
     }
-  }, [isOpen, searchTerm, menuItemId]);
+  }, [isOpen, searchTerm, menuItemId, useMasterApi]);
 
   const fetchModifiers = async () => {
     setLoading(true);
@@ -71,10 +73,84 @@ export default function ModifierSelectionModal({
       if (searchTerm) params.append("search", searchTerm);
       if (menuItemId) params.append("excludeMenuItemId", menuItemId.toString());
 
-      const response = await fetch(`/api/menu/modifiers/available?${params}`);
+      const apiPrefix = useMasterApi ? "/api/master" : "/api/dashboard";
+      const apiPath = useMasterApi 
+        ? "/modifier-groups" 
+        : "/menu/modifiers/available";
+      
+      const response = await fetch(`${apiPrefix}${apiPath}?${params}`, {
+        headers: useMasterApi ? {
+          Authorization: `Bearer ${localStorage.getItem("master_admin_token")}`,
+        } : {},
+      });
+      
       if (response.ok) {
         const data = await response.json();
-        setModifiers(data);
+        // If using master API, map the response to expected format
+        if (useMasterApi) {
+          // Fetch modifier items for each group
+          const groupsWithItems = await Promise.all(
+            data.map(async (group: any) => {
+              try {
+                const itemsResponse = await fetch(
+                  `/api/master/modifier-items?modifierGroupCode=${encodeURIComponent(group.modifierGroupCode)}`,
+                  {
+                    headers: {
+                      Authorization: `Bearer ${localStorage.getItem("master_admin_token")}`,
+                    },
+                  }
+                );
+                let modifierItems: any[] = [];
+                if (itemsResponse.ok) {
+                  const itemsData = await itemsResponse.json();
+                  modifierItems = itemsData || [];
+                }
+                
+                return {
+                  id: parseInt(group.id) || parseInt(group.modifierGroupId || "0"),
+                  name: group.groupName || group.labelName,
+                  labelName: group.labelName || group.groupName,
+                  posName: group.labelName || group.groupName,
+                  colorCode: "#3B82F6",
+                  required: group.isRequired || 0,
+                  isMultiselect: group.isMultiselect || 0,
+                  minSelection: group.minSelection,
+                  maxSelection: group.maxSelection,
+                  itemCount: modifierItems.length,
+                  sampleItems: modifierItems.slice(0, 3).map((item: any) => item.name || item.labelName),
+                  configSummary: `${group.isRequired === 1 ? "Required" : "Optional"} • ${group.isMultiselect === 1 ? "Multi-select" : "Single-select"}`,
+                  modifierItems: modifierItems.map((item: any) => ({
+                    id: parseInt(item.id) || parseInt(item.modifierItemId || "0"),
+                    name: item.name || item.labelName,
+                    labelName: item.labelName || item.name,
+                    posName: item.labelName || item.name,
+                    price: parseFloat(item.price || item.additionalCharge || "0"),
+                  })),
+                };
+              } catch (error) {
+                console.error(`Error fetching items for group ${group.modifierGroupCode}:`, error);
+                return {
+                  id: parseInt(group.id) || parseInt(group.modifierGroupId || "0"),
+                  name: group.groupName || group.labelName,
+                  labelName: group.labelName || group.groupName,
+                  posName: group.labelName || group.groupName,
+                  colorCode: "#3B82F6",
+                  required: group.isRequired || 0,
+                  isMultiselect: group.isMultiselect || 0,
+                  minSelection: group.minSelection,
+                  maxSelection: group.maxSelection,
+                  itemCount: 0,
+                  sampleItems: [],
+                  configSummary: `${group.isRequired === 1 ? "Required" : "Optional"} • ${group.isMultiselect === 1 ? "Multi-select" : "Single-select"}`,
+                  modifierItems: [],
+                };
+              }
+            })
+          );
+          setModifiers(groupsWithItems);
+        } else {
+          setModifiers(data);
+        }
       } else {
         console.error("Failed to fetch modifiers");
       }

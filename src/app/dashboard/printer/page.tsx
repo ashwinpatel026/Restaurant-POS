@@ -43,7 +43,7 @@ export default function PrinterManagementPage() {
 
   const fetchData = async () => {
     try {
-      const response = await fetch("/api/printer");
+      const response = await fetch("/api/dashboard/printer");
 
       if (response.ok) {
         const data = await response.json();
@@ -71,8 +71,8 @@ export default function PrinterManagementPage() {
   const handleSave = async (formData: any) => {
     try {
       const url = editingPrinter
-        ? `/api/printer/${editingPrinter.printerId}`
-        : "/api/printer";
+        ? `/api/dashboard/printer/${editingPrinter.printerId}`
+        : "/api/dashboard/printer";
 
       const method = editingPrinter ? "PUT" : "POST";
 
@@ -114,7 +114,7 @@ export default function PrinterManagementPage() {
 
     try {
       const response = await fetch(
-        `/api/printer/${printerToDelete.printerId}`,
+        `/api/dashboard/printer/${printerToDelete.printerId}`,
         {
           method: "DELETE",
         }

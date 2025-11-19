@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import MasterDashboardLayout from "@/components/layouts/MasterDashboardLayout";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
-import { PageSkeleton } from "@/components/ui/SkeletonLoader";
+import { FormSkeleton } from "@/components/ui/SkeletonLoader";
 import SystemColorPicker from "@/components/ui/SystemColorPicker";
 import { CheckIcon } from "@heroicons/react/24/solid";
 import StatusToggle from "@/components/forms/StatusToggle";
@@ -84,32 +84,33 @@ export default function EditMenuMasterPage() {
   const fetchData = async () => {
     try {
       const token = localStorage.getItem("master_admin_token");
-      const [prepZonesRes, stationsRes, eventsRes, masterRes] = await Promise.all([
-        fetch("/api/master/prep-zone", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          cache: "no-store",
-        }),
-        fetch("/api/master/station", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          cache: "no-store",
-        }),
-        fetch("/api/master/time-event", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          cache: "no-store",
-        }),
-        fetch(`/api/master/menu-masters/${masterId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          cache: "no-store",
-        }),
-      ]);
+      const [prepZonesRes, stationsRes, eventsRes, masterRes] =
+        await Promise.all([
+          fetch("/api/master/prep-zone", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          }),
+          fetch("/api/master/station", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          }),
+          fetch("/api/master/time-event", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          }),
+          fetch(`/api/master/menu-masters/${masterId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          }),
+        ]);
 
       if (prepZonesRes.ok) {
         const prepZonesData = await prepZonesRes.json();
@@ -288,7 +289,7 @@ export default function EditMenuMasterPage() {
   if (loading) {
     return (
       <MasterDashboardLayout>
-        <PageSkeleton />
+        <FormSkeleton />
       </MasterDashboardLayout>
     );
   }
@@ -574,4 +575,3 @@ export default function EditMenuMasterPage() {
     </MasterDashboardLayout>
   );
 }
-

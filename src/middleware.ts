@@ -27,23 +27,6 @@ export default withAuth(
       }
     }
 
-    // Redirect old API routes to dashboard (for backward compatibility)
-    if (path.startsWith('/api/menu') || 
-        path.startsWith('/api/orders') || 
-        path.startsWith('/api/tables') ||
-        path.startsWith('/api/tax') ||
-        path.startsWith('/api/station') ||
-        path.startsWith('/api/printer') ||
-        path.startsWith('/api/prep-zone') ||
-        path.startsWith('/api/events') ||
-        path.startsWith('/api/modifiers') ||
-        path.startsWith('/api/reports') ||
-        path.startsWith('/api/settings') ||
-        (path.startsWith('/api/users') && !path.startsWith('/api/master/users'))) {
-      const newPath = path.replace('/api/', '/api/dashboard/')
-      return NextResponse.redirect(new URL(newPath + req.nextUrl.search, req.url))
-    }
-
     return NextResponse.next()
   },
   {
@@ -61,22 +44,6 @@ export default withAuth(
           return !!token
         }
 
-        // For legacy API routes (redirecting), allow
-        if (path.startsWith('/api/menu') || 
-            path.startsWith('/api/orders') || 
-            path.startsWith('/api/tables') ||
-            path.startsWith('/api/tax') ||
-            path.startsWith('/api/station') ||
-            path.startsWith('/api/printer') ||
-            path.startsWith('/api/prep-zone') ||
-            path.startsWith('/api/events') ||
-            path.startsWith('/api/modifiers') ||
-            path.startsWith('/api/reports') ||
-            path.startsWith('/api/settings') ||
-            (path.startsWith('/api/users') && !path.startsWith('/api/master/users'))) {
-          return true
-        }
-
         // For other routes, allow
         return true
       },
@@ -90,18 +57,5 @@ export const config = {
     '/api/dashboard/:path*',
     '/api/master/:path*',
     '/master/:path*',
-    // Legacy API routes (for redirect)
-    '/api/menu/:path*',
-    '/api/orders/:path*',
-    '/api/tables/:path*',
-    '/api/tax/:path*',
-    '/api/station/:path*',
-    '/api/printer/:path*',
-    '/api/prep-zone/:path*',
-    '/api/events/:path*',
-    '/api/modifiers/:path*',
-    '/api/reports/:path*',
-    '/api/settings/:path*',
-    '/api/users/:path*',
   ],
 }

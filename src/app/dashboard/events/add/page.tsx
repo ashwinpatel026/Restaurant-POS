@@ -77,7 +77,7 @@ export default function AddEventPage() {
           break;
       }
 
-      const response = await fetch("/api/events", {
+      const response = await fetch("/api/dashboard/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submitData),

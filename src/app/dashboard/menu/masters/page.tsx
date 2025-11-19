@@ -198,9 +198,9 @@ export default function MenuMastersPage() {
     try {
       setLoading(true);
       const [mastersRes, prepZonesRes, stationsRes] = await Promise.all([
-        fetch("/api/menu/masters", { cache: "no-store" }),
-        fetch("/api/menu/prep-zone", { cache: "no-store" }),
-        fetch("/api/station", { cache: "no-store" }),
+        fetch("/api/dashboard/menu/masters", { cache: "no-store" }),
+        fetch("/api/dashboard/menu/prep-zone", { cache: "no-store" }),
+        fetch("/api/dashboard/station", { cache: "no-store" }),
       ]);
 
       if (mastersRes.ok) {
@@ -244,7 +244,7 @@ export default function MenuMastersPage() {
     if (!deletingId) return;
 
     try {
-      const response = await fetch(`/api/menu/masters/${deletingId}`, {
+      const response = await fetch(`/api/dashboard/menu/masters/${deletingId}`, {
         method: "DELETE",
       });
 

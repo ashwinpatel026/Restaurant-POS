@@ -104,7 +104,7 @@ export default function TablesPage() {
 
   const fetchTables = async () => {
     try {
-      const response = await fetch("/api/tables");
+      const response = await fetch("/api/dashboard/tables");
       if (response.ok) {
         const data = await response.json();
         // Sort by createdDate descending (most recent first)
@@ -131,7 +131,7 @@ export default function TablesPage() {
   ) => {
     try {
       const statusNumber = getStatusNumber(newStatus);
-      const response = await fetch(`/api/tables/${tableId}`, {
+      const response = await fetch(`/api/dashboard/tables/${tableId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: statusNumber }),
@@ -159,7 +159,7 @@ export default function TablesPage() {
     if (!tableToDelete) return;
 
     try {
-      const response = await fetch(`/api/tables/${tableToDelete.tableId}`, {
+      const response = await fetch(`/api/dashboard/tables/${tableToDelete.tableId}`, {
         method: "DELETE",
       });
 

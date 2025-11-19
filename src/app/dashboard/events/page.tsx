@@ -89,7 +89,7 @@ export default function EventsPage() {
 
   const fetchEvents = async () => {
     try {
-      const response = await fetch("/api/events");
+      const response = await fetch("/api/dashboard/events");
       if (response.ok) {
         const data = await response.json();
         setEvents(data);
@@ -120,7 +120,7 @@ export default function EventsPage() {
     if (!deletingId) return;
 
     try {
-      const response = await fetch(`/api/events/${deletingId}`, {
+      const response = await fetch(`/api/dashboard/events/${deletingId}`, {
         method: "DELETE",
       });
 

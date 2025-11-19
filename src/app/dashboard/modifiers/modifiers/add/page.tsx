@@ -19,7 +19,7 @@ export default function AddModifierPage() {
       } = formData || {};
 
       // 1) Create modifier group
-      const groupRes = await fetch("/api/modifier-groups", {
+      const groupRes = await fetch("/api/dashboard/modifier-groups", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -39,7 +39,7 @@ export default function AddModifierPage() {
       if (Array.isArray(formItems)) {
         for (const item of formItems) {
           if (!item.name?.trim()) continue;
-          const itemRes = await fetch("/api/modifier-items", {
+          const itemRes = await fetch("/api/dashboard/modifier-items", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

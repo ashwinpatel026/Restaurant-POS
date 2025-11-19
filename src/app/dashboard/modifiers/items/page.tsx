@@ -92,8 +92,8 @@ export default function ModifierItemsPage() {
     try {
       setLoading(true);
       const [itemsRes, modifiersRes] = await Promise.all([
-        fetch("/api/modifier-items"),
-        fetch("/api/modifier-groups"),
+        fetch("/api/dashboard/modifier-items"),
+        fetch("/api/dashboard/modifier-groups"),
       ]);
 
       if (itemsRes.ok) {

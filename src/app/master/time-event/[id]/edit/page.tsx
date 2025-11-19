@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import MasterDashboardLayout from "@/components/layouts/MasterDashboardLayout";
 import { ArrowLeftIcon, CheckIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
-import { FormSkeleton, PageSkeleton } from "@/components/ui/SkeletonLoader";
+import { FormSkeleton } from "@/components/ui/SkeletonLoader";
 
 export default function EditTimeEventPage() {
   const router = useRouter();

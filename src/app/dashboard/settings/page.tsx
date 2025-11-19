@@ -34,7 +34,7 @@ export default function SettingsPage() {
 
     const loadSettings = async () => {
       try {
-        const response = await fetch("/api/settings/system", {
+        const response = await fetch("/api/dashboard/settings/system", {
           cache: "no-store",
         });
 
@@ -113,7 +113,7 @@ export default function SettingsPage() {
   const handleSaveSystemSettings = async () => {
     setSaving(true);
     try {
-      const response = await fetch("/api/settings/system", {
+      const response = await fetch("/api/dashboard/settings/system", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

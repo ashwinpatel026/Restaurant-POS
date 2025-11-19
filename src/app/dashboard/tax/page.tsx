@@ -42,7 +42,7 @@ export default function TaxManagementPage() {
 
   const fetchData = async () => {
     try {
-      const response = await fetch("/api/tax");
+      const response = await fetch("/api/dashboard/tax");
 
       if (response.ok) {
         const data = await response.json();
@@ -69,7 +69,7 @@ export default function TaxManagementPage() {
 
   const handleSave = async (formData: any) => {
     try {
-      const url = editingTax ? `/api/tax/${editingTax.tblTaxId}` : "/api/tax";
+      const url = editingTax ? `/api/dashboard/tax/${editingTax.tblTaxId}` : "/api/dashboard/tax";
 
       const method = editingTax ? "PUT" : "POST";
 
@@ -107,7 +107,7 @@ export default function TaxManagementPage() {
     if (!taxToDelete) return;
 
     try {
-      const response = await fetch(`/api/tax/${taxToDelete.tblTaxId}`, {
+      const response = await fetch(`/api/dashboard/tax/${taxToDelete.tblTaxId}`, {
         method: "DELETE",
       });
 

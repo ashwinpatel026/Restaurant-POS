@@ -76,7 +76,7 @@ export default function StationManagementPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/station", { cache: "no-store" });
+      const response = await fetch("/api/dashboard/station", { cache: "no-store" });
 
       if (response.ok) {
         const data = await response.json();
@@ -104,8 +104,8 @@ export default function StationManagementPage() {
   const handleSave = async (formData: StationFormData) => {
     try {
       const url = editingStation
-        ? `/api/station/${editingStation.tblStationId}`
-        : "/api/station";
+        ? `/api/dashboard/station/${editingStation.tblStationId}`
+        : "/api/dashboard/station";
 
       const method = editingStation ? "PUT" : "POST";
 
@@ -155,7 +155,7 @@ export default function StationManagementPage() {
 
     try {
       const response = await fetch(
-        `/api/station/${stationToDelete.tblStationId}`,
+        `/api/dashboard/station/${stationToDelete.tblStationId}`,
         {
           method: "DELETE",
         }
@@ -474,7 +474,7 @@ function StationForm({
   useEffect(() => {
     const fetchAllGroups = async () => {
       try {
-        const response = await fetch("/api/station", { cache: "no-store" });
+        const response = await fetch("/api/dashboard/station", { cache: "no-store" });
         if (response.ok) {
           const stations = await response.json();
           const allStationGroups: string[] = [];
