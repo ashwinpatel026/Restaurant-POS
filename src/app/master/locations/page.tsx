@@ -581,7 +581,7 @@ function LocationModal({
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Location Name *
+                Location/ Business Name/ DBA *
               </label>
               <input
                 type="text"
@@ -596,7 +596,7 @@ function LocationModal({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Company *
+                  Corporate Name / Legal Entity / Business Group *
                 </label>
                 <select
                   required

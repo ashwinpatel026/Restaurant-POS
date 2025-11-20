@@ -37,11 +37,11 @@ interface MenuItem {
 }
 
 const navigation: MenuItem[] = [
-  { 
-    name: "Master Dashboard", 
-    href: "/master", 
+  {
+    name: "Master Dashboard",
+    href: "/master",
     icon: HomeIcon,
-    roles: ["SUPER_ADMIN", "COMPANY_ADMIN", "DEALER_ADMIN"]
+    roles: ["SUPER_ADMIN", "COMPANY_ADMIN", "DEALER_ADMIN"],
   },
   {
     name: "Companies",
@@ -127,7 +127,11 @@ const navigation: MenuItem[] = [
   },
 ];
 
-export default function MasterDashboardLayout({ children }: { children: ReactNode }) {
+export default function MasterDashboardLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const { admin, logout } = useMasterAuth();
   const pathname = usePathname();
   const router = useRouter();
@@ -151,20 +155,20 @@ export default function MasterDashboardLayout({ children }: { children: ReactNod
 
   const isMenuActive = (item: MenuItem): boolean => {
     if (!item.href) return false;
-    
+
     // Exact match
     if (pathname === item.href) return true;
-    
+
     // For parent routes like "/master", only match exactly, not child routes
     if (item.href === "/master") {
       return pathname === item.href;
     }
-    
+
     // For other routes, match exact or child routes
     if (pathname.startsWith(item.href + "/")) {
       return true;
     }
-    
+
     if (item.children) {
       return item.children.some(
         (child) =>
@@ -405,4 +409,3 @@ export default function MasterDashboardLayout({ children }: { children: ReactNod
     </div>
   );
 }
-
