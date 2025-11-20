@@ -17,6 +17,7 @@ function mapMenuItemResponse(item: any) {
     updatedOn: item.updatedOn?.toISOString() || null,
     // Handle JSON fields
     prepZoneCode: item.prepZoneCode ? (typeof item.prepZoneCode === 'string' ? JSON.parse(item.prepZoneCode) : item.prepZoneCode) : null,
+    menuCategoryCode: item.menuCategoryCode ? (typeof item.menuCategoryCode === 'string' ? JSON.parse(item.menuCategoryCode) : item.menuCategoryCode) : null,
   }
 }
 
@@ -131,6 +132,7 @@ export async function PUT(
       isOnlineOrderByApp,
       isOnlineOrdering,
       isCustomerInvoice,
+      menuMasterCode,
       menuCategoryCode,
       taxCode,
       inheritTaxInclusion,
@@ -187,7 +189,10 @@ export async function PUT(
         disqualifyDiningTaxExemption: disqualifyDiningTaxExemption !== undefined ? disqualifyDiningTaxExemption : undefined,
         inheritModifierGroup: inheritModifiers !== undefined ? inheritModifiers : undefined,
         prepZoneCode: prepZoneCodes && prepZoneCodes.length > 0 ? prepZoneCodes : null,
-        menuCategoryCode: menuCategoryCode || null,
+        menuMasterCode: menuMasterCode || null,
+        menuCategoryCode: Array.isArray(menuCategoryCode) && menuCategoryCode.length > 0 
+          ? menuCategoryCode 
+          : menuCategoryCode || null,
         updatedBy: admin.adminId,
         updatedOn: new Date()
       }
@@ -204,10 +209,13 @@ export async function PUT(
         const rowsToCreate: any[] = []
         const seenGroups = new Set<string>()
 
-        // Inherit from category
+        // Inherit from categories
         if (inheritModifiers && menuItem.menuCategoryCode) {
+          const categoryCodes = Array.isArray(menuItem.menuCategoryCode) 
+            ? menuItem.menuCategoryCode 
+            : [menuItem.menuCategoryCode]
           const categoryModifiers = await masterPrisma.masterMenuCategoryModifier.findMany({
-            where: { menuCategoryCode: menuItem.menuCategoryCode }
+            where: { menuCategoryCode: { in: categoryCodes } }
           })
 
           for (const cm of categoryModifiers) {

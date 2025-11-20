@@ -291,7 +291,6 @@ model MasterMenuCategory {
 
   menuMaster        MasterMenuMaster @relation(fields: [menuMasterCode], references: [menuMasterCode])
   menuCategoryModifiers MasterMenuCategoryModifier[]
-  menuItems         MasterMenuItem[]
 
   @@map("tbl_master_menu_category")
 }
@@ -313,7 +312,8 @@ model MasterMenuCategoryModifier {
 model MasterMenuItem {
   menuItemId                     BigInt    @id @default(autoincrement()) @map("menu_item_id")
   menuItemCode                   String    @unique @map("menu_item_code") @db.VarChar(100)
-  menuCategoryCode               String?   @map("menu_category_code") @db.VarChar(100)
+  menuMasterCode                 String?   @map("menu_master_code") @db.VarChar(100)
+  menuCategoryCode               Json?     @map("menu_category_code")
   name                           String?   @map("name") @db.VarChar(500)
   kitchenName                    String?   @map("kitchen_name") @db.VarChar(150)
   labelName                      String?   @map("label_name") @db.VarChar(500)
@@ -350,7 +350,6 @@ model MasterMenuItem {
   updatedBy                      BigInt?   @map("updatedby")
   updatedOn                      DateTime? @map("updatedon")
 
-  menuCategory                   MasterMenuCategory? @relation(fields: [menuCategoryCode], references: [menuCategoryCode])
   menuItemModifierGroups         MasterMenuItemModifierGroup[]
 
   @@map("tbl_master_menu_item")

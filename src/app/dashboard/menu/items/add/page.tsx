@@ -12,29 +12,46 @@ interface MenuCategory {
   tblMenuCategoryId?: number;
   menuCategoryCode?: string;
   name: string;
+  menuMasterCode?: string;
   menuMaster?: {
     name: string;
   };
 }
 
+interface MenuMaster {
+  menuMasterId: string;
+  menuMasterCode: string;
+  name: string;
+}
+
 export default function AddMenuItemPage() {
   const router = useRouter();
+  const [menuMasters, setMenuMasters] = useState<MenuMaster[]>([]);
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchCategories();
+    fetchData();
   }, []);
 
-  const fetchCategories = async () => {
+  const fetchData = async () => {
     try {
-      const response = await fetch("/api/dashboard/menu/categories");
-      if (response.ok) {
-        const categoriesData = await response.json();
+      const [mastersRes, categoriesRes] = await Promise.all([
+        fetch("/api/dashboard/menu/masters"),
+        fetch("/api/dashboard/menu/categories"),
+      ]);
+
+      if (mastersRes.ok) {
+        const mastersData = await mastersRes.json();
+        setMenuMasters(mastersData);
+      }
+
+      if (categoriesRes.ok) {
+        const categoriesData = await categoriesRes.json();
         setCategories(categoriesData);
       }
     } catch (error) {
-      toast.error("Error loading categories");
+      toast.error("Error loading data");
       console.error("Error:", error);
     } finally {
       setLoading(false);
@@ -112,6 +129,7 @@ export default function AddMenuItemPage() {
 
         {/* Form */}
         <MenuItemTabbedForm
+          menuMasters={menuMasters}
           categories={categories}
           onSave={handleSave}
           onCancel={handleCancel}

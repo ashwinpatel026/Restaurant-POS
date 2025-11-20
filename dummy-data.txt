@@ -1,0 +1,227 @@
+INSERT INTO tbl_master_tax 
+(tax_code, taxname, taxrate, created_by, created_date, updated_on)
+VALUES
+('T001', 'State Tax', 6.50, 1, NOW(), NULL),
+('T002', 'County Tax', 2.00, 1, NOW(), NULL),
+('T003', 'City Tax', 1.25, 1, NOW(), NULL),
+('T004', 'Food Tax', 4.00, 1, NOW(), NULL),
+('T005', 'Beverage Tax', 3.50, 1, NOW(), NULL),
+('T006', 'Alcohol Tax', 8.25, 1, NOW(), NULL),
+('T007', 'Prepared Food Tax', 7.00, 1, NOW(), NULL),
+('T008', 'Takeout Tax', 5.00, 1, NOW(), NULL),
+('T009', 'Service Tax', 10.00, 1, NOW(), NULL),
+('T010', 'Delivery Tax', 3.00, 1, NOW(), NULL),
+('T011', 'Environmental Fee', 1.00, 1, NOW(), NULL),
+('T012', 'Luxury Food Tax', 12.50, 1, NOW(), NULL),
+('T013', 'Soda Tax', 1.75, 1, NOW(), NULL),
+('T014', 'Sweet Beverage Tax', 2.50, 1, NOW(), NULL),
+('T015', 'Local Restaurant Tax', 5.75, 1, NOW(), NULL);
+
+
+=======================================================
+
+
+INSERT INTO tbl_master_station 
+(station_code, stationname, is_active, station_groups, created_on, updated_on)
+VALUES
+('S001', 'Grill Station', 1, '["Burgers", "Steaks", "Sandwich Grill"]', NOW(), NULL),
+('S002', 'Fry Station', 1, '["Fries", "Fried Chicken", "Fried Seafood"]', NOW(), NULL),
+('S003', 'Salad Station', 1, '["Green Salads", "Cold Sandwiches", "Wraps"]', NOW(), NULL),
+('S004', 'Beverage Station', 1, '["Coffee", "Tea", "Cold Drinks", "Smoothies"]', NOW(), NULL),
+('S005', 'Dessert Station', 1, '["Cakes", "Ice Cream", "Pastries"]', NOW(), NULL),
+('S006', 'Breakfast Station', 1, '["Omelets", "Pancakes", "Waffles"]', NOW(), NULL),
+('S007', 'Pasta Station', 1, '["Alfredo", "Marinara", "Pesto", "Italian Dishes"]', NOW(), NULL),
+('S008', 'BBQ Station', 1, '["Ribs", "Smoked Meats", "BBQ Chicken"]', NOW(), NULL),
+('S009', 'Sushi Station', 1, '["Sushi Rolls", "Sashimi", "Nigiri"]', NOW(), NULL),
+('S010', 'Tandoor Station', 1, '["Tandoori Chicken", "Breads", "Kebabs"]', NOW(), NULL),
+('S011', 'Griddle Station', 1, '["Pancakes", "Quesadillas", "Flat Grill Items"]', NOW(), NULL),
+('S012', 'Prep Station', 1, '["Cutting", "Veg Prep", "Ingredient Assembly"]', NOW(), NULL);
+
+===================================================================================================
+
+INSERT INTO tbl_master_printer 
+(printer_code, printer_name, is_active, createdby, createdon, updatedby, updatedon)
+VALUES
+('P001', 'Main Receipt Printer', 1, 1, NOW(), NULL, NULL),
+('P002', 'Kitchen Grill Printer', 1, 1, NOW(), NULL, NULL),
+('P003', 'Kitchen Fry Printer', 1, 1, NOW(), NULL, NULL),
+('P004', 'Kitchen Salad Printer', 1, 1, NOW(), NULL, NULL),
+('P005', 'Bar Beverage Printer', 1, 1, NOW(), NULL, NULL),
+('P006', 'Dessert Station Printer', 1, 1, NOW(), NULL, NULL),
+('P007', 'Breakfast Station Printer', 1, 1, NOW(), NULL, NULL),
+('P008', 'Pasta Station Printer', 1, 1, NOW(), NULL, NULL),
+('P009', 'BBQ Station Printer', 1, 1, NOW(), NULL, NULL),
+('P010', 'Backup Receipt Printer', 1, 1, NOW(), NULL, NULL),
+('P011', 'Customer Copy Printer', 1, 1, NOW(), NULL, NULL),
+('P012', 'Expo Line Printer', 1, 1, NOW(), NULL, NULL);
+
+=================================================================================================
+
+INSERT INTO tbl_master_prep_zone
+(
+    prep_zone_code, prep_zone_name,
+    station_code, is_active,
+    send_to_expediter, always_print_ticket,
+    printer_code, backup_printer_code,
+    createdby, createdon
+)
+VALUES
+-- 1. Grill Station
+('PZ001', 'Grill Station', 'S001', 1, 1, 0, 'PR001', 'PR01', 1, NOW()),
+
+-- 2. Fry Station
+('PZ002', 'Fry Station', 'S002', 1, 1, 0, 'PR002', 'PR01', 1, NOW()),
+
+-- 3. Pizza Oven
+('PZ003', 'Pizza Oven', 'S003', 1, 0, 0, 'PR003', 'PR01', 1, NOW()),
+
+-- 4. Tandoor Station
+('PZ004', 'Tandoor Station', 'S004', 1, 1, 0, 'PR004', 'PR01', 1, NOW()),
+
+-- 5. Salad / Cold Prep
+('PZ005', 'Salad Prep', 'S005', 1, 0, 1, 'PR005', 'PR01', 1, NOW()),
+
+-- 6. Sandwich / Deli
+('PZ006', 'Sandwich Station', 'S006', 1, 0, 0, 'PR006', 'PR01', 1, NOW()),
+
+-- 7. Dessert & Pastry
+('PZ007', 'Dessert Station', 'S007', 1, 0, 0, 'PR007', 'PR01', 1, NOW()),
+
+-- 8. Sushi Counter
+('PZ008', 'Sushi Prep', 'S008', 1, 1, 0, 'PR008', 'PR01', 1, NOW()),
+
+-- 9. Beverage & Bar
+('PZ009', 'Beverage Station', 'S009', 1, 0, 1, 'PR009', 'PR01', 1, NOW()),
+
+-- 10. Expediting Station
+('PZ010', 'Expediter Station', 'S010', 1, 1, 1, 'PR010', 'PR01', 1, NOW());
+
+======================================================================================================
+
+INSERT INTO tbl_master_modifier_group
+(
+    modifier_group_code, group_name, label_name,
+    is_required, is_multiselect,
+    min_selection, max_selection,
+    show_default_top, inherit_from_menu_group,
+    price_strategy, price,
+    is_active, createdby, createdon
+)
+VALUES
+-- 1. Spice Level
+('MG001', 'Spice Level', 'Choose Spice Level', 1, 0, 1, 1, 1, 0, 1, 0.00, 1, 1, NOW()),
+
+-- 2. Pizza Size
+('MG002', 'Pizza Size', 'Select Size', 1, 0, 1, 1, 0, 0, 1, 0.00, 1, 1, NOW()),
+
+-- 3. Crust Type
+('MG003', 'Crust Type', 'Choose Crust', 1, 0, 1, 1, 0, 0, 1, 0.00, 1, 1, NOW()),
+
+-- 4. Extra Cheese Options
+('MG004', 'Cheese Options', 'Extra Cheese', 0, 1, 0, 3, 0, 0, 2, 1.50, 1, 1, NOW()),
+
+-- 5. Add Toppings
+('MG005', 'Toppings', 'Add Toppings', 0, 1, 0, 10, 0, 0, 2, 0.75, 1, 1, NOW()),
+
+-- 6. Burger Patty Preference
+('MG006', 'Patty Type', 'Select Patty', 1, 0, 1, 1, 1, 0, 1, 0.00, 1, 1, NOW()),
+
+-- 7. Sides Selection
+('MG007', 'Side Items', 'Choose Sides', 0, 1, 0, 2, 0, 0, 2, 2.00, 1, 1, NOW()),
+
+-- 8. Drink Options
+('MG008', 'Drink Options', 'Select Drink', 0, 1, 0, 1, 0, 0, 1, 0.00, 1, 1, NOW()),
+
+-- 9. Bread Type
+('MG009', 'Bread Type', 'Choose Bread', 1, 0, 1, 1, 0, 1, 1, 0.00, 1, 1, NOW()),
+
+-- 10. Cooking Preference
+('MG010', 'Cooking Preference', 'Doneness', 1, 0, 1, 1, 1, 0, 1, 0.00, 1, 1, NOW());
+
+
+===================================================================================================
+
+INSERT INTO tbl_master_modifier_item
+(
+    modifier_item_code, modifier_group_code,
+    name, label_name, color_code,
+    price, is_default, display_order,
+    is_active, createdby, createdon
+)
+VALUES
+-- ===== MG001 – Spice Level =====
+('MI001','MG001','Mild','Mild','#4CAF50',0.00,0,1,1,1,NOW()),
+('MI002','MG001','Medium','Medium','#FFC107',0.00,1,2,1,1,NOW()),
+('MI003','MG001','Hot','Hot','#FF5722',0.00,0,3,1,1,NOW()),
+('MI004','MG001','Extra Hot','Extra Hot','#D32F2F',0.50,0,4,1,1,NOW()),
+
+-- ===== MG002 – Pizza Size =====
+('MI005','MG002','Small','Small','#2196F3',0.00,0,1,1,1,NOW()),
+('MI006','MG002','Medium','Medium','#3F51B5',1.50,1,2,1,1,NOW()),
+('MI007','MG002','Large','Large','#673AB7',3.00,0,3,1,1,NOW()),
+('MI008','MG002','XLarge','Extra Large','#9C27B0',4.50,0,4,1,1,NOW()),
+
+-- ===== MG003 – Crust Type =====
+('MI009','MG003','Thin Crust','Thin Crust','#8BC34A',0.00,1,1,1,1,NOW()),
+('MI010','MG003','Pan Crust','Pan Crust','#CDDC39',1.00,0,2,1,1,NOW()),
+('MI011','MG003','Cheese Burst','Cheese Burst','#FF9800',2.50,0,3,1,1,NOW()),
+('MI012','MG003','Gluten Free','Gluten Free','#009688',3.00,0,4,1,1,NOW()),
+
+-- ===== MG004 – Cheese Options =====
+('MI013','MG004','Regular Cheese','Regular','#FFEB3B',0.00,1,1,1,1,NOW()),
+('MI014','MG004','Extra Cheese','Extra','#FFC107',1.50,0,2,1,1,NOW()),
+('MI015','MG004','Double Cheese','Double','#FF9800',2.50,0,3,1,1,NOW()),
+('MI016','MG004','No Cheese','No Cheese','#9E9E9E',0.00,0,4,1,1,NOW()),
+
+-- ===== MG005 – Toppings =====
+('MI017','MG005','Mushrooms','Mushrooms','#A5D6A7',0.75,0,1,1,1,NOW()),
+('MI018','MG005','Olives','Olives','#90CAF9',0.75,0,2,1,1,NOW()),
+('MI019','MG005','Pepperoni','Pepperoni','#EF9A9A',1.25,0,3,1,1,NOW()),
+('MI020','MG005','Jalapeños','Jalapeños','#80DEEA',0.75,0,4,1,1,NOW()),
+
+-- ===== MG006 – Patty Type =====
+('MI021','MG006','Veg Patty','Veg Patty','#8BC34A',0.00,1,1,1,1,NOW()),
+('MI022','MG006','Chicken Patty','Chicken Patty','#FFCC80',1.50,0,2,1,1,NOW()),
+('MI023','MG006','Beef Patty','Beef Patty','#E57373',2.00,0,3,1,1,NOW()),
+('MI024','MG006','Double Patty','Double Patty','#D32F2F',3.00,0,4,1,1,NOW()),
+
+-- ===== MG007 – Side Items =====
+('MI025','MG007','Fries','Fries','#FFEB3B',2.00,1,1,1,1,NOW()),
+('MI026','MG007','Coleslaw','Coleslaw','#AED581',1.50,0,2,1,1,NOW()),
+('MI027','MG007','Onion Rings','Onion Rings','#FFB74D',2.50,0,3,1,1,NOW()),
+('MI028','MG007','Garden Salad','Garden Salad','#81C784',3.00,0,4,1,1,NOW()),
+
+-- ===== MG008 – Drink Options =====
+('MI029','MG008','Coke','Coca Cola','#F44336',0.00,1,1,1,1,NOW()),
+('MI030','MG008','Pepsi','Pepsi','#2196F3',0.00,0,2,1,1,NOW()),
+('MI031','MG008','Sprite','Sprite','#8BC34A',0.00,0,3,1,1,NOW()),
+('MI032','MG008','Fanta','Fanta','#FF9800',0.00,0,4,1,1,NOW()),
+
+-- ===== MG009 – Bread Type =====
+('MI033','MG009','White Bread','White','#F5F5F5',0.00,1,1,1,1,NOW()),
+('MI034','MG009','Brown Bread','Brown','#8D6E63',0.00,0,2,1,1,NOW()),
+('MI035','MG009','Multigrain','Multigrain','#795548',0.50,0,3,1,1,NOW()),
+('MI036','MG009','Gluten Free','Gluten Free','#9E9E9E',1.00,0,4,1,1,NOW()),
+
+-- ===== MG010 – Cooking Preference =====
+('MI037','MG010','Rare','Rare','#EF9A9A',0.00,0,1,1,1,NOW()),
+('MI038','MG010','Medium Rare','Medium Rare','#FFCCBC',0.00,1,2,1,1,NOW()),
+('MI039','MG010','Medium','Medium','#FFE0B2',0.00,0,3,1,1,NOW()),
+('MI040','MG010','Well Done','Well Done','#FFAB91',0.00,0,4,1,1,NOW());
+
+
+=====================================================================
+
+SELECT column_name 
+FROM information_schema.columns 
+WHERE table_name = 'tbl_master_menu_master';
+
+INSERT INTO tbl_master_menu_master 
+(menu_master_code, name, label_name, color_code, prep_zone_code, station_code, is_event_menu, is_active, createdby, createdon)
+VALUES
+('MM001', 'Main Menu', 'Main Menu', '#FF5733', '["PZ001","PZ002"]'::jsonb, '["S001"]'::jsonb, 0, 1, 1, NOW()),
+('MM002', 'Breakfast Menu', 'Breakfast', '#33C1FF', '["PZ001"]'::jsonb, '["S001"]'::jsonb, 0, 1, 1, NOW()),
+('MM003', 'Lunch Menu', 'Lunch', '#33FF57', '["PZ002"]'::jsonb, '["S001"]'::jsonb, 0, 1, 1, NOW()),
+('MM004', 'Dinner Menu', 'Dinner', '#FF33A6', '["PZ001","PZ003"]'::jsonb, '["S001","S002"]'::jsonb, 0, 1, 1, NOW()),
+('MM005', 'Kids Menu', 'Kids Menu', '#FFC300', '["PZ003"]'::jsonb, '["S001"]'::jsonb, 0, 1, 1, NOW());
+

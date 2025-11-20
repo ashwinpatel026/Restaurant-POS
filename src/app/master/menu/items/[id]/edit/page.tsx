@@ -45,9 +45,16 @@ interface MenuCategory {
   menuCategoryId?: string;
   menuCategoryCode?: string;
   name: string;
+  menuMasterCode?: string;
   menuMaster?: {
     name: string;
   };
+}
+
+interface MenuMaster {
+  menuMasterId: string;
+  menuMasterCode: string;
+  name: string;
 }
 
 export default function EditMasterMenuItemPage() {
@@ -56,6 +63,7 @@ export default function EditMasterMenuItemPage() {
   const itemId = params.id as string;
 
   const [menuItem, setMenuItem] = useState<MenuItem | null>(null);
+  const [menuMasters, setMenuMasters] = useState<MenuMaster[]>([]);
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -68,8 +76,13 @@ export default function EditMasterMenuItemPage() {
   const fetchData = async () => {
     try {
       const token = localStorage.getItem("master_admin_token");
-      const [itemRes, categoriesRes] = await Promise.all([
+      const [itemRes, mastersRes, categoriesRes] = await Promise.all([
         fetch(`/api/master/menu-items/${itemId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+        fetch("/api/master/menu-masters", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -91,6 +104,11 @@ export default function EditMasterMenuItemPage() {
         toast.error("Menu item not found");
         router.push("/master/menu/items");
         return;
+      }
+
+      if (mastersRes.ok) {
+        const mastersData = await mastersRes.json();
+        setMenuMasters(mastersData);
       }
 
       if (categoriesRes.ok) {
@@ -192,6 +210,7 @@ export default function EditMasterMenuItemPage() {
         {/* Form */}
         <MasterMenuItemTabbedForm
           menuItem={menuItem}
+          menuMasters={menuMasters}
           categories={categories}
           onSave={handleSave}
           onCancel={handleCancel}

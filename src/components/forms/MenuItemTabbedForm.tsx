@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import toast from "react-hot-toast";
 import SystemColorPicker, {
   getPrimaryColor,
@@ -11,6 +11,7 @@ import { CheckIcon } from "@heroicons/react/24/solid";
 
 interface MenuItemFormProps {
   menuItem?: any;
+  menuMasters?: any[];
   categories: any[];
   onSave: (data: any) => void;
   onCancel: () => void;
@@ -18,6 +19,7 @@ interface MenuItemFormProps {
 
 export default function MenuItemTabbedForm({
   menuItem,
+  menuMasters = [],
   categories,
   onSave,
   onCancel,
@@ -38,6 +40,7 @@ export default function MenuItemTabbedForm({
     cardPrice: 0,
     cashPrice: 0,
     isPrice: 1,
+    menuMasterCode: "",
     menuCategoryCode: "",
     isActive: 1,
     stockinhand: "",
@@ -90,12 +93,39 @@ export default function MenuItemTabbedForm({
   const [selectedPrepZones, setSelectedPrepZones] = useState<Set<string>>(
     new Set()
   );
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
+    new Set()
+  );
+  const [filteredCategories, setFilteredCategories] = useState<any[]>([]);
 
   useEffect(() => {
     fetchModifiers();
     fetchTaxes();
     fetchPrepZones();
   }, []);
+
+  // Filter categories when menu master changes
+  useEffect(() => {
+    if (formData.menuMasterCode) {
+      const filtered = categories.filter(
+        (cat) => cat.menuMasterCode === formData.menuMasterCode
+      );
+      setFilteredCategories(filtered);
+      // Clear selected categories if they don't belong to the new menu master
+      setSelectedCategories((prev) => {
+        const valid = new Set<string>();
+        prev.forEach((code) => {
+          if (filtered.some((cat) => cat.menuCategoryCode === code)) {
+            valid.add(code);
+          }
+        });
+        return valid;
+      });
+    } else {
+      setFilteredCategories([]);
+      setSelectedCategories(new Set());
+    }
+  }, [formData.menuMasterCode, categories]);
 
   useEffect(() => {
     if (menuItem) {
@@ -126,6 +156,7 @@ export default function MenuItemTabbedForm({
             ? 0
             : menuItem.basePrice ?? menuItem.price ?? 0,
         isPrice: menuItem.isPrice ?? 1,
+        menuMasterCode: menuItem.menuMasterCode || "",
         menuCategoryCode: menuItem.menuCategoryCode || "",
         isActive: menuItem.isActive ?? 1,
         stockinhand: menuItem.stockinhand?.toString() || "",
@@ -174,6 +205,27 @@ export default function MenuItemTabbedForm({
       }
       setSelectedPrepZones(new Set(prepZoneCodes));
 
+      // Parse menuCategoryCode from JSON if it exists
+      let categoryCodes: string[] = [];
+      if (menuItem.menuCategoryCode) {
+        try {
+          if (typeof menuItem.menuCategoryCode === "string") {
+            // Try to parse if it's a JSON string
+            categoryCodes = JSON.parse(menuItem.menuCategoryCode);
+          } else if (Array.isArray(menuItem.menuCategoryCode)) {
+            // Already an array
+            categoryCodes = menuItem.menuCategoryCode;
+          } else {
+            // Single value (backward compatibility)
+            categoryCodes = [menuItem.menuCategoryCode];
+          }
+        } catch (e) {
+          // If parsing fails, treat as single value (backward compatibility)
+          categoryCodes = [menuItem.menuCategoryCode];
+        }
+      }
+      setSelectedCategories(new Set(categoryCodes));
+
       // Set selected modifiers if editing (ONLY explicit rows: inherit_from_menu_group = 0)
       if (
         menuItem.assignedModifiers &&
@@ -198,29 +250,62 @@ export default function MenuItemTabbedForm({
     }
   }, [menuItem]);
 
+  // Create a stable dependency for selected categories
+  const selectedCategoriesKey = useMemo(() => {
+    return Array.from(selectedCategories).sort().join(",");
+  }, [selectedCategories]);
+
   // Load inherited modifiers list when inheritance is enabled
   useEffect(() => {
     const load = async () => {
       try {
-        if (!inheritModifiers || !formData.menuCategoryCode) {
+        if (!inheritModifiers || selectedCategories.size === 0) {
           setInheritedModifiers([]);
           return;
         }
-        const res = await fetch(
-          `/api/modifier-groups?menuCategoryCode=${encodeURIComponent(
-            formData.menuCategoryCode
-          )}`
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setInheritedModifiers(Array.isArray(data) ? data : []);
+        // Load modifiers for all selected categories and combine them
+        const categoryCodes = Array.from(selectedCategories);
+        const allModifiers: any[] = [];
+        const seenCodes = new Set<string>();
+
+        // Fetch modifiers for each category
+        for (const categoryCode of categoryCodes) {
+          try {
+            const res = await fetch(
+              `/api/dashboard/modifier-groups?menuCategoryCode=${encodeURIComponent(
+                categoryCode
+              )}`
+            );
+            if (res.ok) {
+              const data = await res.json();
+              if (Array.isArray(data)) {
+                // Add modifiers that haven't been seen yet (avoid duplicates)
+                for (const modifier of data) {
+                  // Use modifierGroupCode as primary identifier, fallback to id
+                  const code =
+                    modifier.modifierGroupCode || String(modifier.id);
+                  if (code && !seenCodes.has(String(code))) {
+                    seenCodes.add(String(code));
+                    allModifiers.push(modifier);
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.error(
+              `Error loading modifiers for category ${categoryCode}:`,
+              e
+            );
+          }
         }
+        setInheritedModifiers(allModifiers);
       } catch (e) {
         console.error("Error loading inherited modifiers", e);
+        setInheritedModifiers([]);
       }
     };
     load();
-  }, [inheritModifiers, formData.menuCategoryCode]);
+  }, [inheritModifiers, selectedCategoriesKey]);
 
   const fetchModifiers = async () => {
     try {
@@ -286,7 +371,11 @@ export default function MenuItemTabbedForm({
             : formData.priceStrategy === 3
             ? 0
             : null,
-        menuCategoryCode: formData.menuCategoryCode || null,
+        menuMasterCode: formData.menuMasterCode || null,
+        menuCategoryCode:
+          Array.from(selectedCategories).length > 0
+            ? Array.from(selectedCategories)
+            : null,
         itemContainAlcohol: formData.itemContainAlcohol === 1 ? 1 : 0,
         isPrice: formData.isPrice === 1 ? 1 : 0,
         isActive: formData.isActive === 1 ? 1 : 0,
@@ -345,7 +434,7 @@ export default function MenuItemTabbedForm({
     });
   };
 
-  const handleModifierModalConfirm = (selectedIds: number[]) => {
+  const handleModifierModalConfirm = async (selectedIds: number[]) => {
     setSelectedModifiers(selectedIds);
     setModifierOptions((prev) => {
       const next = { ...prev } as any;
@@ -360,6 +449,8 @@ export default function MenuItemTabbedForm({
       }
       return next;
     });
+    // Refresh modifiers list to ensure selected modifiers are available for display
+    await fetchModifiers();
   };
 
   return (
@@ -447,43 +538,120 @@ export default function MenuItemTabbedForm({
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Category *
+                    Menu Master *
                   </label>
-                  <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50">
-                    <div className="flex flex-wrap gap-2">
-                      {categories.map((category) => {
-                        const categoryValue =
-                          category.menuCategoryCode ||
-                          category.tblMenuCategoryId?.toString() ||
-                          "";
-                        return (
-                          <button
-                            key={
-                              category.menuCategoryCode ||
-                              category.tblMenuCategoryId
-                            }
-                            type="button"
-                            onClick={() =>
-                              setFormData({
-                                ...formData,
-                                menuCategoryCode: categoryValue,
-                              })
-                            }
-                            className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
-                              formData.menuCategoryCode === categoryValue
-                                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
-                                : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                            }`}
-                          >
-                            {category.name}
-                            {formData.menuCategoryCode === categoryValue && (
-                              <CheckIcon className="w-4 h-4 inline-block ml-2" />
-                            )}
-                          </button>
-                        );
-                      })}
+                  <select
+                    required
+                    value={formData.menuMasterCode}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        menuMasterCode: e.target.value,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Select Menu Master</option>
+                    {menuMasters.map((master) => (
+                      <option
+                        key={master.menuMasterCode}
+                        value={master.menuMasterCode}
+                      >
+                        {master.name ||
+                          master.labelName ||
+                          master.menuMasterCode}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Categories *
+                  </label>
+                  {!formData.menuMasterCode ? (
+                    <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
+                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                        Please select a Menu Master first
+                      </p>
                     </div>
-                  </div>
+                  ) : filteredCategories.length === 0 ? (
+                    <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
+                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                        No categories available for this menu master
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50">
+                      <div className="flex items-center gap-2 mb-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (
+                              selectedCategories.size ===
+                              filteredCategories.length
+                            ) {
+                              setSelectedCategories(new Set());
+                            } else {
+                              const allCodes = new Set(
+                                filteredCategories
+                                  .map((cat) => cat.menuCategoryCode)
+                                  .filter(Boolean)
+                              );
+                              setSelectedCategories(allCodes);
+                            }
+                          }}
+                          className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium px-3 py-1 border border-blue-600 dark:border-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                        >
+                          {selectedCategories.size === filteredCategories.length
+                            ? "Deselect All"
+                            : "Select All"}
+                        </button>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          {selectedCategories.size} of{" "}
+                          {filteredCategories.length} selected
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {filteredCategories.map((category) => {
+                          const categoryValue =
+                            category.menuCategoryCode ||
+                            category.tblMenuCategoryId?.toString() ||
+                            "";
+                          const isSelected =
+                            selectedCategories.has(categoryValue);
+                          return (
+                            <button
+                              key={
+                                category.menuCategoryCode ||
+                                category.tblMenuCategoryId
+                              }
+                              type="button"
+                              onClick={() => {
+                                const updated = new Set(selectedCategories);
+                                if (updated.has(categoryValue)) {
+                                  updated.delete(categoryValue);
+                                } else {
+                                  updated.add(categoryValue);
+                                }
+                                setSelectedCategories(updated);
+                              }}
+                              className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
+                                isSelected
+                                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                                  : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                              }`}
+                            >
+                              {category.name}
+                              {isSelected && (
+                                <CheckIcon className="w-4 h-4 inline-block ml-2" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <SystemColorPicker
@@ -702,170 +870,202 @@ export default function MenuItemTabbedForm({
 
           {/* Pricing Section */}
           <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Pricing
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Set pricing strategy and prices
-              </p>
-            </div>
-
-            <div className="space-y-6">
-              {/* Price Strategy Selection - Buttons */}
+            <div className="mb-6 flex items-center justify-between">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                  Price Strategy *
-                </label>
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormData({
-                        ...formData,
-                        priceStrategy: 1,
-                        // Keep existing prices when switching to Base Price
-                      });
-                    }}
-                    className={`relative px-6 py-3 rounded-lg border-2 transition-all font-medium ${
-                      formData.priceStrategy === 1
-                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
-                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                    }`}
-                  >
-                    Base Price
-                    {formData.priceStrategy === 1 && (
-                      <CheckIcon className="w-5 h-5 inline-block ml-2" />
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFormData({
-                        ...formData,
-                        priceStrategy: 3,
-                        cardPrice: 0,
-                        cashPrice: 0,
-                      });
-                    }}
-                    className={`relative px-6 py-3 rounded-lg border-2 transition-all font-medium ${
-                      formData.priceStrategy === 3
-                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
-                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                    }`}
-                  >
-                    Open Price
-                    {formData.priceStrategy === 3 && (
-                      <CheckIcon className="w-5 h-5 inline-block ml-2" />
-                    )}
-                  </button>
-                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  Pricing
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Set pricing strategy and prices
+                </p>
               </div>
-
-              {/* Conditional Price Inputs */}
-              {formData.priceStrategy === 1 ? (
-                <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                    Base Price Configuration
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Card Price *
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={formData.cardPrice || ""}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            cardPrice: parseFloat(e.target.value) || 0,
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Cash Price *
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={formData.cashPrice || ""}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            cashPrice: parseFloat(e.target.value) || 0,
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="0.00"
-                      />
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    * At least one price (Card or Cash) must be provided
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                  <div className="flex items-start space-x-3">
-                    <div className="flex-shrink-0">
-                      <svg
-                        className="w-5 h-5 text-yellow-600 dark:text-yellow-400"
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-1">
-                        Open Price Strategy
-                      </h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        This item uses open pricing. Prices will be set at the
-                        point of sale. Card Price and Cash Price are set to 0.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Card Price (Read-only)
-                      </label>
-                      <input
-                        type="number"
-                        value="0.00"
-                        disabled
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Cash Price (Read-only)
-                      </label>
-                      <input
-                        type="number"
-                        value="0.00"
-                        disabled
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
+              {/* Enable/Disable Price Toggle */}
+              <div className="flex items-center space-x-3">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {formData.isPrice === 1 ? "Price Enabled" : "Price Disabled"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData({
+                      ...formData,
+                      isPrice: formData.isPrice === 1 ? 0 : 1,
+                    });
+                  }}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                    formData.isPrice === 1
+                      ? "bg-blue-600"
+                      : "bg-gray-200 dark:bg-gray-700"
+                  }`}
+                  role="switch"
+                  aria-checked={formData.isPrice === 1}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      formData.isPrice === 1 ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
+
+            {formData.isPrice === 1 && (
+              <div className="space-y-6">
+                {/* Price Strategy Selection - Buttons */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                    Price Strategy *
+                  </label>
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData({
+                          ...formData,
+                          priceStrategy: 1,
+                          // Keep existing prices when switching to Base Price
+                        });
+                      }}
+                      className={`relative px-6 py-3 rounded-lg border-2 transition-all font-medium ${
+                        formData.priceStrategy === 1
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                          : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                      }`}
+                    >
+                      Base Price
+                      {formData.priceStrategy === 1 && (
+                        <CheckIcon className="w-5 h-5 inline-block ml-2" />
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData({
+                          ...formData,
+                          priceStrategy: 3,
+                          cardPrice: 0,
+                          cashPrice: 0,
+                        });
+                      }}
+                      className={`relative px-6 py-3 rounded-lg border-2 transition-all font-medium ${
+                        formData.priceStrategy === 3
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                          : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                      }`}
+                    >
+                      Open Price
+                      {formData.priceStrategy === 3 && (
+                        <CheckIcon className="w-5 h-5 inline-block ml-2" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Conditional Price Inputs */}
+                {formData.priceStrategy === 1 ? (
+                  <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                      Base Price Configuration
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Card Price *
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={formData.cardPrice || ""}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              cardPrice: parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="0.00"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Cash Price *
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={formData.cashPrice || ""}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              cashPrice: parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      * At least one price (Card or Cash) must be provided
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0">
+                        <svg
+                          className="w-5 h-5 text-yellow-600 dark:text-yellow-400"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            fillRule="evenodd"
+                            d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                            clipRule="evenodd"
+                          />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                          Open Price Strategy
+                        </h4>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          This item uses open pricing. Prices will be set at the
+                          point of sale. Card Price and Cash Price are set to 0.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Card Price (Read-only)
+                        </label>
+                        <input
+                          type="number"
+                          value="0.00"
+                          disabled
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Cash Price (Read-only)
+                        </label>
+                        <input
+                          type="number"
+                          value="0.00"
+                          disabled
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Tax Configuration Section */}
@@ -1232,8 +1432,8 @@ export default function MenuItemTabbedForm({
                             .filter((modifierId) => {
                               const modifier = modifiers.find(
                                 (m) =>
-                                  m.id === modifierId ||
-                                  m.tblModifierId === modifierId
+                                  Number(m.id) === Number(modifierId) ||
+                                  Number(m.tblModifierId) === Number(modifierId)
                               );
                               return (
                                 modifier &&
@@ -1243,8 +1443,8 @@ export default function MenuItemTabbedForm({
                             .map((modifierId) => {
                               const modifier = modifiers.find(
                                 (m) =>
-                                  m.id === modifierId ||
-                                  m.tblModifierId === modifierId
+                                  Number(m.id) === Number(modifierId) ||
+                                  Number(m.tblModifierId) === Number(modifierId)
                               );
                               if (!modifier) return null;
                               const opts = modifierOptions[modifierId] || {
@@ -1441,15 +1641,18 @@ export default function MenuItemTabbedForm({
                   <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                     <p className="text-sm text-blue-800 dark:text-blue-200">
                       This menu item will automatically inherit modifiers from
-                      its menu category:
+                      its menu categories:
                       <span className="font-medium">
                         {" "}
-                        {categories.find(
-                          (c) =>
-                            c.menuCategoryCode === formData.menuCategoryCode ||
-                            c.tblMenuCategoryId?.toString() ===
-                              formData.menuCategoryCode
-                        )?.name || "Selected Category"}
+                        {Array.from(selectedCategories)
+                          .map(
+                            (code) =>
+                              filteredCategories.find(
+                                (c) => c.menuCategoryCode === code
+                              )?.name
+                          )
+                          .filter(Boolean)
+                          .join(", ") || "Selected Categories"}
                       </span>
                     </p>
                   </div>

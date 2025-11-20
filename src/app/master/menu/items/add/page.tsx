@@ -12,34 +12,55 @@ interface MenuCategory {
   menuCategoryId?: string;
   menuCategoryCode?: string;
   name: string;
+  menuMasterCode?: string;
   menuMaster?: {
     name: string;
   };
 }
 
+interface MenuMaster {
+  menuMasterId: string;
+  menuMasterCode: string;
+  name: string;
+}
+
 export default function AddMasterMenuItemPage() {
   const router = useRouter();
+  const [menuMasters, setMenuMasters] = useState<MenuMaster[]>([]);
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchCategories();
+    fetchData();
   }, []);
 
-  const fetchCategories = async () => {
+  const fetchData = async () => {
     try {
       const token = localStorage.getItem("master_admin_token");
-      const response = await fetch("/api/master/menu-categories", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (response.ok) {
-        const categoriesData = await response.json();
+      const [mastersRes, categoriesRes] = await Promise.all([
+        fetch("/api/master/menu-masters", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+        fetch("/api/master/menu-categories", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+      ]);
+
+      if (mastersRes.ok) {
+        const mastersData = await mastersRes.json();
+        setMenuMasters(mastersData);
+      }
+
+      if (categoriesRes.ok) {
+        const categoriesData = await categoriesRes.json();
         setCategories(categoriesData);
       }
     } catch (error) {
-      toast.error("Error loading categories");
+      toast.error("Error loading data");
       console.error("Error:", error);
     } finally {
       setLoading(false);
@@ -119,6 +140,7 @@ export default function AddMasterMenuItemPage() {
 
         {/* Form */}
         <MasterMenuItemTabbedForm
+          menuMasters={menuMasters}
           categories={categories}
           onSave={handleSave}
           onCancel={handleCancel}

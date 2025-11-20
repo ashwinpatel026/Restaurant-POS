@@ -74,16 +74,20 @@ export default function ModifierSelectionModal({
       if (menuItemId) params.append("excludeMenuItemId", menuItemId.toString());
 
       const apiPrefix = useMasterApi ? "/api/master" : "/api/dashboard";
-      const apiPath = useMasterApi 
-        ? "/modifier-groups" 
+      const apiPath = useMasterApi
+        ? "/modifier-groups"
         : "/menu/modifiers/available";
-      
+
       const response = await fetch(`${apiPrefix}${apiPath}?${params}`, {
-        headers: useMasterApi ? {
-          Authorization: `Bearer ${localStorage.getItem("master_admin_token")}`,
-        } : {},
+        headers: useMasterApi
+          ? {
+              Authorization: `Bearer ${localStorage.getItem(
+                "master_admin_token"
+              )}`,
+            }
+          : {},
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         // If using master API, map the response to expected format
@@ -93,10 +97,14 @@ export default function ModifierSelectionModal({
             data.map(async (group: any) => {
               try {
                 const itemsResponse = await fetch(
-                  `/api/master/modifier-items?modifierGroupCode=${encodeURIComponent(group.modifierGroupCode)}`,
+                  `/api/master/modifier-items?modifierGroupCode=${encodeURIComponent(
+                    group.modifierGroupCode
+                  )}`,
                   {
                     headers: {
-                      Authorization: `Bearer ${localStorage.getItem("master_admin_token")}`,
+                      Authorization: `Bearer ${localStorage.getItem(
+                        "master_admin_token"
+                      )}`,
                     },
                   }
                 );
@@ -105,9 +113,11 @@ export default function ModifierSelectionModal({
                   const itemsData = await itemsResponse.json();
                   modifierItems = itemsData || [];
                 }
-                
+
                 return {
-                  id: parseInt(group.id) || parseInt(group.modifierGroupId || "0"),
+                  id:
+                    parseInt(group.id) ||
+                    parseInt(group.modifierGroupId || "0"),
                   name: group.groupName || group.labelName,
                   labelName: group.labelName || group.groupName,
                   posName: group.labelName || group.groupName,
@@ -117,20 +127,34 @@ export default function ModifierSelectionModal({
                   minSelection: group.minSelection,
                   maxSelection: group.maxSelection,
                   itemCount: modifierItems.length,
-                  sampleItems: modifierItems.slice(0, 3).map((item: any) => item.name || item.labelName),
-                  configSummary: `${group.isRequired === 1 ? "Required" : "Optional"} • ${group.isMultiselect === 1 ? "Multi-select" : "Single-select"}`,
+                  sampleItems: modifierItems
+                    .slice(0, 3)
+                    .map((item: any) => item.name || item.labelName),
+                  configSummary: `${
+                    group.isRequired === 1 ? "Required" : "Optional"
+                  } • ${
+                    group.isMultiselect === 1 ? "Multi-select" : "Single-select"
+                  }`,
                   modifierItems: modifierItems.map((item: any) => ({
-                    id: parseInt(item.id) || parseInt(item.modifierItemId || "0"),
+                    id:
+                      parseInt(item.id) || parseInt(item.modifierItemId || "0"),
                     name: item.name || item.labelName,
                     labelName: item.labelName || item.name,
                     posName: item.labelName || item.name,
-                    price: parseFloat(item.price || item.additionalCharge || "0"),
+                    price: parseFloat(
+                      item.price || item.additionalCharge || "0"
+                    ),
                   })),
                 };
               } catch (error) {
-                console.error(`Error fetching items for group ${group.modifierGroupCode}:`, error);
+                console.error(
+                  `Error fetching items for group ${group.modifierGroupCode}:`,
+                  error
+                );
                 return {
-                  id: parseInt(group.id) || parseInt(group.modifierGroupId || "0"),
+                  id:
+                    parseInt(group.id) ||
+                    parseInt(group.modifierGroupId || "0"),
                   name: group.groupName || group.labelName,
                   labelName: group.labelName || group.groupName,
                   posName: group.labelName || group.groupName,
@@ -141,7 +165,11 @@ export default function ModifierSelectionModal({
                   maxSelection: group.maxSelection,
                   itemCount: 0,
                   sampleItems: [],
-                  configSummary: `${group.isRequired === 1 ? "Required" : "Optional"} • ${group.isMultiselect === 1 ? "Multi-select" : "Single-select"}`,
+                  configSummary: `${
+                    group.isRequired === 1 ? "Required" : "Optional"
+                  } • ${
+                    group.isMultiselect === 1 ? "Multi-select" : "Single-select"
+                  }`,
                   modifierItems: [],
                 };
               }
@@ -213,7 +241,7 @@ export default function ModifierSelectionModal({
                     as="h3"
                     className="text-lg font-medium leading-6 text-gray-900 dark:text-white flex items-center"
                   >
-                    Select Modifier Groups
+                    Select Modifiers
                     <button className="ml-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                       <svg
                         className="w-4 h-4"
@@ -387,7 +415,7 @@ export default function ModifierSelectionModal({
                       </div>
                     ) : (
                       <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
-                        Select a modifier group to view details
+                        Select a modifiers list to view details
                       </div>
                     )}
                   </div>

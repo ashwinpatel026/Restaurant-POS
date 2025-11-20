@@ -106,6 +106,7 @@ export async function POST(request: NextRequest) {
       isOnlineOrderByApp,
       isOnlineOrdering,
       isCustomerInvoice,
+      menuMasterCode,
       menuCategoryCode,
       taxCode,
       inheritTaxInclusion,
@@ -141,7 +142,10 @@ export async function POST(request: NextRequest) {
       return await (prisma as any).menuItem.create({
         data: {
           menuItemCode,
-          menuCategoryCode: menuCategoryCode || null,
+          menuMasterCode: menuMasterCode || null,
+          menuCategoryCode: Array.isArray(menuCategoryCode) && menuCategoryCode.length > 0 
+            ? menuCategoryCode 
+            : menuCategoryCode || null,
           name: name || null,
           kitchenName: kitchenName || null,
           labelName: labelName || null,
@@ -205,13 +209,15 @@ export async function POST(request: NextRequest) {
         const rowsToCreate: any[] = []
         const seenGroups = new Set<string>() // Track already added modifier groups
 
-        // If inherit from category, add all modifier groups for the category
+        // If inherit from category, add all modifier groups for the categories
         if (inheritModifiers && (menuItem as any).menuCategoryCode) {
-          const categoryCode = (menuItem as any).menuCategoryCode as string
-          // Fetch modifier group codes assigned to this category via junction table
+          const categoryCodes = Array.isArray((menuItem as any).menuCategoryCode) 
+            ? (menuItem as any).menuCategoryCode 
+            : [(menuItem as any).menuCategoryCode]
+          // Fetch modifier group codes assigned to these categories via junction table
           const mcmRows = await prisma.$queryRaw<Array<{ modifier_group_code: string }>>`
             SELECT modifier_group_code FROM tbl_menu_category_modifier 
-            WHERE menu_category_code = ${categoryCode}
+            WHERE menu_category_code = ANY(${categoryCodes}::text[])
           `
           for (const row of mcmRows) {
             const code = row.modifier_group_code

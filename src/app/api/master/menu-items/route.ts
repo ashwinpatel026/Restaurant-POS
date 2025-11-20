@@ -38,6 +38,7 @@ function mapMenuItemResponse(item: any) {
     updatedOn: item.updatedOn?.toISOString() || null,
     // Handle JSON fields
     prepZoneCode: item.prepZoneCode ? (typeof item.prepZoneCode === 'string' ? JSON.parse(item.prepZoneCode) : item.prepZoneCode) : null,
+    menuCategoryCode: item.menuCategoryCode ? (typeof item.menuCategoryCode === 'string' ? JSON.parse(item.menuCategoryCode) : item.menuCategoryCode) : null,
   }
 }
 
@@ -55,7 +56,10 @@ export async function GET(request: NextRequest) {
 
     const where: any = {}
     if (menuCategoryCode || categoryCode) {
-      where.menuCategoryCode = menuCategoryCode || categoryCode
+      // menuCategoryCode is stored as JSON array, so we need to use array_contains filter
+      where.menuCategoryCode = {
+        array_contains: menuCategoryCode || categoryCode
+      }
     }
     if (isActive !== null) {
       where.isActive = isActive === 'true' ? 1 : 0
@@ -107,6 +111,7 @@ export async function POST(request: NextRequest) {
       isOnlineOrderByApp,
       isOnlineOrdering,
       isCustomerInvoice,
+      menuMasterCode,
       menuCategoryCode,
       taxCode,
       inheritTaxInclusion,
@@ -136,7 +141,10 @@ export async function POST(request: NextRequest) {
     const menuItem = await masterPrisma.masterMenuItem.create({
       data: {
         menuItemCode,
-        menuCategoryCode: menuCategoryCode || null,
+        menuMasterCode: menuMasterCode || null,
+        menuCategoryCode: Array.isArray(menuCategoryCode) && menuCategoryCode.length > 0 
+          ? menuCategoryCode 
+          : menuCategoryCode || null,
         name: name || null,
         kitchenName: kitchenName || null,
         labelName: labelName || null,
@@ -177,10 +185,13 @@ export async function POST(request: NextRequest) {
         const rowsToCreate: any[] = []
         const seenGroups = new Set<string>()
 
-        // If inherit from category, add all modifier groups for the category
+        // If inherit from categories, add all modifier groups for the categories
         if (inheritModifiers && menuItem.menuCategoryCode) {
+          const categoryCodes = Array.isArray(menuItem.menuCategoryCode) 
+            ? menuItem.menuCategoryCode 
+            : [menuItem.menuCategoryCode]
           const categoryModifiers = await masterPrisma.masterMenuCategoryModifier.findMany({
-            where: { menuCategoryCode: menuItem.menuCategoryCode }
+            where: { menuCategoryCode: { in: categoryCodes } }
           })
 
           for (const cm of categoryModifiers) {

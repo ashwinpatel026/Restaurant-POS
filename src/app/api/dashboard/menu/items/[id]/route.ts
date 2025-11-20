@@ -173,6 +173,7 @@ export async function PUT(
       isOnlineOrderByApp,
       isOnlineOrdering,
       isCustomerInvoice,
+      menuMasterCode,
       menuCategoryCode,
       taxCode,
       inheritTaxInclusion,
@@ -235,7 +236,10 @@ export async function PUT(
           disqualifyDiningTaxExemption: disqualifyDiningTaxExemption !== undefined ? disqualifyDiningTaxExemption : undefined,
           inheritModifierGroup: inheritModifiers !== undefined ? inheritModifiers : undefined,
           prepZoneCode: prepZoneCodes && prepZoneCodes.length > 0 ? prepZoneCodes : null,
-          menuCategoryCode: menuCategoryCode || null
+          menuMasterCode: menuMasterCode || null,
+          menuCategoryCode: Array.isArray(menuCategoryCode) && menuCategoryCode.length > 0 
+            ? menuCategoryCode 
+            : menuCategoryCode || null
         }
       })
     })
@@ -300,13 +304,15 @@ export async function PUT(
         const rowsToCreate: any[] = []
         const seenGroups = new Set<string>() // Track already added modifier groups
 
-        // Inherit from category
+        // Inherit from categories
         if (inheritModifiers && current?.menuCategoryCode) {
-          const categoryCode = current.menuCategoryCode as string
-          const mcmRows = await prisma.$queryRawUnsafe<Array<{ modifier_group_code: string }>>(
-            `SELECT modifier_group_code FROM tbl_menu_category_modifier WHERE menu_category_code = $1`,
-            categoryCode
-          )
+          const categoryCodes = Array.isArray(current.menuCategoryCode) 
+            ? current.menuCategoryCode 
+            : [current.menuCategoryCode]
+          const mcmRows = await prisma.$queryRaw<Array<{ modifier_group_code: string }>>`
+            SELECT modifier_group_code FROM tbl_menu_category_modifier 
+            WHERE menu_category_code = ANY(${categoryCodes}::text[])
+          `
           for (const row of mcmRows) {
             const code = row.modifier_group_code
             if (code && !seenGroups.has(code)) {

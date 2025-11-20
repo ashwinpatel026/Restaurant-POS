@@ -193,8 +193,13 @@ export async function DELETE(
     }
 
     // Check if category has any menu items
+    // menuCategoryCode is stored as JSON array, so we need to use array_contains filter
     const itemsCount = await masterPrisma.masterMenuItem.count({
-      where: { menuCategoryCode: category.menuCategoryCode }
+      where: { 
+        menuCategoryCode: {
+          array_contains: category.menuCategoryCode
+        }
+      }
     })
 
     // If category has menu items, prevent deletion

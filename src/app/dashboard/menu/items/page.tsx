@@ -19,7 +19,7 @@ import { PageSkeleton, CardSkeleton } from "@/components/ui/SkeletonLoader";
 interface MenuItem {
   menuItemId?: string;
   menuItemCode?: string;
-  menuCategoryCode?: string;
+  menuCategoryCode?: string | string[]; // Can be string or array (JSON)
   tblMenuItemId?: number;
   tblMenuCategoryId?: number;
   name: string;
@@ -94,13 +94,18 @@ export default function MenuItemsPage() {
       );
     }
 
-    // Filter by category (supports code or legacy id)
+    // Filter by category (supports code or legacy id, handles both string and array)
     if (selectedCategory) {
-      filtered = filtered.filter((item) =>
-        item.menuCategoryCode
-          ? item.menuCategoryCode === selectedCategory
-          : item.tblMenuCategoryId === parseInt(selectedCategory)
-      );
+      filtered = filtered.filter((item) => {
+        if (item.menuCategoryCode) {
+          // Handle array (JSON) or string
+          const categoryCodes = Array.isArray(item.menuCategoryCode)
+            ? item.menuCategoryCode
+            : [item.menuCategoryCode];
+          return categoryCodes.includes(selectedCategory);
+        }
+        return item.tblMenuCategoryId === parseInt(selectedCategory);
+      });
     }
 
     // Filter by price range (use cardPrice or cashPrice, fallback to basePrice/price)
@@ -511,65 +516,109 @@ export default function MenuItemsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-600 dark:text-gray-400">
-                          {categories.find((c) =>
-                            item.menuCategoryCode
-                              ? c.menuCategoryCode === item.menuCategoryCode
-                              : c.tblMenuCategoryId === item.tblMenuCategoryId
-                          )?.name || "N/A"}
+                          {(() => {
+                            // Handle both string and array (JSON) formats
+                            const categoryCodes = Array.isArray(
+                              item.menuCategoryCode
+                            )
+                              ? item.menuCategoryCode
+                              : item.menuCategoryCode
+                              ? [item.menuCategoryCode]
+                              : [];
+
+                            if (categoryCodes.length === 0) {
+                              // Fallback to legacy ID
+                              const category = categories.find(
+                                (c) =>
+                                  c.tblMenuCategoryId === item.tblMenuCategoryId
+                              );
+                              return category?.name || "N/A";
+                            }
+
+                            // Find category names for all codes
+                            const categoryNames = categoryCodes
+                              .map(
+                                (code) =>
+                                  categories.find(
+                                    (c) => c.menuCategoryCode === code
+                                  )?.name
+                              )
+                              .filter(Boolean);
+
+                            return categoryNames.length > 0
+                              ? categoryNames.join(", ")
+                              : "N/A";
+                          })()}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {item.priceStrategy === 1
-                            ? "Base Price"
-                            : item.priceStrategy === 3
-                            ? "Open Price"
-                            : "N/A"}
-                        </div>
+                        {item.isPrice === 0 ? (
+                          <div className="flex items-center">
+                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+                              Price Disabled
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {item.priceStrategy === 1
+                              ? "Base Price"
+                              : item.priceStrategy === 3
+                              ? "Open Price"
+                              : "N/A"}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm space-y-1">
-                          {item.priceStrategy === 1 ? (
-                            <>
-                              {item.cardPrice !== null &&
-                                item.cardPrice !== undefined && (
-                                  <div className="text-gray-900 dark:text-white">
-                                    <span className="text-gray-600 dark:text-gray-400">
-                                      Card:
-                                    </span>{" "}
-                                    {formatPrice(item.cardPrice)}
-                                  </div>
+                        {item.isPrice === 0 ? (
+                          <div className="flex items-center">
+                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+                              —
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="text-sm space-y-1">
+                            {item.priceStrategy === 1 ? (
+                              <>
+                                {item.cardPrice !== null &&
+                                  item.cardPrice !== undefined && (
+                                    <div className="text-gray-900 dark:text-white">
+                                      <span className="text-gray-600 dark:text-gray-400">
+                                        Card:
+                                      </span>{" "}
+                                      {formatPrice(item.cardPrice)}
+                                    </div>
+                                  )}
+                                {item.cashPrice !== null &&
+                                  item.cashPrice !== undefined && (
+                                    <div className="text-gray-900 dark:text-white">
+                                      <span className="text-gray-600 dark:text-gray-400">
+                                        Cash:
+                                      </span>{" "}
+                                      {formatPrice(item.cashPrice)}
+                                    </div>
+                                  )}
+                                {(!item.cardPrice || !item.cashPrice) &&
+                                  (item.basePrice || item.price) && (
+                                    <div className="text-gray-900 dark:text-white">
+                                      {formatPrice(
+                                        (item.basePrice ?? item.price) as number
+                                      )}
+                                    </div>
+                                  )}
+                              </>
+                            ) : item.priceStrategy === 3 ? (
+                              <div className="text-gray-500 dark:text-gray-400 italic">
+                                Open Price
+                              </div>
+                            ) : (
+                              <div className="text-gray-900 dark:text-white">
+                                {formatPrice(
+                                  (item.basePrice ?? item.price ?? 0) as number
                                 )}
-                              {item.cashPrice !== null &&
-                                item.cashPrice !== undefined && (
-                                  <div className="text-gray-900 dark:text-white">
-                                    <span className="text-gray-600 dark:text-gray-400">
-                                      Cash:
-                                    </span>{" "}
-                                    {formatPrice(item.cashPrice)}
-                                  </div>
-                                )}
-                              {(!item.cardPrice || !item.cashPrice) &&
-                                (item.basePrice || item.price) && (
-                                  <div className="text-gray-900 dark:text-white">
-                                    {formatPrice(
-                                      (item.basePrice ?? item.price) as number
-                                    )}
-                                  </div>
-                                )}
-                            </>
-                          ) : item.priceStrategy === 3 ? (
-                            <div className="text-gray-500 dark:text-gray-400 italic">
-                              Open Price
-                            </div>
-                          ) : (
-                            <div className="text-gray-900 dark:text-white">
-                              {formatPrice(
-                                (item.basePrice ?? item.price ?? 0) as number
-                              )}
-                            </div>
-                          )}
-                        </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-600 dark:text-gray-400">
@@ -675,57 +724,108 @@ export default function MenuItemsPage() {
                       </p>
                       <p>
                         <strong>Category:</strong>{" "}
-                        {categories.find((c) =>
-                          item.menuCategoryCode
-                            ? c.menuCategoryCode === item.menuCategoryCode
-                            : c.tblMenuCategoryId === item.tblMenuCategoryId
-                        )?.name || "N/A"}
+                        {(() => {
+                          // Handle both string and array (JSON) formats
+                          const categoryCodes = Array.isArray(
+                            item.menuCategoryCode
+                          )
+                            ? item.menuCategoryCode
+                            : item.menuCategoryCode
+                            ? [item.menuCategoryCode]
+                            : [];
+
+                          if (categoryCodes.length === 0) {
+                            // Fallback to legacy ID
+                            const category = categories.find(
+                              (c) =>
+                                c.tblMenuCategoryId === item.tblMenuCategoryId
+                            );
+                            return category?.name || "N/A";
+                          }
+
+                          // Find category names for all codes
+                          const categoryNames = categoryCodes
+                            .map(
+                              (code) =>
+                                categories.find(
+                                  (c) => c.menuCategoryCode === code
+                                )?.name
+                            )
+                            .filter(Boolean);
+
+                          return categoryNames.length > 0
+                            ? categoryNames.join(", ")
+                            : "N/A";
+                        })()}
                       </p>
-                      <div>
-                        <strong>Price Strategy:</strong>{" "}
-                        {item.priceStrategy === 1
-                          ? "Base Price"
-                          : item.priceStrategy === 3
-                          ? "Open Price"
-                          : "N/A"}
-                      </div>
-                      {item.priceStrategy === 1 ? (
-                        <div className="space-y-1">
-                          {item.cardPrice !== null &&
-                            item.cardPrice !== undefined && (
-                              <p>
-                                <strong>Card Price:</strong>{" "}
-                                {formatPrice(item.cardPrice)}
-                              </p>
-                            )}
-                          {item.cashPrice !== null &&
-                            item.cashPrice !== undefined && (
-                              <p>
-                                <strong>Cash Price:</strong>{" "}
-                                {formatPrice(item.cashPrice)}
-                              </p>
-                            )}
-                          {(!item.cardPrice || !item.cashPrice) &&
-                            (item.basePrice || item.price) && (
-                              <p>
-                                <strong>Price:</strong>{" "}
-                                {formatPrice(
-                                  (item.basePrice ?? item.price) as number
-                                )}
-                              </p>
-                            )}
+                      {item.isPrice === 0 ? (
+                        <div className="flex items-center space-x-2">
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+                            <svg
+                              className="w-4 h-4 inline-block mr-1"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                              />
+                            </svg>
+                            Price Disabled
+                          </span>
                         </div>
-                      ) : item.priceStrategy === 3 ? (
-                        <p className="text-gray-500 dark:text-gray-400 italic">
-                          Open Price
-                        </p>
                       ) : (
-                        <p>
-                          <strong>Price:</strong>{" "}
-                          {formatPrice(
-                            (item.basePrice ?? item.price ?? 0) as number
+                        <>
+                          <div>
+                            <strong>Price Strategy:</strong>{" "}
+                            {item.priceStrategy === 1
+                              ? "Base Price"
+                              : item.priceStrategy === 3
+                              ? "Open Price"
+                              : "N/A"}
+                          </div>
+                          {item.priceStrategy === 1 ? (
+                            <div className="space-y-1">
+                              {item.cardPrice !== null &&
+                                item.cardPrice !== undefined && (
+                                  <p>
+                                    <strong>Card Price:</strong>{" "}
+                                    {formatPrice(item.cardPrice)}
+                                  </p>
+                                )}
+                              {item.cashPrice !== null &&
+                                item.cashPrice !== undefined && (
+                                  <p>
+                                    <strong>Cash Price:</strong>{" "}
+                                    {formatPrice(item.cashPrice)}
+                                  </p>
+                                )}
+                              {(!item.cardPrice || !item.cashPrice) &&
+                                (item.basePrice || item.price) && (
+                                  <p>
+                                    <strong>Price:</strong>{" "}
+                                    {formatPrice(
+                                      (item.basePrice ?? item.price) as number
+                                    )}
+                                  </p>
+                                )}
+                            </div>
+                          ) : item.priceStrategy === 3 ? (
+                            <p className="text-gray-500 dark:text-gray-400 italic">
+                              Open Price
+                            </p>
+                          ) : (
+                            <p>
+                              <strong>Price:</strong>{" "}
+                              {formatPrice(
+                                (item.basePrice ?? item.price ?? 0) as number
+                              )}
+                            </p>
                           )}
-                        </p>
+                        </>
                       )}
                       {(item.description || item.descrip) && (
                         <p>

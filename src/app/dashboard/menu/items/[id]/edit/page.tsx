@@ -43,9 +43,16 @@ interface MenuCategory {
   tblMenuCategoryId?: number;
   menuCategoryCode?: string;
   name: string;
+  menuMasterCode?: string;
   menuMaster?: {
     name: string;
   };
+}
+
+interface MenuMaster {
+  menuMasterId: string;
+  menuMasterCode: string;
+  name: string;
 }
 
 export default function EditMenuItemPage() {
@@ -54,6 +61,7 @@ export default function EditMenuItemPage() {
   const itemId = params.id as string;
 
   const [menuItem, setMenuItem] = useState<MenuItem | null>(null);
+  const [menuMasters, setMenuMasters] = useState<MenuMaster[]>([]);
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -65,8 +73,9 @@ export default function EditMenuItemPage() {
 
   const fetchData = async () => {
     try {
-      const [itemRes, categoriesRes] = await Promise.all([
+      const [itemRes, mastersRes, categoriesRes] = await Promise.all([
         fetch(`/api/dashboard/menu/items/${itemId}`),
+        fetch("/api/dashboard/menu/masters"),
         fetch("/api/dashboard/menu/categories"),
       ]);
 
@@ -80,6 +89,11 @@ export default function EditMenuItemPage() {
         toast.error("Menu item not found");
         router.push("/dashboard/menu/items");
         return;
+      }
+
+      if (mastersRes.ok) {
+        const mastersData = await mastersRes.json();
+        setMenuMasters(mastersData);
       }
 
       if (categoriesRes.ok) {
@@ -179,6 +193,7 @@ export default function EditMenuItemPage() {
         {/* Form */}
         <MenuItemTabbedForm
           menuItem={menuItem}
+          menuMasters={menuMasters}
           categories={categories}
           onSave={handleSave}
           onCancel={handleCancel}
