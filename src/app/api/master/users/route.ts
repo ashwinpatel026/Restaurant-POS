@@ -31,60 +31,66 @@ export async function GET(request: NextRequest) {
 
     const users = await masterPrisma.user.findMany({
       where,
-      include: {
-        company: {
-          select: {
-            companyId: true,
-            companyCode: true,
-            companyName: true
-          }
-        },
-        dealer: {
-          select: {
-            dealerId: true,
-            dealerCode: true,
-            dealerName: true
-          }
-        },
-        location: {
-          select: {
-            locationId: true,
-            locationCode: true,
-            locationName: true,
-            storeCode: true
-          }
-        }
-      },
       orderBy: {
         createdOn: 'desc'
       }
     })
 
-    // Remove password and convert BigInt to string
-    const usersWithoutPassword = users.map(user => {
-      const { password, ...userWithoutPassword } = user
-      return {
-        ...userWithoutPassword,
-        userId: user.userId.toString(),
-        companyId: user.companyId?.toString() || null,
-        dealerId: user.dealerId?.toString() || null,
-        locationId: user.locationId?.toString() || null,
-        company: user.company ? {
-          ...user.company,
-          companyId: user.company.companyId.toString()
-        } : null,
-        dealer: user.dealer ? {
-          ...user.dealer,
-          dealerId: user.dealer.dealerId.toString()
-        } : null,
-        location: user.location ? {
-          ...user.location,
-          locationId: user.location.locationId.toString()
-        } : null
-      }
-    })
+    // Fetch company, dealer, and location data separately for each user
+    const usersWithRelations = await Promise.all(
+      users.map(async (user) => {
+        const [company, dealer, location] = await Promise.all([
+          user.companyId ? masterPrisma.company.findUnique({
+            where: { companyId: user.companyId },
+            select: {
+              companyId: true,
+              companyCode: true,
+              companyName: true
+            }
+          }) : null,
+          user.dealerId ? masterPrisma.dealer.findUnique({
+            where: { dealerId: user.dealerId },
+            select: {
+              dealerId: true,
+              dealerCode: true,
+              dealerName: true
+            }
+          }) : null,
+          user.locationId ? masterPrisma.location.findUnique({
+            where: { locationId: user.locationId },
+            select: {
+              locationId: true,
+              locationCode: true,
+              locationName: true,
+              storeCode: true
+            }
+          }) : null
+        ])
 
-    return NextResponse.json(usersWithoutPassword)
+        const { password, ...userWithoutPassword } = user
+        return {
+          ...userWithoutPassword,
+          userId: user.userId.toString(),
+          companyId: user.companyId?.toString() || null,
+          dealerId: user.dealerId?.toString() || null,
+          locationId: user.locationId?.toString() || null,
+          company: company ? {
+            ...company,
+            companyId: company.companyId.toString()
+          } : null,
+          dealer: dealer ? {
+            ...dealer,
+            dealerId: dealer.dealerId.toString()
+          } : null,
+          location: location ? {
+            ...location,
+            locationId: location.locationId.toString()
+          } : null
+        }
+      })
+    )
+
+    return NextResponse.json(usersWithRelations)
   } catch (error) {
     console.error('Error fetching users:', error)
     return NextResponse.json(
@@ -243,32 +249,37 @@ export async function POST(request: NextRequest) {
         role: role as any,
         accessLevel: accessLevel as any,
         isActive: true
-      },
-      include: {
-        company: {
-          select: {
-            companyId: true,
-            companyCode: true,
-            companyName: true
-          }
-        },
-        dealer: {
-          select: {
-            dealerId: true,
-            dealerCode: true,
-            dealerName: true
-          }
-        },
-        location: {
-          select: {
-            locationId: true,
-            locationCode: true,
-            locationName: true,
-            storeCode: true
-          }
-        }
       }
     })
+
+    // Fetch company, dealer, and location data separately
+    const [company, dealer, location] = await Promise.all([
+      user.companyId ? masterPrisma.company.findUnique({
+        where: { companyId: user.companyId },
+        select: {
+          companyId: true,
+          companyCode: true,
+          companyName: true
+        }
+      }) : null,
+      user.dealerId ? masterPrisma.dealer.findUnique({
+        where: { dealerId: user.dealerId },
+        select: {
+          dealerId: true,
+          dealerCode: true,
+          dealerName: true
+        }
+      }) : null,
+      user.locationId ? masterPrisma.location.findUnique({
+        where: { locationId: user.locationId },
+        select: {
+          locationId: true,
+          locationCode: true,
+          locationName: true,
+          storeCode: true
+        }
+      }) : null
+    ])
 
     // Remove password from response
     const { password: _, ...userWithoutPassword } = user
@@ -279,17 +290,17 @@ export async function POST(request: NextRequest) {
       companyId: user.companyId?.toString() || null,
       dealerId: user.dealerId?.toString() || null,
       locationId: user.locationId?.toString() || null,
-      company: user.company ? {
-        ...user.company,
-        companyId: user.company.companyId.toString()
+      company: company ? {
+        ...company,
+        companyId: company.companyId.toString()
       } : null,
-      dealer: user.dealer ? {
-        ...user.dealer,
-        dealerId: user.dealer.dealerId.toString()
+      dealer: dealer ? {
+        ...dealer,
+        dealerId: dealer.dealerId.toString()
       } : null,
-      location: user.location ? {
-        ...user.location,
-        locationId: user.location.locationId.toString()
+      location: location ? {
+        ...location,
+        locationId: location.locationId.toString()
       } : null
     }, { status: 201 })
   } catch (error) {

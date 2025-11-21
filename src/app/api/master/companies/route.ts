@@ -14,15 +14,6 @@ export async function GET(request: NextRequest) {
       where: {
         isActive: 1
       },
-      include: {
-        _count: {
-          select: {
-            dealers: true,
-            locations: true,
-            users: true
-          }
-        }
-      },
       orderBy: {
         createdOn: 'desc'
       }

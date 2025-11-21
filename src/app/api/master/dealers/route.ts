@@ -18,37 +18,36 @@ export async function GET(request: NextRequest) {
         isActive: 1,
         ...(companyId && { companyId: BigInt(companyId) })
       },
-      include: {
-        company: {
-          select: {
-            companyId: true,
-            companyCode: true,
-            companyName: true
-          }
-        },
-        _count: {
-          select: {
-            locations: true,
-            users: true
-          }
-        }
-      },
       orderBy: {
         createdOn: 'desc'
       }
     })
 
-    const dealersWithStringIds = dealers.map(dealer => ({
-      ...dealer,
-      dealerId: dealer.dealerId.toString(),
-      companyId: dealer.companyId.toString(),
-      company: {
-        ...dealer.company,
-        companyId: dealer.company.companyId.toString()
-      }
-    }))
+    // Fetch company data separately for each dealer
+    const dealersWithCompany = await Promise.all(
+      dealers.map(async (dealer) => {
+        const company = await masterPrisma.company.findUnique({
+          where: { companyId: dealer.companyId },
+          select: {
+            companyId: true,
+            companyCode: true,
+            companyName: true
+          }
+        })
 
-    return NextResponse.json(dealersWithStringIds)
+        return {
+          ...dealer,
+          dealerId: dealer.dealerId.toString(),
+          companyId: dealer.companyId.toString(),
+          company: company ? {
+            ...company,
+            companyId: company.companyId.toString()
+          } : null
+        }
+      })
+    )
+
+    return NextResponse.json(dealersWithCompany)
   } catch (error) {
     console.error('Error fetching dealers:', error)
     return NextResponse.json(

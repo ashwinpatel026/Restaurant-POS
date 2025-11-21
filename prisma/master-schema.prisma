@@ -22,10 +22,6 @@ model Company {
   createdOn        DateTime  @default(now()) @map("created_on")
   updatedOn        DateTime? @map("updated_on")
 
-  dealers          Dealer[]
-  locations        Location[]
-  users            User[]
-
   @@map("tbl_company")
 }
 
@@ -40,10 +36,6 @@ model Dealer {
   isActive         Int       @default(1) @map("is_active")
   createdOn        DateTime  @default(now()) @map("created_on")
   updatedOn        DateTime? @map("updated_on")
-
-  company          Company   @relation(fields: [companyId], references: [companyId], onDelete: Cascade)
-  locations        Location[]
-  users            User[]
 
   @@index([companyId])
   @@map("tbl_dealer")
@@ -64,11 +56,6 @@ model Location {
   lastSyncAt       DateTime? @map("last_sync_at")
   createdOn        DateTime  @default(now()) @map("created_on")
   updatedOn        DateTime? @map("updated_on")
-
-  company          Company   @relation(fields: [companyId], references: [companyId], onDelete: Cascade)
-  dealer           Dealer?   @relation(fields: [dealerId], references: [dealerId], onDelete: SetNull)
-  users            User[]
-  syncLogs         SyncLog[]
 
   @@index([companyId])
   @@index([dealerId])
@@ -111,10 +98,6 @@ model User {
   createdOn       DateTime    @default(now()) @map("created_on")
   updatedOn       DateTime?   @map("updated_on")
 
-  company         Company?    @relation(fields: [companyId], references: [companyId], onDelete: SetNull)
-  dealer          Dealer?      @relation(fields: [dealerId], references: [dealerId], onDelete: SetNull)
-  location        Location?    @relation(fields: [locationId], references: [locationId], onDelete: SetNull)
-
   @@index([companyId])
   @@index([dealerId])
   @@index([locationId])
@@ -149,8 +132,6 @@ model SyncLog {
   errorMessage    String?   @map("error_message") @db.Text
   startedAt       DateTime  @default(now()) @map("started_at")
   completedAt     DateTime? @map("completed_at")
-
-  location        Location  @relation(fields: [locationId], references: [locationId], onDelete: Cascade)
 
   @@index([locationId])
   @@index([storeCode])
@@ -219,8 +200,6 @@ model MasterTimeEvent {
   createdBy              BigInt?   @map("Created_by")
   updatedOn              DateTime? @map("updated_on")
 
-  menuMasterEvents       MasterMenuMasterEvent[]
-
   @@map("tbl_master_time_events")
 }
 
@@ -257,9 +236,6 @@ model MasterMenuMaster {
   updatedBy         BigInt?   @map("updatedby")
   updatedOn         DateTime? @map("updatedon")
 
-  menuMasterEvents  MasterMenuMasterEvent[]
-  menuCategories    MasterMenuCategory[]
-
   @@map("tbl_master_menu_master")
 }
 
@@ -269,9 +245,6 @@ model MasterMenuMasterEvent {
   eventCode       String    @map("event_code") @db.VarChar(100)
   createdBy       BigInt?   @map("createdby")
   createdOn       DateTime  @default(now()) @map("createdon")
-
-  menuMaster      MasterMenuMaster @relation(fields: [menuMasterCode], references: [menuMasterCode])
-  timeEvent       MasterTimeEvent  @relation(fields: [eventCode], references: [eventCode])
 
   @@unique([menuMasterCode, eventCode])
   @@map("tbl_master_menu_master_event")
@@ -289,9 +262,6 @@ model MasterMenuCategory {
   updatedBy         BigInt?   @map("updatedby")
   updatedOn         DateTime? @map("updatedon")
 
-  menuMaster        MasterMenuMaster @relation(fields: [menuMasterCode], references: [menuMasterCode])
-  menuCategoryModifiers MasterMenuCategoryModifier[]
-
   @@map("tbl_master_menu_category")
 }
 
@@ -301,9 +271,6 @@ model MasterMenuCategoryModifier {
   modifierGroupCode    String    @map("modifier_group_code") @db.VarChar(100)
   createdBy            BigInt?   @map("createdby")
   createdOn            DateTime  @default(now()) @map("createdon")
-
-  menuCategory         MasterMenuCategory @relation(fields: [menuCategoryCode], references: [menuCategoryCode])
-  modifierGroup        MasterModifierGroup @relation(fields: [modifierGroupCode], references: [modifierGroupCode])
 
   @@unique([menuCategoryCode, modifierGroupCode])
   @@map("tbl_master_menu_category_modifier")
@@ -350,8 +317,6 @@ model MasterMenuItem {
   updatedBy                      BigInt?   @map("updatedby")
   updatedOn                      DateTime? @map("updatedon")
 
-  menuItemModifierGroups         MasterMenuItemModifierGroup[]
-
   @@map("tbl_master_menu_item")
 }
 
@@ -374,10 +339,6 @@ model MasterModifierGroup {
   updatedBy               BigInt?  @map("updatedby")
   updatedOn               DateTime? @map("updatedon")
 
-  modifierItems           MasterModifierItem[]
-  menuItemModifierGroups  MasterMenuItemModifierGroup[]
-  menuCategoryModifiers   MasterMenuCategoryModifier[]
-
   @@index([modifierGroupCode])
   @@map("tbl_master_modifier_group")
 }
@@ -398,8 +359,6 @@ model MasterModifierItem {
   updatedBy          BigInt?  @map("updatedby")
   updatedOn          DateTime? @map("updatedon")
 
-  modifierGroup      MasterModifierGroup? @relation(fields: [modifierGroupCode], references: [modifierGroupCode])
-
   @@map("tbl_master_modifier_item")
 }
 
@@ -415,9 +374,6 @@ model MasterMenuItemModifierGroup {
   maxSelection               Int?      @map("max_selection")
   createdBy                  BigInt?   @map("createdby")
   createdOn                  DateTime  @default(now()) @map("createdon")
-
-  menuItem                   MasterMenuItem? @relation(fields: [menuItemCode], references: [menuItemCode])
-  modifierGroup              MasterModifierGroup? @relation(fields: [modifierGroupCode], references: [modifierGroupCode])
 
   @@unique([menuItemCode, modifierGroupCode])
   @@map("tbl_master_menu_item_modifier_group")

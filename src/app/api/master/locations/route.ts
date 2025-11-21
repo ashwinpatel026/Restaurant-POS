@@ -21,48 +21,51 @@ export async function GET(request: NextRequest) {
         ...(companyId && { companyId: BigInt(companyId) }),
         ...(dealerId && { dealerId: BigInt(dealerId) })
       },
-      include: {
-        company: {
-          select: {
-            companyId: true,
-            companyCode: true,
-            companyName: true
-          }
-        },
-        dealer: {
-          select: {
-            dealerId: true,
-            dealerCode: true,
-            dealerName: true
-          }
-        },
-        _count: {
-          select: {
-            users: true
-          }
-        }
-      },
       orderBy: {
         createdOn: 'desc'
       }
     })
 
-    const locationsWithStringIds = locations.map(location => ({
-      ...location,
-      locationId: location.locationId.toString(),
-      companyId: location.companyId.toString(),
-      dealerId: location.dealerId?.toString() || null,
-      company: {
-        ...location.company,
-        companyId: location.company.companyId.toString()
-      },
-      dealer: location.dealer ? {
-        ...location.dealer,
-        dealerId: location.dealer.dealerId.toString()
-      } : null
-    }))
+    // Fetch company and dealer data separately for each location
+    const locationsWithRelations = await Promise.all(
+      locations.map(async (location) => {
+        const [company, dealer] = await Promise.all([
+          masterPrisma.company.findUnique({
+            where: { companyId: location.companyId },
+            select: {
+              companyId: true,
+              companyCode: true,
+              companyName: true
+            }
+          }),
+          location.dealerId ? masterPrisma.dealer.findUnique({
+            where: { dealerId: location.dealerId },
+            select: {
+              dealerId: true,
+              dealerCode: true,
+              dealerName: true
+            }
+          }) : null
+        ])
 
-    return NextResponse.json(locationsWithStringIds)
+        return {
+          ...location,
+          locationId: location.locationId.toString(),
+          companyId: location.companyId.toString(),
+          dealerId: location.dealerId?.toString() || null,
+          company: company ? {
+            ...company,
+            companyId: company.companyId.toString()
+          } : null,
+          dealer: dealer ? {
+            ...dealer,
+            dealerId: dealer.dealerId.toString()
+          } : null
+        }
+      })
+    )
+
+    return NextResponse.json(locationsWithRelations)
   } catch (error) {
     console.error('Error fetching locations:', error)
     return NextResponse.json(
