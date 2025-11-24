@@ -18,65 +18,60 @@ export async function GET(
     const companyId = BigInt(resolvedParams.id)
 
     const company = await masterPrisma.company.findUnique({
-      where: { companyId },
-      include: {
-        dealers: {
-          where: { isActive: 1 },
-          select: {
-            dealerId: true,
-            dealerCode: true,
-            dealerName: true,
-            isActive: true
-          }
-        },
-        locations: {
-          where: { isActive: 1 },
-          select: {
-            locationId: true,
-            locationCode: true,
-            locationName: true,
-            storeCode: true,
-            isActive: true
-          }
-        },
-        users: {
-          where: { isActive: true },
-          select: {
-            userId: true,
-            email: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-            role: true,
-            accessLevel: true
-          }
-        },
-        _count: {
-          select: {
-            dealers: true,
-            locations: true,
-            users: true
-          }
-        }
-      }
+      where: { companyId }
     })
 
     if (!company) {
       return NextResponse.json({ error: 'Company not found' }, { status: 404 })
     }
 
+    // Fetch related data separately since relations are not defined
+    const [dealers, locations, users] = await Promise.all([
+      masterPrisma.dealer.findMany({
+        where: { companyId: company.companyId, isActive: 1 },
+        select: {
+          dealerId: true,
+          dealerCode: true,
+          dealerName: true,
+          isActive: true
+        }
+      }),
+      masterPrisma.location.findMany({
+        where: { companyId: company.companyId, isActive: 1 },
+        select: {
+          locationId: true,
+          locationCode: true,
+          locationName: true,
+          storeCode: true,
+          isActive: true
+        }
+      }),
+      masterPrisma.user.findMany({
+        where: { companyId: company.companyId, isActive: true },
+        select: {
+          userId: true,
+          email: true,
+          username: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          accessLevel: true
+        }
+      })
+    ])
+
     return NextResponse.json({
       ...company,
       companyId: company.companyId.toString(),
-      dealers: company.dealers.map(d => ({
+      dealers: dealers.map(d => ({
         ...d,
         dealerId: d.dealerId.toString()
       })),
-      locations: company.locations.map(l => ({
+      locations: locations.map(l => ({
         ...l,
         locationId: l.locationId.toString()
       })),
-      users: company.users.map(u => ({
+      users: users.map(u => ({
         ...u,
         userId: u.userId.toString()
       }))
@@ -109,7 +104,12 @@ export async function PUT(
     const {
       companyCode,
       companyName,
-      address,
+      addressLine1,
+      addressLine2,
+      city,
+      state,
+      country,
+      zipcode,
       phone,
       email,
       isActive
@@ -142,7 +142,12 @@ export async function PUT(
       data: {
         ...(companyCode && { companyCode }),
         ...(companyName && { companyName }),
-        ...(address !== undefined && { address: address || null }),
+        ...(addressLine1 !== undefined && { addressLine1: addressLine1 || null }),
+        ...(addressLine2 !== undefined && { addressLine2: addressLine2 || null }),
+        ...(city !== undefined && { city: city || null }),
+        ...(state !== undefined && { state: state || null }),
+        ...(country !== undefined && { country: country || null }),
+        ...(zipcode !== undefined && { zipcode: zipcode || null }),
         ...(phone !== undefined && { phone: phone || null }),
         ...(email !== undefined && { email: email || null }),
         ...(isActive !== undefined && { isActive: isActive ? 1 : 0 }),
@@ -180,16 +185,7 @@ export async function DELETE(
 
     // Check if company exists
     const company = await masterPrisma.company.findUnique({
-      where: { companyId },
-      include: {
-        _count: {
-          select: {
-            locations: true,
-            dealers: true,
-            users: true
-          }
-        }
-      }
+      where: { companyId }
     })
 
     if (!company) {

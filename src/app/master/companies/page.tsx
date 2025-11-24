@@ -10,13 +10,19 @@ import {
   BuildingOfficeIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
-import { PageSkeleton } from "@/components/ui/SkeletonLoader";
+import { TableSkeleton } from "@/components/ui/SkeletonLoader";
+import DataTable from "@/components/tables/DataTable";
+import DeleteConfirmationModal from "@/components/modals/DeleteConfirmationModal";
 
 interface Company {
   companyId: string;
-  companyCode: string;
   companyName: string;
-  address?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  state?: string;
+  country?: string;
+  zipcode?: string;
   phone?: string;
   email?: string;
   isActive: number;
@@ -33,8 +39,8 @@ export default function CompaniesPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingCompany, setEditingCompany] = useState<Company | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
 
   useEffect(() => {
     fetchCompanies();
@@ -62,40 +68,53 @@ export default function CompaniesPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteClick = (company: Company) => {
+    setCompanyToDelete(company);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!companyToDelete) return;
+
     try {
       const token = localStorage.getItem("master_admin_token");
-      const response = await fetch(`/api/master/companies/${id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        `/api/master/companies/${companyToDelete.companyId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       if (response.ok) {
+        setCompanies(
+          companies.filter(
+            (company) => company.companyId !== companyToDelete.companyId
+          )
+        );
         toast.success("Company deactivated successfully");
-        fetchCompanies();
-        setDeletingId(null);
+        setShowDeleteModal(false);
+        setCompanyToDelete(null);
       } else {
-        const error = await response.json();
-        toast.error(error.error || "Failed to delete company");
+        throw new Error("Failed to delete company");
       }
     } catch (error) {
-      console.error("Error deleting company:", error);
       toast.error("Error deleting company");
+      console.error("Error:", error);
     }
   };
 
-  const filteredCompanies = companies.filter(
-    (company) =>
-      company.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.companyCode.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleDeleteCancel = () => {
+    setShowDeleteModal(false);
+    setCompanyToDelete(null);
+  };
 
   if (loading) {
     return (
       <MasterDashboardLayout>
-        <PageSkeleton />
+        <TableSkeleton />
       </MasterDashboardLayout>
     );
   }
@@ -125,130 +144,210 @@ export default function CompaniesPage() {
           </button>
         </div>
 
-        {/* Search */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <input
-            type="text"
-            placeholder="Search companies..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-          />
-        </div>
-
-        {/* Companies Table */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Code
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Contact
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Stats
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredCompanies.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className="px-6 py-8 text-center text-gray-500 dark:text-gray-400"
-                    >
-                      No companies found
-                    </td>
-                  </tr>
-                ) : (
-                  filteredCompanies.map((company) => (
-                    <tr
-                      key={company.companyId}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-700"
-                    >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {company.companyCode}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {company.companyName}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {company.email && (
-                            <div className="flex items-center space-x-1">
-                              <span>{company.email}</span>
-                            </div>
-                          )}
-                          {company.phone && (
-                            <div className="text-xs text-gray-400 dark:text-gray-500">
-                              {company.phone}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {company._count && (
-                            <>
-                              <div>{company._count.dealers} Dealers</div>
-                              <div>{company._count.locations} Locations</div>
-                              <div>{company._count.users} Users</div>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            company.isActive === 1
-                              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                              : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                          }`}
-                        >
-                          {company.isActive === 1 ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex items-center justify-end space-x-2">
-                          <button
-                            onClick={() => {
-                              setEditingCompany(company);
-                              setShowModal(true);
-                            }}
-                            className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                          >
-                            <PencilIcon className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => setDeletingId(company.companyId)}
-                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                          >
-                            <TrashIcon className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+        {/* Companies List */}
+        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+          <div className="mb-4">
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+              Companies List
+            </h3>
           </div>
+          {companies.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                <BuildingOfficeIcon className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                No companies found
+              </h3>
+              <p className="text-gray-500 dark:text-gray-400 mb-4">
+                Get started by creating your first company.
+              </p>
+              <button
+                onClick={() => {
+                  setEditingCompany(null);
+                  setShowModal(true);
+                }}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+              >
+                <PlusIcon className="w-4 h-4 mr-2" />
+                Add Company
+              </button>
+            </div>
+          ) : (
+            <DataTable
+              columns={[
+                {
+                  header: "Company Name",
+                  accessor: "companyName",
+                  cell: (company: Company) => (
+                    <div className="flex items-center">
+                      <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center mr-3">
+                        <BuildingOfficeIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                        {company.companyName}
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  header: "Address",
+                  accessor: "addressLine1",
+                  cell: (company: Company) => (
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      {company.addressLine1 && (
+                        <div>{company.addressLine1}</div>
+                      )}
+                      {company.addressLine2 && (
+                        <div className="text-xs">{company.addressLine2}</div>
+                      )}
+                      {company.zipcode && (
+                        <div className="text-xs">Zip: {company.zipcode}</div>
+                      )}
+                      {!company.addressLine1 && (
+                        <span className="text-gray-400 text-xs">
+                          No address
+                        </span>
+                      )}
+                    </div>
+                  ),
+                },
+                {
+                  header: "City",
+                  accessor: "city",
+                  cell: (company: Company) => (
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      {company.city || <span className="text-gray-400">-</span>}
+                    </div>
+                  ),
+                },
+                {
+                  header: "State",
+                  accessor: "state",
+                  cell: (company: Company) => (
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      {company.state || (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </div>
+                  ),
+                },
+                {
+                  header: "Country",
+                  accessor: "country",
+                  cell: (company: Company) => (
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      {company.country || (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </div>
+                  ),
+                },
+                {
+                  header: "Contact",
+                  accessor: "email",
+                  cell: (company: Company) => (
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      {company.email && (
+                        <div
+                          className="truncate max-w-xs"
+                          title={company.email}
+                        >
+                          {company.email}
+                        </div>
+                      )}
+                      {company.phone && (
+                        <div className="text-xs text-gray-400 dark:text-gray-500">
+                          {company.phone}
+                        </div>
+                      )}
+                      {!company.email && !company.phone && (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </div>
+                  ),
+                },
+                {
+                  header: "Stats",
+                  accessor: "_count",
+                  sortable: false,
+                  cell: (company: Company) => (
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      {company._count ? (
+                        <>
+                          <div className="text-xs">
+                            <span className="font-medium">
+                              {company._count.dealers}
+                            </span>{" "}
+                            Dealers
+                          </div>
+                          <div className="text-xs">
+                            <span className="font-medium">
+                              {company._count.locations}
+                            </span>{" "}
+                            Locations
+                          </div>
+                          <div className="text-xs">
+                            <span className="font-medium">
+                              {company._count.users}
+                            </span>{" "}
+                            Users
+                          </div>
+                        </>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </div>
+                  ),
+                },
+                {
+                  header: "Status",
+                  accessor: "isActive",
+                  cell: (company: Company) => (
+                    <span
+                      className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        company.isActive === 1
+                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                          : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                      }`}
+                    >
+                      {company.isActive === 1 ? "Active" : "Inactive"}
+                    </span>
+                  ),
+                },
+                {
+                  header: "Actions",
+                  accessor: "companyId",
+                  sortable: false,
+                  cell: (company: Company) => (
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => {
+                          setEditingCompany(company);
+                          setShowModal(true);
+                        }}
+                        className="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 p-1 rounded transition-colors duration-200"
+                        title="Edit company"
+                      >
+                        <PencilIcon className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClick(company)}
+                        className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 p-1 rounded transition-colors duration-200"
+                        title="Delete company"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ),
+                },
+              ]}
+              data={companies}
+              keyExtractor={(company: Company) => company.companyId.toString()}
+              searchPlaceholder="Search companies..."
+              emptyMessage="No companies found"
+            />
+          )}
         </div>
 
         {/* Add/Edit Modal */}
@@ -268,14 +367,14 @@ export default function CompaniesPage() {
         )}
 
         {/* Delete Confirmation Modal */}
-        {deletingId && (
-          <DeleteConfirmModal
-            title="Delete Company"
-            message="Are you sure you want to deactivate this company? This will not delete associated dealers, locations, or users."
-            onConfirm={() => handleDelete(deletingId)}
-            onCancel={() => setDeletingId(null)}
-          />
-        )}
+        <DeleteConfirmationModal
+          isOpen={showDeleteModal}
+          onClose={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+          title="Delete Company"
+          itemName={companyToDelete?.companyName || ""}
+          description={`Are you sure you want to deactivate the company "${companyToDelete?.companyName}"? This will not delete associated dealers, locations, or users.`}
+        />
       </div>
     </MasterDashboardLayout>
   );
@@ -292,9 +391,13 @@ function CompanyModal({
   onSuccess: () => void;
 }) {
   const [formData, setFormData] = useState({
-    companyCode: company?.companyCode || "",
     companyName: company?.companyName || "",
-    address: company?.address || "",
+    addressLine1: company?.addressLine1 || "",
+    addressLine2: company?.addressLine2 || "",
+    city: company?.city || "",
+    state: company?.state || "",
+    country: company?.country || "",
+    zipcode: company?.zipcode || "",
     phone: company?.phone || "",
     email: company?.email || "",
     isActive: company?.isActive ?? 1,
@@ -350,21 +453,6 @@ function CompanyModal({
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Company Code *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.companyCode}
-                onChange={(e) =>
-                  setFormData({ ...formData, companyCode: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                disabled={!!company}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Company Name *
               </label>
               <input
@@ -379,16 +467,87 @@ function CompanyModal({
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Address
+                Address Line 1
               </label>
-              <textarea
-                value={formData.address}
+              <input
+                type="text"
+                value={formData.addressLine1}
                 onChange={(e) =>
-                  setFormData({ ...formData, address: e.target.value })
+                  setFormData({ ...formData, addressLine1: e.target.value })
                 }
-                rows={3}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                placeholder="Street address, P.O. box"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Address Line 2
+              </label>
+              <input
+                type="text"
+                value={formData.addressLine2}
+                onChange={(e) =>
+                  setFormData({ ...formData, addressLine2: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                placeholder="Apartment, suite, unit, building, floor, etc."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  City
+                </label>
+                <input
+                  type="text"
+                  value={formData.city}
+                  onChange={(e) =>
+                    setFormData({ ...formData, city: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  State
+                </label>
+                <input
+                  type="text"
+                  value={formData.state}
+                  onChange={(e) =>
+                    setFormData({ ...formData, state: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Country
+                </label>
+                <input
+                  type="text"
+                  value={formData.country}
+                  onChange={(e) =>
+                    setFormData({ ...formData, country: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Zip Code
+                </label>
+                <input
+                  type="text"
+                  value={formData.zipcode}
+                  onChange={(e) =>
+                    setFormData({ ...formData, zipcode: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -455,44 +614,6 @@ function CompanyModal({
               </button>
             </div>
           </form>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Delete Confirmation Modal
-function DeleteConfirmModal({
-  title,
-  message,
-  onConfirm,
-  onCancel,
-}: {
-  title: string;
-  message: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-          {title}
-        </h3>
-        <p className="text-gray-600 dark:text-gray-400 mb-6">{message}</p>
-        <div className="flex justify-end space-x-3">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-          >
-            Delete
-          </button>
         </div>
       </div>
     </div>

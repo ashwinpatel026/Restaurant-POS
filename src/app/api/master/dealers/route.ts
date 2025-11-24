@@ -2,6 +2,27 @@ import { NextRequest, NextResponse } from 'next/server'
 import { masterPrisma } from '@/lib/databaseManager'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 
+// Helper function to generate unique dealer code
+async function generateDealerCode(): Promise<string> {
+  const latestDealer = await masterPrisma.dealer.findFirst({
+    orderBy: { dealerId: 'desc' },
+    select: { dealerCode: true }
+  })
+
+  let nextNumber = 1
+  
+  if (latestDealer?.dealerCode) {
+    // Extract number from code like "DL001" or "DEALER001"
+    const match = latestDealer.dealerCode.match(/^(DL|DEALER)(\d+)$/i)
+    if (match) {
+      nextNumber = parseInt(match[2]) + 1
+    }
+  }
+  
+  // Format as DL + padded 3-digit number
+  return `DL${String(nextNumber).padStart(3, '0')}`
+}
+
 export async function GET(request: NextRequest) {
   try {
     const admin = await verifyMasterAdmin(request)
@@ -26,19 +47,22 @@ export async function GET(request: NextRequest) {
     // Fetch company data separately for each dealer
     const dealersWithCompany = await Promise.all(
       dealers.map(async (dealer) => {
-        const company = await masterPrisma.company.findUnique({
-          where: { companyId: dealer.companyId },
-          select: {
-            companyId: true,
-            companyCode: true,
-            companyName: true
-          }
-        })
+        let company = null
+        if (dealer.companyId) {
+          company = await masterPrisma.company.findUnique({
+            where: { companyId: dealer.companyId },
+            select: {
+              companyId: true,
+              companyCode: true,
+              companyName: true
+            }
+          })
+        }
 
         return {
           ...dealer,
           dealerId: dealer.dealerId.toString(),
-          companyId: dealer.companyId.toString(),
+          companyId: dealer.companyId ? dealer.companyId.toString() : null,
           company: company ? {
             ...company,
             companyId: company.companyId.toString()
@@ -66,14 +90,24 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const {
+    let {
       dealerCode,
       dealerName,
       companyId,
-      address,
+      addressLine1,
+      addressLine2,
+      city,
+      state,
+      country,
+      zipcode,
       phone,
       email
     } = body
+
+    // Auto-generate dealer code if not provided
+    if (!dealerCode || dealerCode.trim() === '') {
+      dealerCode = await generateDealerCode()
+    }
 
     // Check if dealer code already exists
     const existingDealer = await masterPrisma.dealer.findUnique({
@@ -87,24 +121,31 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verify company exists
-    const company = await masterPrisma.company.findUnique({
-      where: { companyId: BigInt(companyId) }
-    })
+    // Verify company exists if provided
+    if (companyId) {
+      const company = await masterPrisma.company.findUnique({
+        where: { companyId: BigInt(companyId) }
+      })
 
-    if (!company) {
-      return NextResponse.json(
-        { error: 'Company not found' },
-        { status: 404 }
-      )
+      if (!company) {
+        return NextResponse.json(
+          { error: 'Company not found' },
+          { status: 404 }
+        )
+      }
     }
 
     const dealer = await masterPrisma.dealer.create({
       data: {
         dealerCode,
         dealerName,
-        companyId: BigInt(companyId),
-        address: address || null,
+        ...(companyId && { companyId: BigInt(companyId) }),
+        addressLine1: addressLine1 || null,
+        addressLine2: addressLine2 || null,
+        city: city || null,
+        state: state || null,
+        country: country || null,
+        zipcode: zipcode || null,
         phone: phone || null,
         email: email || null,
         isActive: 1
@@ -114,7 +155,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ...dealer,
       dealerId: dealer.dealerId.toString(),
-      companyId: dealer.companyId.toString()
+      companyId: dealer.companyId ? dealer.companyId.toString() : null
     }, { status: 201 })
   } catch (error) {
     console.error('Error creating dealer:', error)

@@ -6,8 +6,10 @@ import SystemColorPicker, {
   getPrimaryColor,
 } from "@/components/ui/SystemColorPicker";
 import ModifierSelectionModal from "@/components/modals/ModifierSelectionModal";
+import MenuMasterCategorySelectionModal from "@/components/modals/MenuMasterCategorySelectionModal";
 import { LoadingOverlay } from "@/components/ui/SkeletonLoader";
 import { CheckIcon } from "@heroicons/react/24/solid";
+import { XMarkIcon } from "@heroicons/react/24/outline";
 
 interface MenuItemFormProps {
   menuItem?: any;
@@ -86,6 +88,8 @@ export default function MasterMenuItemTabbedForm({
   const [loading, setLoading] = useState(false);
   const [imageLoading, setImageLoading] = useState(false);
   const [showModifierModal, setShowModifierModal] = useState(false);
+  const [showMenuMasterCategoryModal, setShowMenuMasterCategoryModal] = useState(false);
+  const [selectedMenuMaster, setSelectedMenuMaster] = useState<any>(null);
   const [inheritModifiers, setInheritModifiers] = useState(true);
   const [taxes, setTaxes] = useState<any[]>([]);
   const [inheritedModifiers, setInheritedModifiers] = useState<any[]>([]);
@@ -103,6 +107,18 @@ export default function MasterMenuItemTabbedForm({
     fetchTaxes();
     fetchPrepZones();
   }, []);
+
+  // Update selectedMenuMaster when menuMasterCode changes
+  useEffect(() => {
+    if (formData.menuMasterCode) {
+      const master = menuMasters.find(
+        (m) => m.menuMasterCode === formData.menuMasterCode
+      );
+      setSelectedMenuMaster(master || null);
+    } else {
+      setSelectedMenuMaster(null);
+    }
+  }, [formData.menuMasterCode, menuMasters]);
 
   // Filter categories when menu master changes
   useEffect(() => {
@@ -126,6 +142,25 @@ export default function MasterMenuItemTabbedForm({
       setSelectedCategories(new Set());
     }
   }, [formData.menuMasterCode, categories]);
+
+  // Handle menu master and category selection from modal
+  const handleMenuMasterCategorySelect = (master: any, categoryCodes: string[]) => {
+    if (master) {
+      setFormData({
+        ...formData,
+        menuMasterCode: master.menuMasterCode,
+      });
+      setSelectedMenuMaster(master);
+      setSelectedCategories(new Set(categoryCodes));
+    } else {
+      setFormData({
+        ...formData,
+        menuMasterCode: "",
+      });
+      setSelectedMenuMaster(null);
+      setSelectedCategories(new Set());
+    }
+  };
 
   useEffect(() => {
     if (menuItem) {
@@ -575,120 +610,92 @@ export default function MasterMenuItemTabbedForm({
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Menu Master *
+                    Menu Master & Categories *
                   </label>
-                  <select
-                    required
-                    value={formData.menuMasterCode}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        menuMasterCode: e.target.value,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="">Select Menu Master</option>
-                    {menuMasters.map((master) => (
-                      <option
-                        key={master.menuMasterCode}
-                        value={master.menuMasterCode}
-                      >
-                        {master.name ||
-                          master.labelName ||
-                          master.menuMasterCode}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Categories *
-                  </label>
-                  {!formData.menuMasterCode ? (
-                    <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
-                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                        Please select a Menu Master first
-                      </p>
-                    </div>
-                  ) : filteredCategories.length === 0 ? (
-                    <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
-                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                        No categories available for this menu master
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50 dark:bg-gray-800/50">
-                      <div className="flex items-center gap-2 mb-3">
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowMenuMasterCategoryModal(true)}
+                      className="w-full px-4 py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-left"
+                    >
+                      {selectedMenuMaster && selectedCategories.size > 0
+                        ? `${selectedMenuMaster.name || selectedMenuMaster.labelName || selectedMenuMaster.menuMasterCode} - ${selectedCategories.size} categor${selectedCategories.size === 1 ? "y" : "ies"} selected`
+                        : selectedMenuMaster
+                        ? `${selectedMenuMaster.name || selectedMenuMaster.labelName || selectedMenuMaster.menuMasterCode} - No categories selected`
+                        : "Click to select Menu Master & Categories"}
+                    </button>
+                    
+                    {/* Display Selected Menu Master */}
+                    {selectedMenuMaster && (
+                      <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                        <div className="flex-1">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                            Menu Master:
+                          </div>
+                          <div className="font-medium text-gray-900 dark:text-white">
+                            {selectedMenuMaster.name ||
+                              selectedMenuMaster.labelName ||
+                              selectedMenuMaster.menuMasterCode}
+                          </div>
+                          {selectedMenuMaster.labelName &&
+                            selectedMenuMaster.labelName !==
+                              selectedMenuMaster.name && (
+                              <div className="text-sm text-gray-500 dark:text-gray-400">
+                                {selectedMenuMaster.labelName}
+                              </div>
+                            )}
+                          <div className="text-xs text-gray-400 dark:text-gray-500">
+                            Code: {selectedMenuMaster.menuMasterCode}
+                          </div>
+                        </div>
                         <button
                           type="button"
-                          onClick={() => {
-                            if (
-                              selectedCategories.size ===
-                              filteredCategories.length
-                            ) {
-                              setSelectedCategories(new Set());
-                            } else {
-                              const allCodes = new Set(
-                                filteredCategories
-                                  .map((cat) => cat.menuCategoryCode)
-                                  .filter(Boolean)
-                              );
-                              setSelectedCategories(allCodes);
-                            }
-                          }}
-                          className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium px-3 py-1 border border-blue-600 dark:border-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                          onClick={() => handleMenuMasterCategorySelect(null, [])}
+                          className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                         >
-                          {selectedCategories.size === filteredCategories.length
-                            ? "Deselect All"
-                            : "Select All"}
+                          <XMarkIcon className="w-5 h-5" />
                         </button>
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
-                          {selectedCategories.size} of{" "}
-                          {filteredCategories.length} selected
-                        </span>
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        {filteredCategories.map((category) => {
-                          const categoryValue =
-                            category.menuCategoryCode ||
-                            category.tblMenuCategoryId?.toString() ||
-                            "";
-                          const isSelected =
-                            selectedCategories.has(categoryValue);
-                          return (
-                            <button
-                              key={
-                                category.menuCategoryCode ||
-                                category.tblMenuCategoryId
-                              }
-                              type="button"
-                              onClick={() => {
-                                const updated = new Set(selectedCategories);
-                                if (updated.has(categoryValue)) {
-                                  updated.delete(categoryValue);
-                                } else {
-                                  updated.add(categoryValue);
-                                }
-                                setSelectedCategories(updated);
-                              }}
-                              className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
-                                isSelected
-                                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
-                                  : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                              }`}
-                            >
-                              {category.name}
-                              {isSelected && (
-                                <CheckIcon className="w-4 h-4 inline-block ml-2" />
-                              )}
-                            </button>
-                          );
-                        })}
+                    )}
+
+                    {/* Display Selected Categories */}
+                    {selectedCategories.size > 0 && (
+                      <div className="space-y-2">
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          Selected Categories ({selectedCategories.size}):
+                        </div>
+                        <div className="flex flex-wrap gap-2 p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                          {Array.from(selectedCategories).map((categoryCode) => {
+                            const category = categories.find(
+                              (c) =>
+                                c.menuCategoryCode === categoryCode ||
+                                c.menuCategoryId?.toString() === categoryCode
+                            );
+                            if (!category) return null;
+                            return (
+                              <div
+                                key={categoryCode}
+                                className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-lg text-sm font-medium"
+                              >
+                                <span>{category.name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = new Set(selectedCategories);
+                                    updated.delete(categoryCode);
+                                    setSelectedCategories(updated);
+                                  }}
+                                  className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
+                                >
+                                  <XMarkIcon className="w-4 h-4" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
 
                 <SystemColorPicker
@@ -1786,6 +1793,15 @@ export default function MasterMenuItemTabbedForm({
           selectedModifierIds={selectedModifiers}
           menuItemId={menuItem?.tblMenuItemId}
           useMasterApi={true}
+        />
+        <MenuMasterCategorySelectionModal
+          isOpen={showMenuMasterCategoryModal}
+          onClose={() => setShowMenuMasterCategoryModal(false)}
+          onConfirm={handleMenuMasterCategorySelect}
+          selectedMenuMasterCode={formData.menuMasterCode}
+          selectedCategoryCodes={Array.from(selectedCategories)}
+          menuMasters={menuMasters}
+          categories={categories}
         />
       </div>
     </LoadingOverlay>

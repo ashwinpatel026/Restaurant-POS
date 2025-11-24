@@ -108,7 +108,12 @@ export async function PUT(
       dealerCode,
       dealerName,
       companyId,
-      address,
+      addressLine1,
+      addressLine2,
+      city,
+      state,
+      country,
+      zipcode,
       phone,
       email,
       isActive
@@ -149,24 +154,39 @@ export async function PUT(
       }
     }
 
+    const updateData: any = {
+      ...(dealerCode && { dealerCode }),
+      ...(dealerName && { dealerName }),
+      ...(addressLine1 !== undefined && { addressLine1: addressLine1 || null }),
+      ...(addressLine2 !== undefined && { addressLine2: addressLine2 || null }),
+      ...(city !== undefined && { city: city || null }),
+      ...(state !== undefined && { state: state || null }),
+      ...(country !== undefined && { country: country || null }),
+      ...(zipcode !== undefined && { zipcode: zipcode || null }),
+      ...(phone !== undefined && { phone: phone || null }),
+      ...(email !== undefined && { email: email || null }),
+      ...(isActive !== undefined && { isActive: isActive ? 1 : 0 }),
+      updatedOn: new Date()
+    }
+
+    // Handle companyId update
+    if (companyId !== undefined) {
+      if (companyId === "" || companyId === null) {
+        updateData.companyId = null
+      } else {
+        updateData.companyId = BigInt(companyId)
+      }
+    }
+
     const dealer = await masterPrisma.dealer.update({
       where: { dealerId },
-      data: {
-        ...(dealerCode && { dealerCode }),
-        ...(dealerName && { dealerName }),
-        ...(companyId && { companyId: BigInt(companyId) }),
-        ...(address !== undefined && { address: address || null }),
-        ...(phone !== undefined && { phone: phone || null }),
-        ...(email !== undefined && { email: email || null }),
-        ...(isActive !== undefined && { isActive: isActive ? 1 : 0 }),
-        updatedOn: new Date()
-      }
+      data: updateData
     })
 
     return NextResponse.json({
       ...dealer,
       dealerId: dealer.dealerId.toString(),
-      companyId: dealer.companyId.toString()
+      companyId: dealer.companyId ? dealer.companyId.toString() : null
     })
   } catch (error) {
     console.error('Error updating dealer:', error)
@@ -194,20 +214,22 @@ export async function DELETE(
 
     // Check if dealer exists
     const dealer = await masterPrisma.dealer.findUnique({
-      where: { dealerId },
-      include: {
-        _count: {
-          select: {
-            locations: true,
-            users: true
-          }
-        }
-      }
+      where: { dealerId }
     })
 
     if (!dealer) {
       return NextResponse.json({ error: 'Dealer not found' }, { status: 404 })
     }
+
+    // Get counts separately if needed
+    const [locationsCount, usersCount] = await Promise.all([
+      masterPrisma.location.count({
+        where: { dealerId: dealerId, isActive: 1 }
+      }),
+      masterPrisma.user.count({
+        where: { dealerId: dealerId, isActive: true }
+      })
+    ])
 
     // Soft delete
     await masterPrisma.dealer.update({

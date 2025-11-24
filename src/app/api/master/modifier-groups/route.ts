@@ -56,12 +56,29 @@ export async function GET(request: NextRequest) {
         where: {
           menuCategoryCode: menuCategoryCode
         },
-        include: {
-          modifierGroup: true
+        select: {
+          modifierGroupCode: true
         }
       })
 
-      groups = categoryModifiers.map((cm: any) => cm.modifierGroup).filter(Boolean)
+      // Extract unique modifier group codes
+      const modifierGroupCodes = [...new Set(
+        categoryModifiers
+          .map((cm: any) => cm.modifierGroupCode)
+          .filter(Boolean)
+      )]
+
+      // Fetch modifier groups separately
+      if (modifierGroupCodes.length > 0) {
+        groups = await masterPrisma.masterModifierGroup.findMany({
+          where: {
+            modifierGroupCode: { in: modifierGroupCodes }
+          },
+          orderBy: { createdOn: 'desc' }
+        })
+      } else {
+        groups = []
+      }
     } else {
       // Fetch all modifier groups
       groups = await masterPrisma.masterModifierGroup.findMany({
