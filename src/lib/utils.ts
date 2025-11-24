@@ -71,3 +71,61 @@ export function debounce<T extends (...args: any[]) => any>(
   }
 }
 
+// USA-based formatting utilities
+
+/**
+ * Formats Federal Tax ID as XX-XXXXXXX
+ * @param value - Input string
+ * @returns Formatted string (XX-XXXXXXX)
+ */
+export function formatFederalTaxId(value: string): string {
+  const cleaned = value.replace(/\D/g, "");
+  if (cleaned.length <= 2) {
+    return cleaned;
+  }
+  return `${cleaned.slice(0, 2)}-${cleaned.slice(2, 9)}`;
+}
+
+/**
+ * Formats Social Security Number as XXX-XX-XXXX
+ * @param value - Input string
+ * @returns Formatted string (XXX-XX-XXXX)
+ */
+export function formatSSN(value: string): string {
+  const cleaned = value.replace(/\D/g, "");
+  if (cleaned.length <= 3) {
+    return cleaned;
+  } else if (cleaned.length <= 5) {
+    return `${cleaned.slice(0, 3)}-${cleaned.slice(3)}`;
+  }
+  return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 5)}-${cleaned.slice(5, 9)}`;
+}
+
+/**
+ * Formats US Phone Number as (XXX) XXX-XXXX
+ * @param value - Input string
+ * @returns Formatted string ((XXX) XXX-XXXX)
+ */
+export function formatPhone(value: string): string {
+  const cleaned = value.replace(/\D/g, "");
+  if (cleaned.length <= 3) {
+    return cleaned;
+  } else if (cleaned.length <= 6) {
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+  }
+  return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+}
+
+/**
+ * Formats US Zipcode as XXXXX or XXXXX-XXXX
+ * @param value - Input string
+ * @returns Formatted string (XXXXX or XXXXX-XXXX)
+ */
+export function formatZipcode(value: string): string {
+  const cleaned = value.replace(/\D/g, "");
+  if (cleaned.length <= 5) {
+    return cleaned;
+  }
+  return `${cleaned.slice(0, 5)}-${cleaned.slice(5, 9)}`;
+}
+

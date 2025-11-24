@@ -19,79 +19,91 @@ export async function GET(
     const locationId = BigInt(resolvedParams.id)
 
     const location = await masterPrisma.location.findUnique({
-      where: { locationId },
-      include: {
-        company: {
-          select: {
-            companyId: true,
-            companyCode: true,
-            companyName: true
-          }
-        },
-        dealer: {
-          select: {
-            dealerId: true,
-            dealerCode: true,
-            dealerName: true
-          }
-        },
-        users: {
-          where: { isActive: true },
-          select: {
-            userId: true,
-            email: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-            role: true,
-            accessLevel: true
-          }
-        },
-        syncLogs: {
-          take: 10,
-          orderBy: { startedAt: 'desc' },
-          select: {
-            syncLogId: true,
-            syncType: true,
-            status: true,
-            recordsSynced: true,
-            startedAt: true,
-            completedAt: true
-          }
-        },
-        _count: {
-          select: {
-            users: true
-          }
-        }
-      }
+      where: { locationId }
     })
 
     if (!location) {
       return NextResponse.json({ error: 'Location not found' }, { status: 404 })
     }
 
+    // Fetch related data separately
+    const [company, dealer, users, syncLogs, userCount] = await Promise.all([
+      location.companyId ? masterPrisma.company.findUnique({
+        where: { companyId: location.companyId },
+        select: {
+          companyId: true,
+          companyCode: true,
+          companyName: true
+        }
+      }) : null,
+      location.dealerId ? masterPrisma.dealer.findUnique({
+        where: { dealerId: location.dealerId },
+        select: {
+          dealerId: true,
+          dealerCode: true,
+          dealerName: true
+        }
+      }) : null,
+      masterPrisma.user.findMany({
+        where: {
+          locationId: location.locationId,
+          isActive: true
+        },
+        select: {
+          userId: true,
+          email: true,
+          username: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          accessLevel: true
+        }
+      }),
+      masterPrisma.syncLog.findMany({
+        where: { locationId: location.locationId },
+        take: 10,
+        orderBy: { startedAt: 'desc' },
+        select: {
+          syncLogId: true,
+          syncType: true,
+          status: true,
+          recordsSynced: true,
+          startedAt: true,
+          completedAt: true
+        }
+      }),
+      masterPrisma.user.count({
+        where: {
+          locationId: location.locationId,
+          isActive: true
+        }
+      })
+    ])
+
     return NextResponse.json({
       ...location,
       locationId: location.locationId.toString(),
-      companyId: location.companyId.toString(),
+      companyId: location.companyId?.toString() || null,
       dealerId: location.dealerId?.toString() || null,
-      company: {
-        ...location.company,
-        companyId: location.company.companyId.toString()
-      },
-      dealer: location.dealer ? {
-        ...location.dealer,
-        dealerId: location.dealer.dealerId.toString()
+      company: company ? {
+        ...company,
+        companyId: company.companyId.toString()
       } : null,
-      users: location.users.map(u => ({
+      dealer: dealer ? {
+        ...dealer,
+        dealerId: dealer.dealerId.toString()
+      } : null,
+      users: users.map(u => ({
         ...u,
         userId: u.userId.toString()
       })),
-      syncLogs: location.syncLogs.map(log => ({
+      syncLogs: syncLogs.map(log => ({
         ...log,
         syncLogId: log.syncLogId.toString()
-      }))
+      })),
+      _count: {
+        users: userCount
+      }
     })
   } catch (error) {
     console.error('Error fetching location:', error)
@@ -119,13 +131,21 @@ export async function PUT(
     const body = await request.json()
     
     const {
-      locationCode,
+      storeCode,
       locationName,
       companyId,
       dealerId,
-      address,
+      addressLine1,
+      addressLine2,
+      city,
+      state,
+      country,
+      zipcode,
       phone,
       email,
+      federalTaxId,
+      socialSecurityNumber,
+      entityType,
       isActive,
       syncEnabled
     } = body
@@ -136,11 +156,12 @@ export async function PUT(
     })
 
     if (!existingLocation) {
+      console.error(`Location not found with ID: ${locationId} (from params: ${resolvedParams.id})`)
       return NextResponse.json({ error: 'Location not found' }, { status: 404 })
     }
 
     // Verify company exists if companyId is being changed
-    if (companyId && companyId !== existingLocation.companyId.toString()) {
+    if (companyId && companyId !== existingLocation.companyId?.toString()) {
       const company = await masterPrisma.company.findUnique({
         where: { companyId: BigInt(companyId) }
       })
@@ -164,26 +185,27 @@ export async function PUT(
             { status: 404 }
           )
         }
-        // Verify dealer belongs to company
-        if (companyId && dealer.companyId.toString() !== companyId) {
-          return NextResponse.json(
-            { error: 'Dealer does not belong to the specified company' },
-            { status: 400 }
-          )
-        }
       }
     }
 
     const location = await masterPrisma.location.update({
       where: { locationId },
       data: {
-        ...(locationCode && { locationCode }),
+        ...(storeCode && { storeCode }),
         ...(locationName && { locationName }),
-        ...(companyId && { companyId: BigInt(companyId) }),
-        ...(dealerId !== undefined && { dealerId: dealerId ? BigInt(dealerId) : null }),
-        ...(address !== undefined && { address: address || null }),
+        ...(companyId !== undefined && { companyId: companyId && companyId !== "" ? BigInt(companyId) : null }),
+        ...(dealerId !== undefined && { dealerId: dealerId && dealerId !== "" ? BigInt(dealerId) : null }),
+        ...(addressLine1 !== undefined && { addressLine1: addressLine1 || null }),
+        ...(addressLine2 !== undefined && { addressLine2: addressLine2 || null }),
+        ...(city !== undefined && { city: city || null }),
+        ...(state !== undefined && { state: state || null }),
+        ...(country !== undefined && { country: country || null }),
+        ...(zipcode !== undefined && { zipcode: zipcode || null }),
         ...(phone !== undefined && { phone: phone || null }),
         ...(email !== undefined && { email: email || null }),
+        ...(federalTaxId !== undefined && { federalTaxId: federalTaxId || null }),
+        ...(socialSecurityNumber !== undefined && { socialSecurityNumber: socialSecurityNumber || null }),
+        ...(entityType !== undefined && { entityType: entityType || null }),
         ...(isActive !== undefined && { isActive: isActive ? 1 : 0 }),
         ...(syncEnabled !== undefined && { syncEnabled: syncEnabled ? 1 : 0 }),
         updatedOn: new Date()
@@ -193,7 +215,7 @@ export async function PUT(
     return NextResponse.json({
       ...location,
       locationId: location.locationId.toString(),
-      companyId: location.companyId.toString(),
+      companyId: location.companyId?.toString() || null,
       dealerId: location.dealerId?.toString() || null
     })
   } catch (error) {
@@ -222,14 +244,7 @@ export async function DELETE(
 
     // Check if location exists
     const location = await masterPrisma.location.findUnique({
-      where: { locationId },
-      include: {
-        _count: {
-          select: {
-            users: true
-          }
-        }
-      }
+      where: { locationId }
     })
 
     if (!location) {

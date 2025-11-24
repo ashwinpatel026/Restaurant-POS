@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import MasterDashboardLayout from "@/components/layouts/MasterDashboardLayout";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+import { formatPhone, formatZipcode } from "@/lib/utils";
 
 interface Company {
   companyId: string;
@@ -15,7 +16,9 @@ interface Company {
 export default function AddDealerPage() {
   const router = useRouter();
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [companySelection, setCompanySelection] = useState<"existing" | "new">("existing");
+  const [companySelection, setCompanySelection] = useState<"existing" | "new">(
+    "existing"
+  );
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     dealerCode: "",
@@ -69,7 +72,7 @@ export default function AddDealerPage() {
 
     try {
       const token = localStorage.getItem("master_admin_token");
-      
+
       // If creating new company, create it first
       let finalCompanyId = formData.companyId;
       if (companySelection === "new" && formData.companyName) {
@@ -179,7 +182,10 @@ export default function AddDealerPage() {
               </h3>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Dealer Code <span className="text-gray-500 text-xs">(Optional - Auto-generated if empty)</span>
+                  Dealer Code{" "}
+                  <span className="text-gray-500 text-xs">
+                    (Optional - Auto-generated if empty)
+                  </span>
                 </label>
                 <input
                   type="text"
@@ -187,7 +193,7 @@ export default function AddDealerPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, dealerCode: e.target.value })
                   }
-                  placeholder="Leave empty to auto-generate (e.g., DL001)"
+                  placeholder="Leave empty to auto-generate"
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                 />
               </div>
@@ -216,34 +222,36 @@ export default function AddDealerPage() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Company Selection
                 </label>
-                <div className="flex space-x-4 mb-4">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      value="existing"
-                      checked={companySelection === "existing"}
-                      onChange={(e) => setCompanySelection(e.target.value as "existing" | "new")}
-                      className="mr-2"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Select Existing</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      value="new"
-                      checked={companySelection === "new"}
-                      onChange={(e) => setCompanySelection(e.target.value as "existing" | "new")}
-                      className="mr-2"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">Create New</span>
-                  </label>
+                <div className="flex flex-wrap gap-3 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => setCompanySelection("existing")}
+                    className={`relative px-6 py-3 rounded-lg border-2 transition-all font-medium ${
+                      companySelection === "existing"
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                    }`}
+                  >
+                    Select Existing
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCompanySelection("new")}
+                    className={`relative px-6 py-3 rounded-lg border-2 transition-all font-medium ${
+                      companySelection === "new"
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                    }`}
+                  >
+                    Create New
+                  </button>
                 </div>
               </div>
 
               {companySelection === "existing" ? (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Select Company
+                    Select Company (Optional)
                   </label>
                   <select
                     value={formData.companyId}
@@ -262,7 +270,9 @@ export default function AddDealerPage() {
                 </div>
               ) : (
                 <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                  <h4 className="font-medium text-gray-900 dark:text-white">New Company Details</h4>
+                  <h4 className="font-medium text-gray-900 dark:text-white">
+                    New Company Details
+                  </h4>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Company Name *
@@ -272,7 +282,10 @@ export default function AddDealerPage() {
                       required={companySelection === "new"}
                       value={formData.companyName}
                       onChange={(e) =>
-                        setFormData({ ...formData, companyName: e.target.value })
+                        setFormData({
+                          ...formData,
+                          companyName: e.target.value,
+                        })
                       }
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                     />
@@ -285,7 +298,10 @@ export default function AddDealerPage() {
                       type="text"
                       value={formData.companyAddressLine1}
                       onChange={(e) =>
-                        setFormData({ ...formData, companyAddressLine1: e.target.value })
+                        setFormData({
+                          ...formData,
+                          companyAddressLine1: e.target.value,
+                        })
                       }
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                     />
@@ -298,7 +314,10 @@ export default function AddDealerPage() {
                       type="text"
                       value={formData.companyAddressLine2}
                       onChange={(e) =>
-                        setFormData({ ...formData, companyAddressLine2: e.target.value })
+                        setFormData({
+                          ...formData,
+                          companyAddressLine2: e.target.value,
+                        })
                       }
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                     />
@@ -312,7 +331,10 @@ export default function AddDealerPage() {
                         type="text"
                         value={formData.companyCity}
                         onChange={(e) =>
-                          setFormData({ ...formData, companyCity: e.target.value })
+                          setFormData({
+                            ...formData,
+                            companyCity: e.target.value,
+                          })
                         }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                       />
@@ -325,7 +347,10 @@ export default function AddDealerPage() {
                         type="text"
                         value={formData.companyState}
                         onChange={(e) =>
-                          setFormData({ ...formData, companyState: e.target.value })
+                          setFormData({
+                            ...formData,
+                            companyState: e.target.value,
+                          })
                         }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                       />
@@ -340,7 +365,10 @@ export default function AddDealerPage() {
                         type="text"
                         value={formData.companyCountry}
                         onChange={(e) =>
-                          setFormData({ ...formData, companyCountry: e.target.value })
+                          setFormData({
+                            ...formData,
+                            companyCountry: e.target.value,
+                          })
                         }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                       />
@@ -352,10 +380,15 @@ export default function AddDealerPage() {
                       <input
                         type="text"
                         value={formData.companyZipcode}
-                        onChange={(e) =>
-                          setFormData({ ...formData, companyZipcode: e.target.value })
-                        }
+                        onChange={(e) => {
+                          const formatted = formatZipcode(e.target.value);
+                          setFormData({
+                            ...formData,
+                            companyZipcode: formatted,
+                          });
+                        }}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                        placeholder="12345 or 12345-6789"
                       />
                     </div>
                   </div>
@@ -367,10 +400,15 @@ export default function AddDealerPage() {
                       <input
                         type="tel"
                         value={formData.companyPhone}
-                        onChange={(e) =>
-                          setFormData({ ...formData, companyPhone: e.target.value })
-                        }
+                        onChange={(e) => {
+                          const formatted = formatPhone(e.target.value);
+                          setFormData({
+                            ...formData,
+                            companyPhone: formatted,
+                          });
+                        }}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                        placeholder="(123) 456-7890"
                       />
                     </div>
                     <div>
@@ -381,7 +419,10 @@ export default function AddDealerPage() {
                         type="email"
                         value={formData.companyEmail}
                         onChange={(e) =>
-                          setFormData({ ...formData, companyEmail: e.target.value })
+                          setFormData({
+                            ...formData,
+                            companyEmail: e.target.value,
+                          })
                         }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                       />
@@ -394,7 +435,7 @@ export default function AddDealerPage() {
             {/* Dealer Address */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b pb-2">
-                Dealer Address (USA Standard)
+                Dealer Address
               </h3>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -473,10 +514,12 @@ export default function AddDealerPage() {
                   <input
                     type="text"
                     value={formData.zipcode}
-                    onChange={(e) =>
-                      setFormData({ ...formData, zipcode: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const formatted = formatZipcode(e.target.value);
+                      setFormData({ ...formData, zipcode: formatted });
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    placeholder="12345 or 12345-6789"
                   />
                 </div>
               </div>
@@ -495,10 +538,12 @@ export default function AddDealerPage() {
                   <input
                     type="tel"
                     value={formData.phone}
-                    onChange={(e) =>
-                      setFormData({ ...formData, phone: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const formatted = formatPhone(e.target.value);
+                      setFormData({ ...formData, phone: formatted });
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                    placeholder="(123) 456-7890"
                   />
                 </div>
                 <div>
@@ -539,4 +584,3 @@ export default function AddDealerPage() {
     </MasterDashboardLayout>
   );
 }
-
