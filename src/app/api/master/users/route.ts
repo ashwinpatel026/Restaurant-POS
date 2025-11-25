@@ -60,7 +60,6 @@ export async function GET(request: NextRequest) {
             where: { locationId: user.locationId },
             select: {
               locationId: true,
-              locationCode: true,
               locationName: true,
               storeCode: true
             }
@@ -112,7 +111,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const {
       email,
-      username,
       password,
       firstName,
       lastName,
@@ -124,7 +122,7 @@ export async function POST(request: NextRequest) {
     } = body
 
     // Validate required fields
-    if (!email || !username || !password || !firstName || !lastName || !role || !accessLevel) {
+    if (!email || !password || !firstName || !lastName || !role || !accessLevel) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -138,17 +136,6 @@ export async function POST(request: NextRequest) {
     if (existingEmail) {
       return NextResponse.json(
         { error: 'Email already exists' },
-        { status: 400 }
-      )
-    }
-
-    // Check if username already exists
-    const existingUsername = await masterPrisma.user.findUnique({
-      where: { username }
-    })
-    if (existingUsername) {
-      return NextResponse.json(
-        { error: 'Username already exists' },
         { status: 400 }
       )
     }
@@ -197,13 +184,7 @@ export async function POST(request: NextRequest) {
           { status: 404 }
         )
       }
-      // Verify dealer belongs to company if both provided
-      if (companyId && dealer.companyId.toString() !== companyId) {
-        return NextResponse.json(
-          { error: 'Dealer does not belong to the specified company' },
-          { status: 400 }
-        )
-      }
+      // Dealers are now independent of companies, so no validation needed
     }
 
     // Verify location exists if provided
@@ -217,23 +198,31 @@ export async function POST(request: NextRequest) {
           { status: 404 }
         )
       }
-      // Verify location belongs to company/dealer if provided
-      if (companyId && location.companyId.toString() !== companyId) {
-        return NextResponse.json(
-          { error: 'Location does not belong to the specified company' },
-          { status: 400 }
-        )
-      }
-      if (dealerId && location.dealerId?.toString() !== dealerId) {
-        return NextResponse.json(
-          { error: 'Location does not belong to the specified dealer' },
-          { status: 400 }
-        )
-      }
+      // Locations are independent, so no validation needed for company/dealer relationships
     }
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)
+
+    // Generate username from email (extract part before @)
+    // If username already exists, append a number to make it unique
+    let baseUsername = email.split('@')[0]
+    let username = baseUsername
+    let counter = 1
+    
+    while (true) {
+      const existingUsername = await masterPrisma.user.findUnique({
+        where: { username }
+      })
+      if (!existingUsername) break
+      username = `${baseUsername}${counter}`
+      counter++
+      if (counter > 1000) {
+        // Fallback: use timestamp
+        username = `${baseUsername}_${Date.now()}`
+        break
+      }
+    }
 
     // Create user
     const user = await masterPrisma.user.create({
@@ -274,7 +263,6 @@ export async function POST(request: NextRequest) {
         where: { locationId: user.locationId },
         select: {
           locationId: true,
-          locationCode: true,
           locationName: true,
           storeCode: true
         }

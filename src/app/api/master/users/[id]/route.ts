@@ -19,36 +19,40 @@ export async function GET(
     const userId = BigInt(resolvedParams.id)
 
     const user = await masterPrisma.user.findUnique({
-      where: { userId },
-      include: {
-        company: {
-          select: {
-            companyId: true,
-            companyCode: true,
-            companyName: true
-          }
-        },
-        dealer: {
-          select: {
-            dealerId: true,
-            dealerCode: true,
-            dealerName: true
-          }
-        },
-        location: {
-          select: {
-            locationId: true,
-            locationCode: true,
-            locationName: true,
-            storeCode: true
-          }
-        }
-      }
+      where: { userId }
     })
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
+
+    // Fetch company, dealer, and location data separately
+    const [company, dealer, location] = await Promise.all([
+      user.companyId ? masterPrisma.company.findUnique({
+        where: { companyId: user.companyId },
+        select: {
+          companyId: true,
+          companyCode: true,
+          companyName: true
+        }
+      }) : null,
+      user.dealerId ? masterPrisma.dealer.findUnique({
+        where: { dealerId: user.dealerId },
+        select: {
+          dealerId: true,
+          dealerCode: true,
+          dealerName: true
+        }
+      }) : null,
+      user.locationId ? masterPrisma.location.findUnique({
+        where: { locationId: user.locationId },
+        select: {
+          locationId: true,
+          locationName: true,
+          storeCode: true
+        }
+      }) : null
+    ])
 
     // Remove password
     const { password, ...userWithoutPassword } = user
@@ -59,17 +63,17 @@ export async function GET(
       companyId: user.companyId?.toString() || null,
       dealerId: user.dealerId?.toString() || null,
       locationId: user.locationId?.toString() || null,
-      company: user.company ? {
-        ...user.company,
-        companyId: user.company.companyId.toString()
+      company: company ? {
+        ...company,
+        companyId: company.companyId.toString()
       } : null,
-      dealer: user.dealer ? {
-        ...user.dealer,
-        dealerId: user.dealer.dealerId.toString()
+      dealer: dealer ? {
+        ...dealer,
+        dealerId: dealer.dealerId.toString()
       } : null,
-      location: user.location ? {
-        ...user.location,
-        locationId: user.location.locationId.toString()
+      location: location ? {
+        ...location,
+        locationId: location.locationId.toString()
       } : null
     })
   } catch (error) {
@@ -190,12 +194,7 @@ export async function PUT(
           { status: 404 }
         )
       }
-      if (companyId && dealer.companyId.toString() !== companyId) {
-        return NextResponse.json(
-          { error: 'Dealer does not belong to the specified company' },
-          { status: 400 }
-        )
-      }
+      // Dealers are now independent of companies, so no validation needed
     }
 
     // Verify location exists if provided
@@ -209,18 +208,7 @@ export async function PUT(
           { status: 404 }
         )
       }
-      if (companyId && location.companyId.toString() !== companyId) {
-        return NextResponse.json(
-          { error: 'Location does not belong to the specified company' },
-          { status: 400 }
-        )
-      }
-      if (dealerId && location.dealerId?.toString() !== dealerId) {
-        return NextResponse.json(
-          { error: 'Location does not belong to the specified dealer' },
-          { status: 400 }
-        )
-      }
+      // Locations are independent, so no validation needed for company/dealer relationships
     }
 
     // Prepare update data
@@ -240,32 +228,36 @@ export async function PUT(
 
     const user = await masterPrisma.user.update({
       where: { userId },
-      data: updateData,
-      include: {
-        company: {
-          select: {
-            companyId: true,
-            companyCode: true,
-            companyName: true
-          }
-        },
-        dealer: {
-          select: {
-            dealerId: true,
-            dealerCode: true,
-            dealerName: true
-          }
-        },
-        location: {
-          select: {
-            locationId: true,
-            locationCode: true,
-            locationName: true,
-            storeCode: true
-          }
-        }
-      }
+      data: updateData
     })
+
+    // Fetch company, dealer, and location data separately
+    const [company, dealer, location] = await Promise.all([
+      user.companyId ? masterPrisma.company.findUnique({
+        where: { companyId: user.companyId },
+        select: {
+          companyId: true,
+          companyCode: true,
+          companyName: true
+        }
+      }) : null,
+      user.dealerId ? masterPrisma.dealer.findUnique({
+        where: { dealerId: user.dealerId },
+        select: {
+          dealerId: true,
+          dealerCode: true,
+          dealerName: true
+        }
+      }) : null,
+      user.locationId ? masterPrisma.location.findUnique({
+        where: { locationId: user.locationId },
+        select: {
+          locationId: true,
+          locationName: true,
+          storeCode: true
+        }
+      }) : null
+    ])
 
     // Remove password
     const { password: _, ...userWithoutPassword } = user
@@ -276,17 +268,17 @@ export async function PUT(
       companyId: user.companyId?.toString() || null,
       dealerId: user.dealerId?.toString() || null,
       locationId: user.locationId?.toString() || null,
-      company: user.company ? {
-        ...user.company,
-        companyId: user.company.companyId.toString()
+      company: company ? {
+        ...company,
+        companyId: company.companyId.toString()
       } : null,
-      dealer: user.dealer ? {
-        ...user.dealer,
-        dealerId: user.dealer.dealerId.toString()
+      dealer: dealer ? {
+        ...dealer,
+        dealerId: dealer.dealerId.toString()
       } : null,
-      location: user.location ? {
-        ...user.location,
-        locationId: user.location.locationId.toString()
+      location: location ? {
+        ...location,
+        locationId: location.locationId.toString()
       } : null
     })
   } catch (error) {

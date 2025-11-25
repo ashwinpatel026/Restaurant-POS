@@ -9,12 +9,15 @@ import {
   UserIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
-import { PageSkeleton } from "@/components/ui/SkeletonLoader";
+import { TableSkeleton } from "@/components/ui/SkeletonLoader";
+import DataTable from "@/components/tables/DataTable";
+import DeleteConfirmationModal from "@/components/modals/DeleteConfirmationModal";
 
 interface Company {
   companyId: string;
   companyCode: string;
   companyName: string;
+  isActive?: number;
 }
 
 interface Dealer {
@@ -22,6 +25,7 @@ interface Dealer {
   dealerCode: string;
   dealerName: string;
   companyId: string;
+  isActive?: number;
 }
 
 interface Location {
@@ -31,12 +35,12 @@ interface Location {
   storeCode: string;
   companyId: string;
   dealerId?: string;
+  isActive?: number;
 }
 
 interface User {
   userId: string;
   email: string;
-  username: string;
   firstName: string;
   lastName: string;
   role: string;
@@ -59,19 +63,12 @@ export default function UsersPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterCompanyId, setFilterCompanyId] = useState<string>("");
-  const [filterDealerId, setFilterDealerId] = useState<string>("");
-  const [filterLocationId, setFilterLocationId] = useState<string>("");
-  const [filterAccessLevel, setFilterAccessLevel] = useState<string>("");
-  const [filterRole, setFilterRole] = useState<string>("");
-
   useEffect(() => {
     fetchCompanies();
     fetchDealers();
     fetchLocations();
     fetchUsers();
-  }, [filterCompanyId, filterDealerId, filterLocationId, filterAccessLevel, filterRole]);
+  }, []);
 
   const fetchCompanies = async () => {
     try {
@@ -93,10 +90,7 @@ export default function UsersPage() {
   const fetchDealers = async () => {
     try {
       const token = localStorage.getItem("master_admin_token");
-      const url = filterCompanyId
-        ? `/api/master/dealers?companyId=${filterCompanyId}`
-        : "/api/master/dealers";
-      const response = await fetch(url, {
+      const response = await fetch("/api/master/dealers", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -113,13 +107,7 @@ export default function UsersPage() {
   const fetchLocations = async () => {
     try {
       const token = localStorage.getItem("master_admin_token");
-      let url = "/api/master/locations";
-      const params = new URLSearchParams();
-      if (filterCompanyId) params.append("companyId", filterCompanyId);
-      if (filterDealerId) params.append("dealerId", filterDealerId);
-      if (params.toString()) url += `?${params.toString()}`;
-
-      const response = await fetch(url, {
+      const response = await fetch("/api/master/locations", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -137,16 +125,7 @@ export default function UsersPage() {
     try {
       setLoading(true);
       const token = localStorage.getItem("master_admin_token");
-      let url = "/api/master/users";
-      const params = new URLSearchParams();
-      if (filterCompanyId) params.append("companyId", filterCompanyId);
-      if (filterDealerId) params.append("dealerId", filterDealerId);
-      if (filterLocationId) params.append("locationId", filterLocationId);
-      if (filterAccessLevel) params.append("accessLevel", filterAccessLevel);
-      if (filterRole) params.append("role", filterRole);
-      if (params.toString()) url += `?${params.toString()}`;
-
-      const response = await fetch(url, {
+      const response = await fetch("/api/master/users", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -189,18 +168,10 @@ export default function UsersPage() {
     }
   };
 
-  const filteredUsers = users.filter(
-    (user) =>
-      user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.username.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   if (loading) {
     return (
       <MasterDashboardLayout>
-        <PageSkeleton />
+        <TableSkeleton />
       </MasterDashboardLayout>
     );
   }
@@ -230,218 +201,114 @@ export default function UsersPage() {
           </button>
         </div>
 
-        {/* Filters */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Company
-              </label>
-              <select
-                value={filterCompanyId}
-                onChange={(e) => {
-                  setFilterCompanyId(e.target.value);
-                  setFilterDealerId("");
-                  setFilterLocationId("");
-                }}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              >
-                <option value="">All Companies</option>
-                {companies.map((company) => (
-                  <option key={company.companyId} value={company.companyId}>
-                    {company.companyName}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Dealer
-              </label>
-              <select
-                value={filterDealerId}
-                onChange={(e) => {
-                  setFilterDealerId(e.target.value);
-                  setFilterLocationId("");
-                }}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                disabled={!filterCompanyId}
-              >
-                <option value="">All Dealers</option>
-                {dealers.map((dealer) => (
-                  <option key={dealer.dealerId} value={dealer.dealerId}>
-                    {dealer.dealerName}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Location
-              </label>
-              <select
-                value={filterLocationId}
-                onChange={(e) => setFilterLocationId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                disabled={!filterCompanyId}
-              >
-                <option value="">All Locations</option>
-                {locations.map((location) => (
-                  <option key={location.locationId} value={location.locationId}>
-                    {location.locationName}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Access Level
-              </label>
-              <select
-                value={filterAccessLevel}
-                onChange={(e) => setFilterAccessLevel(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              >
-                <option value="">All Levels</option>
-                <option value="COMPANY">Company</option>
-                <option value="DEALER">Dealer</option>
-                <option value="LOCATION">Location</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Search
-              </label>
-              <input
-                type="text"
-                placeholder="Search users..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              />
-            </div>
-          </div>
-        </div>
-
         {/* Users Table */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Email/Username
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Role
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Access Level
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Assignment
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredUsers.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={7}
-                      className="px-6 py-8 text-center text-gray-500 dark:text-gray-400"
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <DataTable
+            columns={[
+              {
+                header: "Name",
+                accessor: "firstName",
+                cell: (user: User) => (
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">
+                    {user.firstName} {user.lastName}
+                  </div>
+                ),
+              },
+              {
+                header: "Email",
+                accessor: "email",
+                cell: (user: User) => (
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    {user.email}
+                  </div>
+                ),
+              },
+              {
+                header: "Role",
+                accessor: "role",
+                cell: (user: User) => (
+                  <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                    {user.role}
+                  </span>
+                ),
+              },
+              {
+                header: "Access Level",
+                accessor: "accessLevel",
+                cell: (user: User) => (
+                  <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                    {user.accessLevel}
+                  </span>
+                ),
+              },
+              {
+                header: "Assignment",
+                accessor: "companyId",
+                sortable: false,
+                cell: (user: User) => (
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    {user.company && <div>{user.company.companyName}</div>}
+                    {user.dealer && (
+                      <div className="text-xs text-gray-400 dark:text-gray-500">
+                        {user.dealer.dealerName}
+                      </div>
+                    )}
+                    {user.location && (
+                      <div className="text-xs text-gray-400 dark:text-gray-500">
+                        {user.location.locationName}
+                      </div>
+                    )}
+                    {!user.company && !user.dealer && !user.location && (
+                      <span className="text-gray-400 text-xs">-</span>
+                    )}
+                  </div>
+                ),
+              },
+              {
+                header: "Status",
+                accessor: "isActive",
+                cell: (user: User) => (
+                  <span
+                    className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                      user.isActive
+                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                        : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                    }`}
+                  >
+                    {user.isActive ? "Active" : "Inactive"}
+                  </span>
+                ),
+              },
+              {
+                header: "Actions",
+                accessor: "userId",
+                sortable: false,
+                cell: (user: User) => (
+                  <div className="flex items-center justify-end space-x-2">
+                    <button
+                      onClick={() => {
+                        setEditingUser(user);
+                        setShowModal(true);
+                      }}
+                      className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
                     >
-                      No users found
-                    </td>
-                  </tr>
-                ) : (
-                  filteredUsers.map((user) => (
-                    <tr
-                      key={user.userId}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-700"
+                      <PencilIcon className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => setDeletingId(user.userId)}
+                      className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                     >
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {user.firstName} {user.lastName}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          <div>{user.email}</div>
-                          <div className="text-xs text-gray-400 dark:text-gray-500">
-                            @{user.username}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                          {user.role}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                          {user.accessLevel}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {user.company && <div>{user.company.companyName}</div>}
-                          {user.dealer && (
-                            <div className="text-xs text-gray-400 dark:text-gray-500">
-                              {user.dealer.dealerName}
-                            </div>
-                          )}
-                          {user.location && (
-                            <div className="text-xs text-gray-400 dark:text-gray-500">
-                              {user.location.locationName}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            user.isActive
-                              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                              : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                          }`}
-                        >
-                          {user.isActive ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex items-center justify-end space-x-2">
-                          <button
-                            onClick={() => {
-                              setEditingUser(user);
-                              setShowModal(true);
-                            }}
-                            className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                          >
-                            <PencilIcon className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => setDeletingId(user.userId)}
-                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                          >
-                            <TrashIcon className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                      <TrashIcon className="w-5 h-5" />
+                    </button>
+                  </div>
+                ),
+              },
+            ]}
+            data={users}
+            keyExtractor={(user) => user.userId}
+            searchPlaceholder="Search users by name or email..."
+            emptyMessage="No users found"
+          />
         </div>
 
         {/* Add/Edit Modal */}
@@ -465,11 +332,18 @@ export default function UsersPage() {
 
         {/* Delete Confirmation Modal */}
         {deletingId && (
-          <DeleteConfirmModal
+          <DeleteConfirmationModal
+            isOpen={!!deletingId}
+            onClose={() => setDeletingId(null)}
+            onConfirm={() => {
+              handleDelete(deletingId);
+              setDeletingId(null);
+            }}
             title="Delete User"
-            message="Are you sure you want to deactivate this user? They will no longer be able to access the system."
-            onConfirm={() => handleDelete(deletingId)}
-            onCancel={() => setDeletingId(null)}
+            itemName={
+              users.find((u) => u.userId === deletingId)?.email || "this user"
+            }
+            description="Are you sure you want to deactivate this user? They will no longer be able to access the system."
           />
         )}
       </div>
@@ -495,11 +369,10 @@ function UserModal({
 }) {
   const [formData, setFormData] = useState({
     email: user?.email || "",
-    username: user?.username || "",
     password: "",
     firstName: user?.firstName || "",
     lastName: user?.lastName || "",
-    role: user?.role || "CASHIER",
+    role: user?.role || "OUTLET_MANAGER",
     accessLevel: user?.accessLevel || "LOCATION",
     companyId: user?.companyId || "",
     dealerId: user?.dealerId || "",
@@ -507,29 +380,8 @@ function UserModal({
     isActive: user?.isActive ?? true,
   });
   const [loading, setLoading] = useState(false);
-  const [filteredDealers, setFilteredDealers] = useState<Dealer[]>([]);
-  const [filteredLocations, setFilteredLocations] = useState<Location[]>([]);
 
-  useEffect(() => {
-    if (formData.companyId) {
-      setFilteredDealers(
-        dealers.filter((d) => d.companyId === formData.companyId)
-      );
-    } else {
-      setFilteredDealers([]);
-    }
-    if (formData.dealerId) {
-      setFilteredLocations(
-        locations.filter((l) => l.dealerId === formData.dealerId)
-      );
-    } else if (formData.companyId) {
-      setFilteredLocations(
-        locations.filter((l) => l.companyId === formData.companyId)
-      );
-    } else {
-      setFilteredLocations([]);
-    }
-  }, [formData.companyId, formData.dealerId, dealers, locations]);
+  // Removed filtered dealers/locations logic as we're simplifying the LOCATION access level
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -622,22 +474,8 @@ function UserModal({
                 onChange={(e) =>
                   setFormData({ ...formData, email: e.target.value })
                 }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Username *
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.username}
-                onChange={(e) =>
-                  setFormData({ ...formData, username: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                 disabled={!!user}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
               />
             </div>
             <div>
@@ -667,12 +505,13 @@ function UserModal({
                   }
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                 >
-                  <option value="CASHIER">Cashier</option>
-                  <option value="WAITER">Waiter</option>
-                  <option value="KITCHEN_STAFF">Kitchen Staff</option>
-                  <option value="MANAGER">Manager</option>
-                  <option value="SUPER_ADMIN">Super Admin</option>
                   <option value="OUTLET_MANAGER">Outlet Manager</option>
+                  <option value="SUPER_ADMIN">Super Admin</option>
+                  <option value="COMPANY_ADMIN">Company Admin</option>
+                  <option value="DEALER_ADMIN">Dealer Admin</option>
+                  <option value="CAPTAIN">Captain</option>
+                  <option value="CASHIER">Cashier</option>
+                  <option value="KITCHEN_STAFF">Kitchen Staff</option>
                 </select>
               </div>
               <div>
@@ -687,8 +526,11 @@ function UserModal({
                     setFormData({
                       ...formData,
                       accessLevel: newLevel,
+                      companyId:
+                        newLevel !== "COMPANY" ? "" : formData.companyId,
                       dealerId: newLevel !== "DEALER" ? "" : formData.dealerId,
-                      locationId: newLevel !== "LOCATION" ? "" : formData.locationId,
+                      locationId:
+                        newLevel !== "LOCATION" ? "" : formData.locationId,
                     });
                   }}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
@@ -729,29 +571,6 @@ function UserModal({
             {formData.accessLevel === "DEALER" && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Company *
-                </label>
-                <select
-                  required
-                  value={formData.companyId}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      companyId: e.target.value,
-                      dealerId: "",
-                      locationId: "",
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white mb-4"
-                >
-                  <option value="">Select Company</option>
-                  {companies.map((company) => (
-                    <option key={company.companyId} value={company.companyId}>
-                      {company.companyName}
-                    </option>
-                  ))}
-                </select>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Dealer *
                 </label>
                 <select
@@ -765,10 +584,9 @@ function UserModal({
                     })
                   }
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                  disabled={!formData.companyId}
                 >
                   <option value="">Select Dealer</option>
-                  {filteredDealers.map((dealer) => (
+                  {dealers.map((dealer) => (
                     <option key={dealer.dealerId} value={dealer.dealerId}>
                       {dealer.dealerName}
                     </option>
@@ -779,51 +597,6 @@ function UserModal({
             {formData.accessLevel === "LOCATION" && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Company *
-                </label>
-                <select
-                  required
-                  value={formData.companyId}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      companyId: e.target.value,
-                      dealerId: "",
-                      locationId: "",
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white mb-4"
-                >
-                  <option value="">Select Company</option>
-                  {companies.map((company) => (
-                    <option key={company.companyId} value={company.companyId}>
-                      {company.companyName}
-                    </option>
-                  ))}
-                </select>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Dealer (Optional)
-                </label>
-                <select
-                  value={formData.dealerId}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      dealerId: e.target.value,
-                      locationId: "",
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white mb-4"
-                  disabled={!formData.companyId}
-                >
-                  <option value="">No Dealer</option>
-                  {filteredDealers.map((dealer) => (
-                    <option key={dealer.dealerId} value={dealer.dealerId}>
-                      {dealer.dealerName}
-                    </option>
-                  ))}
-                </select>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Location *
                 </label>
                 <select
@@ -833,11 +606,13 @@ function UserModal({
                     setFormData({ ...formData, locationId: e.target.value })
                   }
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                  disabled={!formData.companyId}
                 >
                   <option value="">Select Location</option>
-                  {filteredLocations.map((location) => (
-                    <option key={location.locationId} value={location.locationId}>
+                  {locations.map((location) => (
+                    <option
+                      key={location.locationId}
+                      value={location.locationId}
+                    >
                       {location.locationName}
                     </option>
                   ))}
@@ -886,42 +661,3 @@ function UserModal({
     </div>
   );
 }
-
-// Delete Confirmation Modal
-function DeleteConfirmModal({
-  title,
-  message,
-  onConfirm,
-  onCancel,
-}: {
-  title: string;
-  message: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
-        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-          {title}
-        </h3>
-        <p className="text-gray-600 dark:text-gray-400 mb-6">{message}</p>
-        <div className="flex justify-end space-x-3">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
