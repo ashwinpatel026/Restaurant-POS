@@ -12,6 +12,7 @@ import {
   formatPhone,
   formatZipcode,
 } from "@/lib/utils";
+import StatusToggle from "@/components/forms/StatusToggle";
 
 interface Company {
   companyId: string;
@@ -381,7 +382,7 @@ export default function EditLocationPage() {
             {/* Location Address */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b pb-2">
-                Location Address (USA Standard)
+                Location / Business Name / DBA Address
               </h3>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -515,43 +516,31 @@ export default function EditLocationPage() {
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b pb-2">
                 Status
               </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.isActive === 1}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          isActive: e.target.checked ? 1 : 0,
-                        })
-                      }
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Active
-                    </span>
-                  </label>
-                </div>
-                <div>
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.syncEnabled === 1}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          syncEnabled: e.target.checked ? 1 : 0,
-                        })
-                      }
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Sync Enabled
-                    </span>
-                  </label>
-                </div>
+              <div className="grid grid-cols-1 gap-4">
+                <StatusToggle
+                  label="Location Status"
+                  description="Toggle to control whether this location is active and can be used in the system."
+                  value={formData.isActive === 1}
+                  onChange={(val) =>
+                    setFormData({
+                      ...formData,
+                      isActive: val ? 1 : 0,
+                    })
+                  }
+                  disabled={loading}
+                />
+                <StatusToggle
+                  label="Sync Enabled"
+                  description="Toggle to enable or disable synchronization for this location."
+                  value={formData.syncEnabled === 1}
+                  onChange={(val) =>
+                    setFormData({
+                      ...formData,
+                      syncEnabled: val ? 1 : 0,
+                    })
+                  }
+                  disabled={loading}
+                />
               </div>
             </div>
 

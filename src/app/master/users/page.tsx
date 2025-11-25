@@ -12,6 +12,7 @@ import toast from "react-hot-toast";
 import { TableSkeleton } from "@/components/ui/SkeletonLoader";
 import DataTable from "@/components/tables/DataTable";
 import DeleteConfirmationModal from "@/components/modals/DeleteConfirmationModal";
+import StatusToggle from "@/components/forms/StatusToggle";
 
 interface Company {
   companyId: string;
@@ -620,24 +621,18 @@ function UserModal({
               </div>
             )}
             {user && (
-              <div>
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.isActive}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        isActive: e.target.checked,
-                      })
-                    }
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Active
-                  </span>
-                </label>
-              </div>
+              <StatusToggle
+                label="User Status"
+                description="Toggle to control whether this user is active and can access the system."
+                value={formData.isActive}
+                onChange={(val) =>
+                  setFormData({
+                    ...formData,
+                    isActive: val,
+                  })
+                }
+                disabled={loading}
+              />
             )}
             <div className="flex justify-end space-x-3 pt-4">
               <button

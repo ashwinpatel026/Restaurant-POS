@@ -1,0 +1,9 @@
+{
+  "crons": [
+    {
+      "path": "/api/master/sync/auto",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}
+
