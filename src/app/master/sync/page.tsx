@@ -13,6 +13,7 @@ import {
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
+import { formatDateSafe } from "@/lib/utils";
 
 interface SyncStatus {
   locationCode: string;
@@ -55,6 +56,7 @@ export default function SyncManagementPage() {
   const [activeTab, setActiveTab] = useState<"status" | "log" | "sync">(
     "status"
   );
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const syncableTables = [
     { value: "", label: "All Tables" },
@@ -70,11 +72,18 @@ export default function SyncManagementPage() {
     { value: "tbl_master_time_events", label: "Time Events" },
   ];
 
+  // Initial load - fetch locations only
   useEffect(() => {
     fetchLocations();
-    fetchSyncStatus();
-    fetchSyncLog();
-    fetchPendingCount();
+  }, []);
+
+  // Fetch data when filters change (but not on initial load)
+  useEffect(() => {
+    if (!isInitialLoad) {
+      fetchSyncStatus();
+      fetchSyncLog();
+      fetchPendingCount();
+    }
   }, [selectedLocation, selectedTable]);
 
   const fetchLocations = async () => {
@@ -87,9 +96,18 @@ export default function SyncManagementPage() {
       });
       if (response.ok) {
         const data = await response.json();
-        setLocations(data.filter((loc: Location) => loc.isActive === 1));
-        if (data.length > 0 && !selectedLocation) {
-          setSelectedLocation(data[0].storeCode);
+        const activeLocations = data.filter((loc: Location) => loc.isActive === 1);
+        setLocations(activeLocations);
+        
+        // Mark initial load as complete and fetch data (with empty location = All Locations)
+        if (isInitialLoad) {
+          setIsInitialLoad(false);
+          // Fetch initial data after locations are loaded
+          setTimeout(() => {
+            fetchSyncStatus();
+            fetchSyncLog();
+            fetchPendingCount();
+          }, 0);
         }
       }
     } catch (error) {
@@ -416,9 +434,7 @@ export default function SyncManagementPage() {
                           {status.tableName}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {status.lastSyncTime
-                            ? new Date(status.lastSyncTime).toLocaleString()
-                            : "Never"}
+                          {formatDateSafe(status.lastSyncTime)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {getStatusBadge(status.lastSyncStatus)}
@@ -496,7 +512,7 @@ export default function SyncManagementPage() {
                           {entry.recordId.substring(0, 8)}...
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {new Date(entry.changeTime).toLocaleString()}
+                          {formatDateSafe(entry.changeTime)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {entry.syncStatus === 0 ? (

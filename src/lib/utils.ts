@@ -27,6 +27,58 @@ export function formatDate(date: Date | string): string {
   }).format(d)
 }
 
+/**
+ * Safely formats a date value, handling null/undefined and invalid dates
+ * Returns "Never" for null/undefined/invalid dates, otherwise formats the date
+ * @param dateValue - Date value (string, Date object, null, or undefined)
+ * @returns Formatted date string or "Never" if invalid/null
+ */
+export function formatDateSafe(
+  dateValue: string | null | undefined | Date
+): string {
+  if (!dateValue) {
+    return "Never";
+  }
+
+  // Handle if it's already a Date object
+  if (dateValue instanceof Date) {
+    if (isNaN(dateValue.getTime())) {
+      return "Never";
+    }
+    return dateValue.toLocaleString();
+  }
+
+  // Try to parse the date string
+  let date: Date;
+
+  // If it's already an ISO string or valid date string, use it directly
+  if (typeof dateValue === "string") {
+    date = new Date(dateValue);
+  } else {
+    return "Never";
+  }
+
+  // Check if the date is valid
+  if (isNaN(date.getTime())) {
+    // Try alternative parsing methods
+    // Sometimes PostgreSQL returns dates in different formats
+    const timestamp = Date.parse(dateValue);
+    if (!isNaN(timestamp)) {
+      date = new Date(timestamp);
+    } else {
+      return "Never";
+    }
+  }
+
+  // Final validation
+  if (isNaN(date.getTime())) {
+    return "Never";
+  }
+
+  // Format the date
+  return date.toLocaleString();
+}
+
 export function calculateTax(amount: number, taxRate: number = 0.18): number {
   return amount * taxRate
 }

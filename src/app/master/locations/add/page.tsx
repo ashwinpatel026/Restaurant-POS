@@ -159,10 +159,10 @@ export default function AddLocationPage() {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Add Location
+              Add Location / Business
             </h1>
             <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Create a new location
+              Create a new location / business
             </p>
           </div>
         </div>
@@ -173,7 +173,7 @@ export default function AddLocationPage() {
             {/* Location Basic Info */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b pb-2">
-                Location Information
+                Location / Business Information
               </h3>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -197,7 +197,8 @@ export default function AddLocationPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Location/ Business Name/ DBA *
+                  Location / Business / DBA Name{" "}
+                  <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"

@@ -16,6 +16,15 @@ import {
 import { syncValidator } from './syncValidator';
 
 export class SyncProcessor {
+  // List of boolean columns that need special handling
+  private readonly BOOLEAN_COLUMNS = new Set([
+    'inherit_tax_inclusion',
+    'is_tax_included',
+    'inherit_dining_tax',
+    'disqualify_dining_tax_exemption',
+    'inherit_modifier_group',
+  ]);
+
   /**
    * Process a batch of sync log entries
    */
@@ -134,6 +143,12 @@ export class SyncProcessor {
 
     // Map field names from master table to location table
     const mappedData = this.mapFieldsToLocationTable(tableName, recordData);
+    
+    // Add store_code from locationCode (all location tables have store_code column)
+    // This maps the sync location_code to the location database's store_code column
+    mappedData.store_code = locationCode;
+    
+    console.log(`Mapped data for ${tableName} -> ${locationTableName}:`, Object.keys(mappedData));
 
     switch (operation) {
       case 'INSERT':
@@ -167,7 +182,13 @@ export class SyncProcessor {
 
     const mappedData: Record<string, any> = {};
 
+    // Normalize all keys to lowercase for comparison (PostgreSQL returns lowercase from row_to_json)
+    const normalizedData: Record<string, any> = {};
     for (const [key, value] of Object.entries(data)) {
+      normalizedData[key.toLowerCase()] = value;
+    }
+
+    for (const [key, value] of Object.entries(normalizedData)) {
       // Skip sync fields - they're handled separately
       if (key === 'sync_id' || key === 'sync_source') {
         continue;
@@ -180,17 +201,17 @@ export class SyncProcessor {
         continue;
       }
 
-      // Skip audit fields
+      // Skip audit fields (check various case variations)
       if (key === 'created_date' || key === 'created_on' || key === 'createdon' ||
           key === 'updated_on' || key === 'updatedon' ||
           key === 'created_by' || key === 'createdby' ||
           key === 'updated_by' || key === 'updatedby' ||
-          key === 'Created_date' || key === 'Created_by') {
+          key === 'created_date' || key === 'created_by' ) {
         continue;
       }
 
-      // Skip store-specific fields
-      if (key === 'store_code' || key === 'Store_code' ||
+      // Skip store-specific fields (we'll set store_code from locationCode)
+      if (key === 'store_code' || key === 'storecode' ||
           key === 'is_sync_to_web' || key === 'is_sync_to_local') {
         continue;
       }
@@ -198,10 +219,15 @@ export class SyncProcessor {
       // Try exact match first (for case-sensitive columns like Event_code)
       let mappedKey = fieldMap[key];
       
-      // If no exact match, try lowercase
+      // If no exact match, try with original case from fieldMap keys
       if (!mappedKey) {
-        const normalizedKey = key.toLowerCase();
-        mappedKey = fieldMap[normalizedKey];
+        // Check if any fieldMap key matches (case-insensitive)
+        for (const [mapKey, mapValue] of Object.entries(fieldMap)) {
+          if (mapKey.toLowerCase() === key) {
+            mappedKey = mapValue;
+            break;
+          }
+        }
       }
       
       // Only include if field is in the sync map (whitelist)
@@ -257,7 +283,24 @@ export class SyncProcessor {
       if (val === null) {
         values.push('NULL');
       } else if (typeof val === 'boolean') {
-        values.push(val ? '1' : '0');
+        // Check if this is a boolean column - if so, use PostgreSQL boolean, otherwise convert to int
+        if (this.BOOLEAN_COLUMNS.has(key)) {
+          values.push(val ? 'true' : 'false');
+        } else {
+          values.push(val ? '1' : '0');
+        }
+      } else if (this.BOOLEAN_COLUMNS.has(key)) {
+        // Handle boolean columns - convert various formats to boolean
+        if (typeof val === 'number') {
+          values.push(val ? 'true' : 'false');
+        } else if (typeof val === 'string') {
+          // Handle string values like "1", "0", "true", "false"
+          const boolVal = val === '1' || val.toLowerCase() === 'true';
+          values.push(boolVal ? 'true' : 'false');
+        } else {
+          // Fallback for other types
+          values.push(val ? 'true' : 'false');
+        }
       } else if (val instanceof Date) {
         values.push(`'${val.toISOString()}'`);
       } else if (typeof val === 'number') {
@@ -288,6 +331,9 @@ export class SyncProcessor {
 
     const columnsStr = columns.join(', ');
     const valuesStr = values.join(', ');
+
+    console.log(`Inserting into ${tableName} with columns:`, columns);
+    console.log(`Values count:`, values.length);
 
     try {
       await locationPrisma.$executeRawUnsafe(`
@@ -338,7 +384,24 @@ export class SyncProcessor {
       if (val === null) {
         setParts.push(`${quotedKey} = NULL`);
       } else if (typeof val === 'boolean') {
-        setParts.push(`${quotedKey} = ${val ? '1' : '0'}`);
+        // Check if this is a boolean column - if so, use PostgreSQL boolean, otherwise convert to int
+        if (this.BOOLEAN_COLUMNS.has(key)) {
+          setParts.push(`${quotedKey} = ${val ? 'true' : 'false'}`);
+        } else {
+          setParts.push(`${quotedKey} = ${val ? '1' : '0'}`);
+        }
+      } else if (this.BOOLEAN_COLUMNS.has(key)) {
+        // Handle boolean columns - convert various formats to boolean
+        if (typeof val === 'number') {
+          setParts.push(`${quotedKey} = ${val ? 'true' : 'false'}`);
+        } else if (typeof val === 'string') {
+          // Handle string values like "1", "0", "true", "false"
+          const boolVal = val === '1' || val.toLowerCase() === 'true';
+          setParts.push(`${quotedKey} = ${boolVal ? 'true' : 'false'}`);
+        } else {
+          // Fallback for other types
+          setParts.push(`${quotedKey} = ${val ? 'true' : 'false'}`);
+        }
       } else if (val instanceof Date) {
         setParts.push(`${quotedKey} = '${val.toISOString()}'`);
       } else if (typeof val === 'number') {

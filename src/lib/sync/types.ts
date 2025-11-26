@@ -97,7 +97,7 @@ export const SYNC_TABLE_MAP: Record<string, string> = {
   'tbl_master_prep_zone': 'tbl_prep_zone',
   'tbl_master_station': 'tbl_station',
   'tbl_master_tax': 'tbl_tax',
-  'tbl_master_time_events': 'tbl_Time_Events',
+  'tbl_master_time_events': 'tbl_time_events',
 };
 
 // Field mapping: Master table column -> Location table column
@@ -257,7 +257,7 @@ export const SYNC_ORDER_BY_COLUMN: Record<string, string> = {
   'tbl_master_prep_zone': 'createdon',
   'tbl_master_station': 'created_on',
   'tbl_master_tax': 'created_date',
-  'tbl_master_time_events': 'Created_date',
+  'tbl_master_time_events': 'created_date',
 };
 
 // List of tables that support syncing

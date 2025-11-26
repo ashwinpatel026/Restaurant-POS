@@ -60,9 +60,11 @@ model TimeEvent {
   eventStartDate         DateTime? @map("Event_Start_Date") @db.Date
   eventEndDate           DateTime? @map("Event_End_Date") @db.Date
   isActive               Int?      @map("is_active")
-  createdDate            DateTime? @map("Created_date")
-  createdBy              Int?      @map("Created_by")
-  storeCode              String?   @map("Store_code") @db.VarChar(30)
+  createdBy              BigInt?  @map("created_by")
+  createdDate            DateTime @default(now()) @map("created_date")
+  updatedBy              BigInt?  @map("updated_by")
+  updatedOn              DateTime? @map("updated_on")
+  storeCode              String?   @map("store_code") @db.VarChar(100)
   isSyncToWeb            Int?      @map("is_sync_to_web")
   isSyncToLocal          Int?      @map("is_sync_to_local")
   syncId                 String?   @unique @map("sync_id") @db.Uuid
@@ -71,7 +73,7 @@ model TimeEvent {
   // Relationships
   menuMasterEvents       MenuMasterEvent[]
 
-  @@map("tbl_Time_Events")
+  @@map("tbl_time_events")
 }
 
 model PrepZone {
@@ -93,9 +95,6 @@ model PrepZone {
   storeCode          String?   @map("store_code") @db.VarChar(100)
   syncId             String?   @unique @map("sync_id") @db.Uuid
   syncSource         String?   @default("server") @map("sync_source") @db.VarChar(20)
-
-  // Relationships
-  printer Printer? @relation(fields: [printerCode], references: [printerCode])
 
   @@map("tbl_prep_zone")
 }
@@ -396,7 +395,7 @@ model Station {
   syncSource    String? @default("server") @map("sync_source") @db.VarChar(20)
 
   // Relationship
-  shifts Shift[]
+  // shifts Shift[]
 
   @@map("tbl_station")
 }
@@ -433,7 +432,7 @@ model Shift {
   storeCode      String?   @map("store_code") @db.VarChar(100)
 
   // Relationship
-  station Station? @relation(fields: [stationid], references: [tblStationId])
+  // station Station? @relation(fields: [stationid], references: [tblStationId])
 
   @@map("tbl_shift")
 }
@@ -452,9 +451,6 @@ model Printer {
   storeCode     String?   @map("store_code") @db.VarChar(100)
   syncId        String?   @unique @map("sync_id") @db.Uuid
   syncSource    String?   @default("server") @map("sync_source") @db.VarChar(20)
-
-  // Relationships
-  prepZones PrepZone[]
 
   @@map("tbl_printer")
 }

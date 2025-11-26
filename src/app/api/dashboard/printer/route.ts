@@ -19,7 +19,8 @@ export async function GET() {
     // Serialize BigInt to string
     const serializedPrinters = printers.map(printer => ({
       ...printer,
-      printerId: printer.printerId.toString()
+      printerId: printer.printerId.toString(),
+      updatedBy: printer.updatedBy ? printer.updatedBy.toString() : null
     }))
 
     return NextResponse.json(serializedPrinters)
@@ -67,7 +68,8 @@ export async function POST(request: NextRequest) {
     // Serialize BigInt to string
     const serializedPrinter = {
       ...printer,
-      printerId: printer.printerId.toString()
+      printerId: printer.printerId.toString(),
+      updatedBy: printer.updatedBy ? printer.updatedBy.toString() : null
     }
 
     return NextResponse.json(serializedPrinter, { status: 201 })

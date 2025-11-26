@@ -5,6 +5,7 @@
 
 /**
  * Recursively converts all BigInt values in an object to strings
+ * Also handles Date objects by converting them to ISO strings
  */
 export function serializeBigInt<T>(obj: T): any {
   if (obj === null || obj === undefined) {
@@ -13,6 +14,11 @@ export function serializeBigInt<T>(obj: T): any {
 
   if (typeof obj === 'bigint') {
     return obj.toString();
+  }
+
+  // Handle Date objects - convert to ISO string
+  if (obj instanceof Date) {
+    return obj.toISOString();
   }
 
   if (Array.isArray(obj)) {

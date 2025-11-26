@@ -255,8 +255,9 @@ model MasterTimeEvent {
   eventStartDate         DateTime? @map("Event_Start_Date") @db.Date
   eventEndDate           DateTime? @map("Event_End_Date") @db.Date
   isActive               Int       @default(1) @map("is_active")
-  createdDate            DateTime  @default(now()) @map("Created_date")
-  createdBy              BigInt?   @map("Created_by")
+  createdBy              BigInt?  @map("created_by")
+  createdDate            DateTime @default(now()) @map("created_date")
+  updatedBy              BigInt?  @map("updated_by")
   updatedOn              DateTime? @map("updated_on")
   syncId                 String    @unique @default(uuid()) @map("sync_id") @db.Uuid
   syncSource             String?   @default("server") @map("sync_source") @db.VarChar(20)

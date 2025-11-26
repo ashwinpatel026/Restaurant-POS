@@ -164,6 +164,24 @@ export async function DELETE(
     const { id: idParam } = await params
     const id = BigInt(idParam)
     
+    // First, get the event to retrieve its eventCode
+    const event = await prisma.timeEvent.findUnique({
+      where: { id }
+    })
+    
+    if (!event) {
+      return NextResponse.json(
+        { error: 'Time event not found' },
+        { status: 404 }
+      )
+    }
+    
+    // Delete all MenuMasterEvent records that reference this event
+    await prisma.menuMasterEvent.deleteMany({
+      where: { eventCode: event.eventCode }
+    })
+    
+    // Now delete the time event
     await prisma.timeEvent.delete({
       where: { id }
     })
@@ -179,6 +197,14 @@ export async function DELETE(
       return NextResponse.json(
         { error: 'Time event not found' },
         { status: 404 }
+      )
+    }
+    
+    // Handle foreign key constraint errors
+    if (error.code === 'P2003' || error.message?.includes('foreign key constraint')) {
+      return NextResponse.json(
+        { error: 'Cannot delete event: it is still referenced by menu masters. Please remove the event from all menu masters first.' },
+        { status: 409 }
       )
     }
     
