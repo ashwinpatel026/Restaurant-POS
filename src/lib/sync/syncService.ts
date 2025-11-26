@@ -48,7 +48,7 @@ export class SyncService {
 
     try {
       // Validate location exists
-      const location = await masterPrisma.masterLocation.findUnique({
+      const location = await masterPrisma.location.findUnique({
         where: { storeCode: locationCode },
       });
 
@@ -128,6 +128,8 @@ export class SyncService {
     try {
       // Fetch pending sync log entries
       const pendingEntries = await this.getPendingSyncEntries(locationCode, tableName);
+
+      console.log(`Found ${pendingEntries.length} pending entries for ${tableName} at location ${locationCode}`);
 
       if (pendingEntries.length === 0) {
         console.log(`No pending syncs for ${tableName} at location ${locationCode}`);
@@ -277,16 +279,22 @@ export class SyncService {
     locationCode: string,
     tableName?: string
   ): Promise<SyncLogEntry[]> {
-    const where: any = {
-      sync_status: 0, // pending
-      OR: [{ location_code: locationCode }, { location_code: null }], // null = all locations
+    // Build WHERE clause
+    const escapeSQL = (value: any): string => {
+      if (value === null || value === undefined) return 'NULL';
+      if (typeof value === 'string') {
+        return `'${value.replace(/'/g, "''")}'`;
+      }
+      return String(value);
     };
 
+    let whereClause = `sync_status = 0 AND (location_code = ${escapeSQL(locationCode)} OR location_code IS NULL)`;
+    
     if (tableName) {
-      where.table_name = tableName;
+      whereClause += ` AND table_name = ${escapeSQL(tableName)}`;
     }
 
-    const entries = await masterPrisma.$queryRaw<SyncLogEntry[]>`
+    const entries = await masterPrisma.$queryRawUnsafe<SyncLogEntry[]>(`
       SELECT 
         id,
         table_name as "tableName",
@@ -303,14 +311,12 @@ export class SyncService {
         synced_at as "syncedAt",
         synced_by as "syncedBy"
       FROM sync_log
-      WHERE sync_status = 0
-        AND (location_code = ${locationCode} OR location_code IS NULL)
-        ${tableName ? `AND table_name = ${tableName}` : ''}
+      WHERE ${whereClause}
       ORDER BY change_time ASC
       LIMIT 1000
-    `;
+    `);
 
-    return entries;
+    return entries || [];
   }
 
   /**
@@ -376,7 +382,7 @@ export class SyncService {
    */
   async processPendingSyncs(): Promise<void> {
     // Get all active locations
-    const locations = await masterPrisma.masterLocation.findMany({
+    const locations = await masterPrisma.location.findMany({
       where: { isActive: 1 },
       select: { storeCode: true },
     });

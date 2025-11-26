@@ -46,7 +46,15 @@ export async function POST(request: NextRequest) {
     };
 
     // Execute sync
+    console.log('Manual sync request:', syncRequest);
     const result = await syncService.syncToLocation(syncRequest);
+    console.log('Manual sync result:', {
+      success: result.success,
+      recordsProcessed: result.recordsProcessed,
+      recordsSucceeded: result.recordsSucceeded,
+      recordsFailed: result.recordsFailed,
+      errors: result.errors,
+    });
 
     // Return result
     return NextResponse.json({

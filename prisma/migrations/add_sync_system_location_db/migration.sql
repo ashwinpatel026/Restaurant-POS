@@ -74,9 +74,9 @@ ADD COLUMN IF NOT EXISTS sync_source VARCHAR(20) DEFAULT 'server';
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tax_sync_id ON tbl_tax(sync_id) WHERE sync_id IS NOT NULL;
 
 -- Time Events
-ALTER TABLE tbl_Time_Events 
+ALTER TABLE "tbl_Time_Events" 
 ADD COLUMN IF NOT EXISTS sync_id UUID,
 ADD COLUMN IF NOT EXISTS sync_source VARCHAR(20) DEFAULT 'server';
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_time_events_sync_id ON tbl_Time_Events(sync_id) WHERE sync_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_time_events_sync_id ON "tbl_Time_Events"(sync_id) WHERE sync_id IS NOT NULL;
 

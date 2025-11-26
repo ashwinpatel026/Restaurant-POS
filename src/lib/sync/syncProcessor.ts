@@ -57,9 +57,12 @@ export class SyncProcessor {
     // Process each entry
     for (const entry of entries) {
       try {
+        console.log(`Processing sync entry: ${entry.recordId}, operation: ${entry.operation}, table: ${tableName}`);
+        
         // Validate entry
         const validation = await syncValidator.validateEntry(entry, locationTableName);
         if (!validation.valid) {
+          console.error(`Validation failed for entry ${entry.recordId}:`, validation.error);
           result.recordsFailed++;
           result.errors.push({
             recordId: entry.recordId,
@@ -76,9 +79,11 @@ export class SyncProcessor {
 
         // Mark as processed
         await this.markSyncProcessed(entry.id);
+        console.log(`Successfully synced entry ${entry.recordId}`);
 
         result.recordsSucceeded++;
       } catch (error: any) {
+        console.error(`Error processing sync entry ${entry.recordId}:`, error);
         result.recordsFailed++;
         result.errors.push({
           recordId: entry.recordId,
@@ -112,16 +117,27 @@ export class SyncProcessor {
   ): Promise<void> {
     const { operation, data, recordId } = entry;
 
+    // Parse data if it's a string (JSONB from database)
+    let parsedData: any = data;
+    if (typeof data === 'string') {
+      try {
+        parsedData = JSON.parse(data);
+      } catch (e) {
+        console.error('Failed to parse data JSON:', e);
+        throw new Error(`Invalid JSON data in sync_log: ${e}`);
+      }
+    }
+
     // Filter out sync fields from data (we'll set them separately)
-    const { sync_id, sync_source, ...recordData } = data;
+    const { sync_id, sync_source, ...recordData } = parsedData;
 
     switch (operation) {
       case 'INSERT':
-        await this.handleInsert(locationTableName, recordId, recordData, data.sync_source);
+        await this.handleInsert(locationTableName, recordId, recordData, parsedData.sync_source || 'server');
         break;
 
       case 'UPDATE':
-        await this.handleUpdate(locationTableName, recordId, recordData, data.sync_source);
+        await this.handleUpdate(locationTableName, recordId, recordData, parsedData.sync_source || 'server');
         break;
 
       case 'DELETE':
@@ -160,15 +176,38 @@ export class SyncProcessor {
       sync_source: syncSource,
     };
 
-    // Build dynamic INSERT query
-    const columns = Object.keys(insertData).join(', ');
-    const values = Object.values(insertData)
-      .map((v) => (v === null ? 'NULL' : `'${String(v).replace(/'/g, "''")}'`))
-      .join(', ');
+    // Build dynamic INSERT query with proper value formatting
+    const columns: string[] = [];
+    const values: string[] = [];
+
+    for (const [key, value] of Object.entries(insertData)) {
+      // Skip undefined values
+      if (value === undefined) continue;
+      
+      columns.push(key);
+      
+      if (value === null) {
+        values.push('NULL');
+      } else if (typeof value === 'boolean') {
+        values.push(value ? '1' : '0');
+      } else if (value instanceof Date) {
+        values.push(`'${value.toISOString()}'`);
+      } else if (typeof value === 'object') {
+        // Handle JSON/JSONB fields
+        values.push(`'${JSON.stringify(value).replace(/'/g, "''")}'::jsonb`);
+      } else if (typeof value === 'string') {
+        values.push(`'${value.replace(/'/g, "''")}'`);
+      } else {
+        values.push(String(value));
+      }
+    }
+
+    const columnsStr = columns.join(', ');
+    const valuesStr = values.join(', ');
 
     await locationPrisma.$executeRawUnsafe(`
-      INSERT INTO ${tableName} (${columns})
-      VALUES (${values})
+      INSERT INTO ${tableName} (${columnsStr})
+      VALUES (${valuesStr})
     `);
   }
 
@@ -192,19 +231,37 @@ export class SyncProcessor {
       return;
     }
 
-    // Build UPDATE query
-    const setClause = Object.entries(data)
-      .map(([key, value]) => {
-        if (value === null) {
-          return `${key} = NULL`;
-        }
-        return `${key} = '${String(value).replace(/'/g, "''")}'`;
-      })
-      .join(', ');
+    // Build UPDATE query with proper value formatting
+    const setParts: string[] = [];
+
+    for (const [key, value] of Object.entries(data)) {
+      // Skip undefined values
+      if (value === undefined) continue;
+      
+      if (value === null) {
+        setParts.push(`${key} = NULL`);
+      } else if (typeof value === 'boolean') {
+        setParts.push(`${key} = ${value ? '1' : '0'}`);
+      } else if (value instanceof Date) {
+        setParts.push(`${key} = '${value.toISOString()}'`);
+      } else if (typeof value === 'object') {
+        // Handle JSON/JSONB fields
+        setParts.push(`${key} = '${JSON.stringify(value).replace(/'/g, "''")}'::jsonb`);
+      } else if (typeof value === 'string') {
+        setParts.push(`${key} = '${value.replace(/'/g, "''")}'`);
+      } else {
+        setParts.push(`${key} = ${value}`);
+      }
+    }
+
+    // Add sync_source
+    setParts.push(`sync_source = '${syncSource.replace(/'/g, "''")}'`);
+
+    const setClause = setParts.join(', ');
 
     await locationPrisma.$executeRawUnsafe(`
       UPDATE ${tableName}
-      SET ${setClause}, sync_source = '${syncSource}'
+      SET ${setClause}
       WHERE sync_id = '${syncId}'::UUID
     `);
   }
@@ -223,24 +280,25 @@ export class SyncProcessor {
    * Mark sync entry as processed
    */
   private async markSyncProcessed(entryId: bigint): Promise<void> {
-    await masterPrisma.$executeRaw`
+    await masterPrisma.$executeRawUnsafe(`
       UPDATE sync_log
       SET sync_status = 1,
           synced_at = CURRENT_TIMESTAMP
       WHERE id = ${entryId}
-    `;
+    `);
   }
 
   /**
    * Mark sync entry as failed
    */
   private async markSyncFailed(entryId: bigint, errorMessage: string): Promise<void> {
-    await masterPrisma.$executeRaw`
+    const escapedError = errorMessage.replace(/'/g, "''");
+    await masterPrisma.$executeRawUnsafe(`
       UPDATE sync_log
       SET sync_status = 2,
-          error_message = ${errorMessage}
+          error_message = '${escapedError}'
       WHERE id = ${entryId}
-    `;
+    `);
   }
 
   /**
@@ -252,6 +310,7 @@ export class SyncProcessor {
     config: SyncConfig
   ): Promise<void> {
     const newRetryCount = entry.retryCount + 1;
+    const escapedError = errorMessage.replace(/'/g, "''");
 
     if (newRetryCount <= config.maxRetries) {
       // Calculate retry delay with exponential backoff
@@ -260,14 +319,14 @@ export class SyncProcessor {
         config.maxRetryDelay
       );
 
-      await masterPrisma.$executeRaw`
+      await masterPrisma.$executeRawUnsafe(`
         UPDATE sync_log
         SET retry_count = ${newRetryCount},
-            error_message = ${errorMessage},
+            error_message = '${escapedError}',
             last_retry_at = CURRENT_TIMESTAMP,
             sync_status = 0
         WHERE id = ${entry.id}
-      `;
+      `);
     } else {
       // Max retries reached, mark as failed
       await this.markSyncFailed(entry.id, `Max retries reached: ${errorMessage}`);

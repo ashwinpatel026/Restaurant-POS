@@ -72,7 +72,7 @@ Authorization: Bearer <token>
 
 {
   "locationCode": "LOC001",
-  "tableName": "tbl_printer_master",  // Optional
+  "tableName": "tbl_master_printer",  // Optional
   "fullSync": false,                   // Optional
   "forceSync": false                   // Optional
 }
@@ -81,7 +81,7 @@ Authorization: Bearer <token>
 ### Get Sync Status
 
 ```http
-GET /api/master/sync/status?locationCode=LOC001&tableName=tbl_printer_master
+GET /api/master/sync/status?locationCode=LOC001&tableName=tbl_master_printer
 Authorization: Bearer <token>
 ```
 
@@ -110,7 +110,7 @@ const result = await syncService.syncToLocation({
 ```typescript
 const result = await syncService.syncToLocation({
   locationCode: "LOC001",
-  tableName: "tbl_printer_master",
+  tableName: "tbl_master_printer",
   fullSync: true,
 });
 ```

@@ -7,13 +7,16 @@ A complete UUID-based synchronization system for syncing data from Master Databa
 ## Files Created
 
 ### Documentation
+
 1. **SYNC_SYSTEM_ROADMAP.md** - Complete implementation roadmap and architecture
 2. **SYNC_SYSTEM_SETUP.md** - Step-by-step setup guide
 3. **SYNC_SYSTEM_SUMMARY.md** - This file (overview)
 4. **src/lib/sync/README.md** - Implementation details and usage guide
 
 ### Database Migrations
+
 1. **prisma/migrations/add_sync_system/migration.sql** - Master DB migration
+
    - Creates sync_log and sync_status tables
    - Adds sync_id and sync_source to master tables
    - Creates triggers for automatic change detection
@@ -24,6 +27,7 @@ A complete UUID-based synchronization system for syncing data from Master Databa
    - Creates indexes for performance
 
 ### Core Sync Library
+
 1. **src/lib/sync/types.ts** - TypeScript type definitions
 2. **src/lib/sync/syncService.ts** - Main sync orchestrator
 3. **src/lib/sync/syncProcessor.ts** - Processes individual sync operations
@@ -31,12 +35,14 @@ A complete UUID-based synchronization system for syncing data from Master Databa
 5. **src/lib/sync/autoSyncWorker.ts** - Background worker for auto-sync
 
 ### API Endpoints
+
 1. **src/app/api/master/sync/manual/route.ts** - Manual sync endpoint
 2. **src/app/api/master/sync/status/route.ts** - Sync status endpoint
 3. **src/app/api/master/sync/log/route.ts** - Sync log endpoint
 4. **src/app/api/master/sync/auto/route.ts** - Auto-sync cron endpoint
 
 ### Configuration
+
 1. **vercel.json.example** - Example Vercel cron configuration
 
 ## Key Features
@@ -55,11 +61,13 @@ A complete UUID-based synchronization system for syncing data from Master Databa
 ## How It Works
 
 ### 1. Change Detection
+
 - Database triggers automatically log INSERT/UPDATE/DELETE to `sync_log`
 - Each change includes full row data (JSONB)
 - Tracks operation type, source, and timestamp
 
 ### 2. Sync Process
+
 - **Manual**: API call triggers sync for specific location
 - **Auto**: Background worker processes pending syncs periodically
 - Sync processor reads pending entries from `sync_log`
@@ -67,6 +75,7 @@ A complete UUID-based synchronization system for syncing data from Master Databa
 - Updates sync status and marks entries as processed
 
 ### 3. Data Flow
+
 ```
 Master DB Table (with sync_id)
     ↓ (Trigger on INSERT/UPDATE/DELETE)
@@ -80,6 +89,7 @@ Location DB Table (with sync_id)
 ## API Usage Examples
 
 ### Manual Sync (Incremental)
+
 ```bash
 POST /api/master/sync/manual
 {
@@ -88,6 +98,7 @@ POST /api/master/sync/manual
 ```
 
 ### Manual Sync (Full, Specific Table)
+
 ```bash
 POST /api/master/sync/manual
 {
@@ -98,11 +109,13 @@ POST /api/master/sync/manual
 ```
 
 ### Check Sync Status
+
 ```bash
 GET /api/master/sync/status?locationCode=LOC001
 ```
 
 ### View Sync Log
+
 ```bash
 GET /api/master/sync/log?locationCode=LOC001&status=0&limit=100
 ```
@@ -110,16 +123,19 @@ GET /api/master/sync/log?locationCode=LOC001&status=0&limit=100
 ## Database Tables
 
 ### Master DB
+
 - **sync_log**: Tracks all changes (INSERT/UPDATE/DELETE)
 - **sync_status**: Tracks sync status per location/table
 - **Master tables**: Added `sync_id` (UUID) and `sync_source` fields
 
 ### Location DB
+
 - **Location tables**: Added `sync_id` (UUID) and `sync_source` fields
 
 ## Syncable Tables
 
 The following tables are configured for syncing:
+
 - `tbl_printer_master` → `tbl_printer`
 - `tbl_menu_master` → `tbl_menu_master`
 - `tbl_menu_category` → `tbl_menu_category`
@@ -157,6 +173,7 @@ The following tables are configured for syncing:
 ## Customization
 
 The sync system is highly configurable:
+
 - Batch sizes
 - Retry logic
 - Sync intervals
@@ -164,4 +181,3 @@ The sync system is highly configurable:
 - Table mappings
 
 All configuration is in `src/lib/sync/types.ts` and can be customized per instance.
-

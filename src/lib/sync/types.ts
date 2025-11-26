@@ -86,17 +86,18 @@ export const DEFAULT_SYNC_CONFIG: SyncConfig = {
 };
 
 // Table mapping: Master table name -> Location table name
+// Note: Master tables have "tbl_master_" prefix, location tables don't
 export const SYNC_TABLE_MAP: Record<string, string> = {
-  'tbl_printer_master': 'tbl_printer',
-  'tbl_menu_master': 'tbl_menu_master',
-  'tbl_menu_category': 'tbl_menu_category',
-  'tbl_menu_item': 'tbl_menu_item',
-  'tbl_modifier_group': 'tbl_modifier_group',
-  'tbl_modifier_item': 'tbl_modifier_item',
-  'tbl_prep_zone': 'tbl_prep_zone',
-  'tbl_station': 'tbl_station',
-  'tbl_tax': 'tbl_tax',
-  'tbl_Time_Events': 'tbl_Time_Events',
+  'tbl_master_printer': 'tbl_printer',
+  'tbl_master_menu_master': 'tbl_menu_master',
+  'tbl_master_menu_category': 'tbl_menu_category',
+  'tbl_master_menu_item': 'tbl_menu_item',
+  'tbl_master_modifier_group': 'tbl_modifier_group',
+  'tbl_master_modifier_item': 'tbl_modifier_item',
+  'tbl_master_prep_zone': 'tbl_prep_zone',
+  'tbl_master_station': 'tbl_station',
+  'tbl_master_tax': 'tbl_tax',
+  'tbl_master_time_events': 'tbl_Time_Events',
 };
 
 // List of tables that support syncing

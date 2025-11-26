@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper';
 import { masterPrisma } from '@/lib/databaseManager';
+import { serializeBigInt, toNumber } from '@/lib/utils/bigIntSerializer';
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,22 +22,33 @@ export async function GET(request: NextRequest) {
     const locationCode = searchParams.get('locationCode');
     const tableName = searchParams.get('tableName');
 
-    // Build query
-    let whereClause = '1=1';
-    const params: any[] = [];
-    let paramIndex = 1;
+    // Build WHERE clauses with proper SQL escaping
+    const escapeSQL = (value: any): string => {
+      if (value === null || value === undefined) return 'NULL';
+      if (typeof value === 'string') {
+        return `'${value.replace(/'/g, "''")}'`;
+      }
+      return String(value);
+    };
+
+    const statusWhereParts: string[] = [];
+    const logWhereParts: string[] = ['sync_status = 0'];
 
     if (locationCode) {
-      whereClause += ` AND location_code = $${paramIndex}`;
-      params.push(locationCode);
-      paramIndex++;
+      statusWhereParts.push(`location_code = ${escapeSQL(locationCode)}`);
+      logWhereParts.push(`(location_code = ${escapeSQL(locationCode)} OR location_code IS NULL)`);
     }
 
     if (tableName) {
-      whereClause += ` AND table_name = $${paramIndex}`;
-      params.push(tableName);
-      paramIndex++;
+      statusWhereParts.push(`table_name = ${escapeSQL(tableName)}`);
+      logWhereParts.push(`table_name = ${escapeSQL(tableName)}`);
     }
+
+    const statusWhereClause = statusWhereParts.length > 0 
+      ? `WHERE ${statusWhereParts.join(' AND ')}`
+      : '';
+    
+    const logWhereClause = `WHERE ${logWhereParts.join(' AND ')}`;
 
     // Get sync status
     const status = await masterPrisma.$queryRawUnsafe(`
@@ -51,37 +63,26 @@ export async function GET(request: NextRequest) {
         created_at as "createdAt",
         updated_at as "updatedAt"
       FROM sync_status
-      WHERE ${whereClause}
+      ${statusWhereClause}
       ORDER BY updated_at DESC
     `);
 
     // Get pending sync count
-    let pendingCountQuery = `
+    const pendingCount = await masterPrisma.$queryRawUnsafe(`
       SELECT COUNT(*) as count
       FROM sync_log
-      WHERE sync_status = 0
-    `;
-    const pendingParams: any[] = [];
-    let pendingParamIndex = 1;
+      ${logWhereClause}
+    `);
 
-    if (locationCode) {
-      pendingCountQuery += ` AND (location_code = $${pendingParamIndex} OR location_code IS NULL)`;
-      pendingParams.push(locationCode);
-      pendingParamIndex++;
-    }
-
-    if (tableName) {
-      pendingCountQuery += ` AND table_name = $${pendingParamIndex}`;
-      pendingParams.push(tableName);
-    }
-
-    const pendingCount = await masterPrisma.$queryRawUnsafe(pendingCountQuery);
+    // Convert BigInt values for JSON serialization
+    const serializedStatus = serializeBigInt(status);
+    const pendingCountValue = (pendingCount as any[])[0]?.count || 0;
 
     return NextResponse.json({
       success: true,
       data: {
-        status: status,
-        pendingCount: (pendingCount as any[])[0]?.count || 0,
+        status: serializedStatus,
+        pendingCount: toNumber(pendingCountValue),
       },
     });
   } catch (error: any) {

@@ -56,74 +56,74 @@ CREATE INDEX IF NOT EXISTS idx_sync_status_table ON sync_status(table_name);
 -- ============================================
 
 -- Printer Master
-ALTER TABLE tbl_printer_master 
+ALTER TABLE tbl_master_printer 
 ADD COLUMN IF NOT EXISTS sync_id UUID NOT NULL DEFAULT uuid_generate_v4(),
 ADD COLUMN IF NOT EXISTS sync_source VARCHAR(20) DEFAULT 'server';
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_printer_master_sync_id ON tbl_printer_master(sync_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_printer_master_sync_id ON tbl_master_printer(sync_id);
 
 -- Menu Master
-ALTER TABLE tbl_menu_master 
+ALTER TABLE tbl_master_menu_master 
 ADD COLUMN IF NOT EXISTS sync_id UUID NOT NULL DEFAULT uuid_generate_v4(),
 ADD COLUMN IF NOT EXISTS sync_source VARCHAR(20) DEFAULT 'server';
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_master_sync_id ON tbl_menu_master(sync_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_master_sync_id ON tbl_master_menu_master(sync_id);
 
 -- Menu Category
-ALTER TABLE tbl_menu_category 
+ALTER TABLE tbl_master_menu_category 
 ADD COLUMN IF NOT EXISTS sync_id UUID NOT NULL DEFAULT uuid_generate_v4(),
 ADD COLUMN IF NOT EXISTS sync_source VARCHAR(20) DEFAULT 'server';
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_category_sync_id ON tbl_menu_category(sync_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_category_sync_id ON tbl_master_menu_category(sync_id);
 
 -- Menu Item
-ALTER TABLE tbl_menu_item 
+ALTER TABLE tbl_master_menu_item 
 ADD COLUMN IF NOT EXISTS sync_id UUID NOT NULL DEFAULT uuid_generate_v4(),
 ADD COLUMN IF NOT EXISTS sync_source VARCHAR(20) DEFAULT 'server';
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_item_sync_id ON tbl_menu_item(sync_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_item_sync_id ON tbl_master_menu_item(sync_id);
 
 -- Modifier Group
-ALTER TABLE tbl_modifier_group 
+ALTER TABLE tbl_master_modifier_group 
 ADD COLUMN IF NOT EXISTS sync_id UUID NOT NULL DEFAULT uuid_generate_v4(),
 ADD COLUMN IF NOT EXISTS sync_source VARCHAR(20) DEFAULT 'server';
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_modifier_group_sync_id ON tbl_modifier_group(sync_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_modifier_group_sync_id ON tbl_master_modifier_group(sync_id);
 
 -- Modifier Item
-ALTER TABLE tbl_modifier_item 
+ALTER TABLE tbl_master_modifier_item 
 ADD COLUMN IF NOT EXISTS sync_id UUID NOT NULL DEFAULT uuid_generate_v4(),
 ADD COLUMN IF NOT EXISTS sync_source VARCHAR(20) DEFAULT 'server';
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_modifier_item_sync_id ON tbl_modifier_item(sync_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_modifier_item_sync_id ON tbl_master_modifier_item(sync_id);
 
 -- Prep Zone
-ALTER TABLE tbl_prep_zone 
+ALTER TABLE tbl_master_prep_zone 
 ADD COLUMN IF NOT EXISTS sync_id UUID NOT NULL DEFAULT uuid_generate_v4(),
 ADD COLUMN IF NOT EXISTS sync_source VARCHAR(20) DEFAULT 'server';
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_prep_zone_sync_id ON tbl_prep_zone(sync_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_prep_zone_sync_id ON tbl_master_prep_zone(sync_id);
 
 -- Station
-ALTER TABLE tbl_station 
+ALTER TABLE tbl_master_station 
 ADD COLUMN IF NOT EXISTS sync_id UUID NOT NULL DEFAULT uuid_generate_v4(),
 ADD COLUMN IF NOT EXISTS sync_source VARCHAR(20) DEFAULT 'server';
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_station_sync_id ON tbl_station(sync_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_station_sync_id ON tbl_master_station(sync_id);
 
 -- Tax
-ALTER TABLE tbl_tax 
+ALTER TABLE tbl_master_tax 
 ADD COLUMN IF NOT EXISTS sync_id UUID NOT NULL DEFAULT uuid_generate_v4(),
 ADD COLUMN IF NOT EXISTS sync_source VARCHAR(20) DEFAULT 'server';
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_tax_sync_id ON tbl_tax(sync_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tax_sync_id ON tbl_master_tax(sync_id);
 
 -- Time Events
-ALTER TABLE tbl_Time_Events 
+ALTER TABLE tbl_master_time_events 
 ADD COLUMN IF NOT EXISTS sync_id UUID NOT NULL DEFAULT uuid_generate_v4(),
 ADD COLUMN IF NOT EXISTS sync_source VARCHAR(20) DEFAULT 'server';
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_time_events_sync_id ON tbl_Time_Events(sync_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_time_events_sync_id ON tbl_master_time_events(sync_id);
 
 -- ============================================
 -- 4. TRIGGER FUNCTION FOR CHANGE DETECTION
@@ -175,56 +175,56 @@ $$ LANGUAGE plpgsql;
 -- ============================================
 
 -- Drop existing triggers if they exist
-DROP TRIGGER IF EXISTS trigger_printer_master_sync ON tbl_printer_master;
-DROP TRIGGER IF EXISTS trigger_menu_master_sync ON tbl_menu_master;
-DROP TRIGGER IF EXISTS trigger_menu_category_sync ON tbl_menu_category;
-DROP TRIGGER IF EXISTS trigger_menu_item_sync ON tbl_menu_item;
-DROP TRIGGER IF EXISTS trigger_modifier_group_sync ON tbl_modifier_group;
-DROP TRIGGER IF EXISTS trigger_modifier_item_sync ON tbl_modifier_item;
-DROP TRIGGER IF EXISTS trigger_prep_zone_sync ON tbl_prep_zone;
-DROP TRIGGER IF EXISTS trigger_station_sync ON tbl_station;
-DROP TRIGGER IF EXISTS trigger_tax_sync ON tbl_tax;
-DROP TRIGGER IF EXISTS trigger_time_events_sync ON tbl_Time_Events;
+DROP TRIGGER IF EXISTS trigger_printer_master_sync ON tbl_master_printer;
+DROP TRIGGER IF EXISTS trigger_menu_master_sync ON tbl_master_menu_master;
+DROP TRIGGER IF EXISTS trigger_menu_category_sync ON tbl_master_menu_category;
+DROP TRIGGER IF EXISTS trigger_menu_item_sync ON tbl_master_menu_item;
+DROP TRIGGER IF EXISTS trigger_modifier_group_sync ON tbl_master_modifier_group;
+DROP TRIGGER IF EXISTS trigger_modifier_item_sync ON tbl_master_modifier_item;
+DROP TRIGGER IF EXISTS trigger_prep_zone_sync ON tbl_master_prep_zone;
+DROP TRIGGER IF EXISTS trigger_station_sync ON tbl_master_station;
+DROP TRIGGER IF EXISTS trigger_tax_sync ON tbl_master_tax;
+DROP TRIGGER IF EXISTS trigger_time_events_sync ON tbl_master_time_events;
 
 -- Create triggers
 CREATE TRIGGER trigger_printer_master_sync
-AFTER INSERT OR UPDATE OR DELETE ON tbl_printer_master
+AFTER INSERT OR UPDATE OR DELETE ON tbl_master_printer
 FOR EACH ROW EXECUTE FUNCTION log_sync_change();
 
 CREATE TRIGGER trigger_menu_master_sync
-AFTER INSERT OR UPDATE OR DELETE ON tbl_menu_master
+AFTER INSERT OR UPDATE OR DELETE ON tbl_master_menu_master
 FOR EACH ROW EXECUTE FUNCTION log_sync_change();
 
 CREATE TRIGGER trigger_menu_category_sync
-AFTER INSERT OR UPDATE OR DELETE ON tbl_menu_category
+AFTER INSERT OR UPDATE OR DELETE ON tbl_master_menu_category
 FOR EACH ROW EXECUTE FUNCTION log_sync_change();
 
 CREATE TRIGGER trigger_menu_item_sync
-AFTER INSERT OR UPDATE OR DELETE ON tbl_menu_item
+AFTER INSERT OR UPDATE OR DELETE ON tbl_master_menu_item
 FOR EACH ROW EXECUTE FUNCTION log_sync_change();
 
 CREATE TRIGGER trigger_modifier_group_sync
-AFTER INSERT OR UPDATE OR DELETE ON tbl_modifier_group
+AFTER INSERT OR UPDATE OR DELETE ON tbl_master_modifier_group
 FOR EACH ROW EXECUTE FUNCTION log_sync_change();
 
 CREATE TRIGGER trigger_modifier_item_sync
-AFTER INSERT OR UPDATE OR DELETE ON tbl_modifier_item
+AFTER INSERT OR UPDATE OR DELETE ON tbl_master_modifier_item
 FOR EACH ROW EXECUTE FUNCTION log_sync_change();
 
 CREATE TRIGGER trigger_prep_zone_sync
-AFTER INSERT OR UPDATE OR DELETE ON tbl_prep_zone
+AFTER INSERT OR UPDATE OR DELETE ON tbl_master_prep_zone
 FOR EACH ROW EXECUTE FUNCTION log_sync_change();
 
 CREATE TRIGGER trigger_station_sync
-AFTER INSERT OR UPDATE OR DELETE ON tbl_station
+AFTER INSERT OR UPDATE OR DELETE ON tbl_master_station
 FOR EACH ROW EXECUTE FUNCTION log_sync_change();
 
 CREATE TRIGGER trigger_tax_sync
-AFTER INSERT OR UPDATE OR DELETE ON tbl_tax
+AFTER INSERT OR UPDATE OR DELETE ON tbl_master_tax
 FOR EACH ROW EXECUTE FUNCTION log_sync_change();
 
 CREATE TRIGGER trigger_time_events_sync
-AFTER INSERT OR UPDATE OR DELETE ON tbl_Time_Events
+AFTER INSERT OR UPDATE OR DELETE ON tbl_master_time_events
 FOR EACH ROW EXECUTE FUNCTION log_sync_change();
 
 -- ============================================

@@ -25,6 +25,7 @@ import {
   CogIcon,
   DocumentTextIcon,
   FolderIcon,
+  ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -59,6 +60,12 @@ const navigation: MenuItem[] = [
     name: "Locations",
     href: "/master/locations",
     icon: MapPinIcon,
+    roles: ["SUPER_ADMIN", "COMPANY_ADMIN", "DEALER_ADMIN"],
+  },
+  {
+    name: "Sync Management",
+    href: "/master/sync",
+    icon: ArrowPathIcon,
     roles: ["SUPER_ADMIN", "COMPANY_ADMIN", "DEALER_ADMIN"],
   },
   {

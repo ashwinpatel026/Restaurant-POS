@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper';
 import { masterPrisma } from '@/lib/databaseManager';
+import { serializeBigInt, toNumber } from '@/lib/utils/bigIntSerializer';
 
 export async function GET(request: NextRequest) {
   try {
@@ -24,28 +25,31 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '100');
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    // Build query
-    let whereClause = '1=1';
-    const params: any[] = [];
-    let paramIndex = 1;
+    // Build WHERE clause with proper SQL escaping
+    const whereParts: string[] = [];
+    
+    // Escape SQL values to prevent injection
+    const escapeSQL = (value: any): string => {
+      if (value === null || value === undefined) return 'NULL';
+      if (typeof value === 'string') {
+        return `'${value.replace(/'/g, "''")}'`;
+      }
+      return String(value);
+    };
 
     if (locationCode) {
-      whereClause += ` AND (location_code = $${paramIndex} OR location_code IS NULL)`;
-      params.push(locationCode);
-      paramIndex++;
+      whereParts.push(`(location_code = ${escapeSQL(locationCode)} OR location_code IS NULL)`);
     }
 
     if (tableName) {
-      whereClause += ` AND table_name = $${paramIndex}`;
-      params.push(tableName);
-      paramIndex++;
+      whereParts.push(`table_name = ${escapeSQL(tableName)}`);
     }
 
     if (status !== null) {
-      whereClause += ` AND sync_status = $${paramIndex}`;
-      params.push(parseInt(status));
-      paramIndex++;
+      whereParts.push(`sync_status = ${parseInt(status)}`);
     }
+
+    const whereClause = whereParts.length > 0 ? `WHERE ${whereParts.join(' AND ')}` : '';
 
     // Get sync log entries
     const entries = await masterPrisma.$queryRawUnsafe(`
@@ -65,23 +69,27 @@ export async function GET(request: NextRequest) {
         synced_at as "syncedAt",
         synced_by as "syncedBy"
       FROM sync_log
-      WHERE ${whereClause}
+      ${whereClause}
       ORDER BY change_time DESC
-      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
-    `, ...params, limit, offset);
+      LIMIT ${limit} OFFSET ${offset}
+    `);
 
     // Get total count
     const countResult = await masterPrisma.$queryRawUnsafe(`
       SELECT COUNT(*) as count
       FROM sync_log
-      WHERE ${whereClause}
-    `, ...params);
+      ${whereClause}
+    `);
+
+    // Convert BigInt values for JSON serialization
+    const serializedEntries = serializeBigInt(entries);
+    const totalCount = (countResult as any[])[0]?.count || 0;
 
     return NextResponse.json({
       success: true,
       data: {
-        entries: entries,
-        total: (countResult as any[])[0]?.count || 0,
+        entries: serializedEntries,
+        total: toNumber(totalCount),
         limit,
         offset,
       },
