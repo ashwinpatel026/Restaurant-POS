@@ -65,6 +65,8 @@ model TimeEvent {
   storeCode              String?   @map("Store_code") @db.VarChar(30)
   isSyncToWeb            Int?      @map("is_sync_to_web")
   isSyncToLocal          Int?      @map("is_sync_to_local")
+  syncId                 String?   @unique @map("sync_id") @db.Uuid
+  syncSource             String?   @default("server") @map("sync_source") @db.VarChar(20)
 
   // Relationships
   menuMasterEvents       MenuMasterEvent[]
@@ -89,6 +91,8 @@ model PrepZone {
   isSyncToWeb        Int       @default(0) @map("is_sync_to_web")
   isSyncToLocal      Int       @default(0) @map("is_sync_to_local")
   storeCode          String?   @map("store_code") @db.VarChar(100)
+  syncId             String?   @unique @map("sync_id") @db.Uuid
+  syncSource         String?   @default("server") @map("sync_source") @db.VarChar(20)
 
   // Relationships
   printer Printer? @relation(fields: [printerCode], references: [printerCode])
@@ -114,6 +118,8 @@ model MenuMaster {
   isSyncToWeb       Int       @default(0) @map("is_sync_to_web")
   isSyncToLocal     Int       @default(0) @map("is_sync_to_local")
   storeCode         String?   @map("store_code") @db.VarChar(100)
+  syncId            String?   @unique @map("sync_id") @db.Uuid
+  syncSource        String?   @default("server") @map("sync_source") @db.VarChar(20)
 
   // Relationships
   menuMasterEvents  MenuMasterEvent[]
@@ -153,6 +159,8 @@ model MenuCategory {
   isSyncToWeb       Int       @default(0) @map("is_sync_to_web")
   isSyncToLocal     Int       @default(0) @map("is_sync_to_local")
   storeCode         String?   @map("store_code") @db.VarChar(100)
+  syncId            String?   @unique @map("sync_id") @db.Uuid
+  syncSource        String?   @default("server") @map("sync_source") @db.VarChar(20)
 
   // Relationships
   menuMaster        MenuMaster @relation(fields: [menuMasterCode], references: [menuMasterCode])
@@ -218,6 +226,8 @@ model MenuItem {
   isSyncToWeb                    Int       @default(0) @map("is_sync_to_web")
   isSyncToLocal                  Int       @default(0) @map("is_sync_to_local")
   storeCode                      String?   @map("store_code") @db.VarChar(100)
+  syncId                         String?   @unique @map("sync_id") @db.Uuid
+  syncSource                     String?   @default("server") @map("sync_source") @db.VarChar(20)
 
   @@map("tbl_menu_item")
 }
@@ -287,9 +297,13 @@ model Tax {
   taxrate       Decimal  @map("taxrate") @db.Decimal(22, 2) @default(0.00)
   createdBy     Int?     @map("created_by")
   createdDate   DateTime @default(now()) @map("created_date")
+  updatedBy     BigInt?  @map("updated_by")
+  updatedOn     DateTime? @map("updated_on")
   isSyncToWeb   Int      @default(0) @map("is_sync_to_web")
   isSyncToLocal Int      @default(0) @map("is_sync_to_local")
   storeCode     String?  @map("store_code") @db.VarChar(100)
+  syncId        String?  @unique @map("sync_id") @db.Uuid
+  syncSource    String?  @default("server") @map("sync_source") @db.VarChar(20)
 
   @@map("tbl_tax")
 }
@@ -313,6 +327,8 @@ model ModifierGroup {
   isSyncToWeb             Int      @default(0) @map("is_sync_to_web")
   isSyncToLocal           Int      @default(0) @map("is_sync_to_local")
   storeCode               String?  @map("store_code") @db.VarChar(100)
+  syncId                  String?  @unique @map("sync_id") @db.Uuid
+  syncSource              String?  @default("server") @map("sync_source") @db.VarChar(20)
 
   // Items in this group (by code)
   // Note: Relation is via code; Prisma cannot enforce without FK. Use manual joins in API.
@@ -337,6 +353,8 @@ model ModifierItem {
   isSyncToWeb        Int      @default(0) @map("is_sync_to_web")
   isSyncToLocal      Int      @default(0) @map("is_sync_to_local")
   storeCode          String?  @map("store_code") @db.VarChar(100)
+  syncId             String?  @unique @map("sync_id") @db.Uuid
+  syncSource         String?  @default("server") @map("sync_source") @db.VarChar(20)
 
   @@map("tbl_modifier_item")
 }
@@ -374,6 +392,8 @@ model Station {
   isSyncToWeb   Int     @default(0) @map("is_sync_to_web")
   isSyncToLocal Int     @default(0) @map("is_sync_to_local")
   storeCode     String? @map("store_code") @db.VarChar(100)
+  syncId        String? @unique @map("sync_id") @db.Uuid
+  syncSource    String? @default("server") @map("sync_source") @db.VarChar(20)
 
   // Relationship
   shifts Shift[]
@@ -425,9 +445,13 @@ model Printer {
   isActive      Int?      @map("is_active")
   createdBy     Int?      @map("createdby")
   createdOn     DateTime  @default(now()) @map("createdon")
+  updatedBy     BigInt?   @map("updatedby")
+  updatedOn     DateTime? @map("updatedon")
   isSyncToWeb   Int       @default(0) @map("is_sync_to_web")
   isSyncToLocal Int       @default(0) @map("is_sync_to_local")
   storeCode     String?   @map("store_code") @db.VarChar(100)
+  syncId        String?   @unique @map("sync_id") @db.Uuid
+  syncSource    String?   @default("server") @map("sync_source") @db.VarChar(20)
 
   // Relationships
   prepZones PrepZone[]

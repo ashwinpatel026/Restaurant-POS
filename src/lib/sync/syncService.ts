@@ -13,6 +13,7 @@ import {
   DEFAULT_SYNC_CONFIG,
   SYNC_TABLE_MAP,
   SYNCABLE_TABLES,
+  SYNC_ORDER_BY_COLUMN,
   SyncOperation,
 } from './types';
 import { syncProcessor } from './syncProcessor';
@@ -337,11 +338,14 @@ export class SyncService {
    * Get all records from master table
    */
   private async getMasterTableRecords(tableName: string): Promise<any[]> {
+    // Get the order by column for this table
+    const orderByColumn = SYNC_ORDER_BY_COLUMN[tableName] || 'createdon';
+    
     // This is a simplified version - you'll need to map table names to Prisma models
     // For now, using raw query
     const records = await masterPrisma.$queryRawUnsafe(`
       SELECT * FROM ${tableName}
-      ORDER BY createdon DESC
+      ORDER BY ${orderByColumn} DESC
     `);
 
     return records as any[];

@@ -11,6 +11,7 @@ import {
   SyncConfig,
   SyncOperation,
   SYNC_TABLE_MAP,
+  SYNC_FIELD_MAP,
 } from './types';
 import { syncValidator } from './syncValidator';
 
@@ -115,7 +116,7 @@ export class SyncProcessor {
     locationTableName: string,
     locationCode: string
   ): Promise<void> {
-    const { operation, data, recordId } = entry;
+    const { operation, data, recordId, tableName } = entry;
 
     // Parse data if it's a string (JSONB from database)
     let parsedData: any = data;
@@ -131,13 +132,16 @@ export class SyncProcessor {
     // Filter out sync fields from data (we'll set them separately)
     const { sync_id, sync_source, ...recordData } = parsedData;
 
+    // Map field names from master table to location table
+    const mappedData = this.mapFieldsToLocationTable(tableName, recordData);
+
     switch (operation) {
       case 'INSERT':
-        await this.handleInsert(locationTableName, recordId, recordData, parsedData.sync_source || 'server');
+        await this.handleInsert(locationTableName, recordId, mappedData, parsedData.sync_source || 'server');
         break;
 
       case 'UPDATE':
-        await this.handleUpdate(locationTableName, recordId, recordData, parsedData.sync_source || 'server');
+        await this.handleUpdate(locationTableName, recordId, mappedData, parsedData.sync_source || 'server');
         break;
 
       case 'DELETE':
@@ -147,6 +151,66 @@ export class SyncProcessor {
       default:
         throw new Error(`Unknown operation: ${operation}`);
     }
+  }
+
+  /**
+   * Map field names from master table to location table
+   * Only includes columns defined in SYNC_FIELD_MAP (whitelist approach)
+   */
+  private mapFieldsToLocationTable(masterTableName: string, data: Record<string, any>): Record<string, any> {
+    const fieldMap = SYNC_FIELD_MAP[masterTableName];
+    if (!fieldMap) {
+      // No mapping defined - return empty object (don't sync anything)
+      console.warn(`No sync field map defined for table ${masterTableName}, skipping all fields`);
+      return {};
+    }
+
+    const mappedData: Record<string, any> = {};
+
+    for (const [key, value] of Object.entries(data)) {
+      // Skip sync fields - they're handled separately
+      if (key === 'sync_id' || key === 'sync_source') {
+        continue;
+      }
+
+      // Skip ID fields (auto-increment primary keys)
+      if (key === 'tbl_tax_id' || key === 'printer_id' || key === 'prep_zone_id' ||
+          key === 'menu_master_id' || key === 'menu_category_id' || key === 'menu_item_id' ||
+          key === 'tbl_station_id' || key === 'id') {
+        continue;
+      }
+
+      // Skip audit fields
+      if (key === 'created_date' || key === 'created_on' || key === 'createdon' ||
+          key === 'updated_on' || key === 'updatedon' ||
+          key === 'created_by' || key === 'createdby' ||
+          key === 'updated_by' || key === 'updatedby' ||
+          key === 'Created_date' || key === 'Created_by') {
+        continue;
+      }
+
+      // Skip store-specific fields
+      if (key === 'store_code' || key === 'Store_code' ||
+          key === 'is_sync_to_web' || key === 'is_sync_to_local') {
+        continue;
+      }
+
+      // Try exact match first (for case-sensitive columns like Event_code)
+      let mappedKey = fieldMap[key];
+      
+      // If no exact match, try lowercase
+      if (!mappedKey) {
+        const normalizedKey = key.toLowerCase();
+        mappedKey = fieldMap[normalizedKey];
+      }
+      
+      // Only include if field is in the sync map (whitelist)
+      if (mappedKey) {
+        mappedData[mappedKey] = value;
+      }
+    }
+
+    return mappedData;
   }
 
   /**
@@ -184,31 +248,58 @@ export class SyncProcessor {
       // Skip undefined values
       if (value === undefined) continue;
       
-      columns.push(key);
+      // Use double quotes for column names to handle case sensitivity
+      columns.push(`"${key}"`);
       
-      if (value === null) {
+      // Type value as any to handle Prisma Decimal and other complex types
+      const val: any = value;
+      
+      if (val === null) {
         values.push('NULL');
-      } else if (typeof value === 'boolean') {
-        values.push(value ? '1' : '0');
-      } else if (value instanceof Date) {
-        values.push(`'${value.toISOString()}'`);
-      } else if (typeof value === 'object') {
-        // Handle JSON/JSONB fields
-        values.push(`'${JSON.stringify(value).replace(/'/g, "''")}'::jsonb`);
-      } else if (typeof value === 'string') {
-        values.push(`'${value.replace(/'/g, "''")}'`);
+      } else if (typeof val === 'boolean') {
+        values.push(val ? '1' : '0');
+      } else if (val instanceof Date) {
+        values.push(`'${val.toISOString()}'`);
+      } else if (typeof val === 'number') {
+        // Handle numeric values (including Decimal from Prisma)
+        values.push(String(val));
+      } else if (Array.isArray(val)) {
+        // Handle arrays as JSONB
+        values.push(`'${JSON.stringify(val).replace(/'/g, "''")}'::jsonb`);
+      } else if (typeof val === 'object' && val !== null) {
+        // Check if it's a Decimal-like object with toNumber or valueOf method
+        if (typeof val.toNumber === 'function') {
+          values.push(String(val.toNumber()));
+        } else if (typeof val.valueOf === 'function' && typeof val.valueOf() === 'number') {
+          values.push(String(val.valueOf()));
+        } else if (val.constructor === Object) {
+          // Only treat plain objects as JSONB
+          values.push(`'${JSON.stringify(val).replace(/'/g, "''")}'::jsonb`);
+        } else {
+          // For other objects, try to convert to string
+          values.push(`'${String(val).replace(/'/g, "''")}'`);
+        }
+      } else if (typeof val === 'string') {
+        values.push(`'${val.replace(/'/g, "''")}'`);
       } else {
-        values.push(String(value));
+        values.push(String(val));
       }
     }
 
     const columnsStr = columns.join(', ');
     const valuesStr = values.join(', ');
 
-    await locationPrisma.$executeRawUnsafe(`
-      INSERT INTO ${tableName} (${columnsStr})
-      VALUES (${valuesStr})
-    `);
+    try {
+      await locationPrisma.$executeRawUnsafe(`
+        INSERT INTO ${tableName} (${columnsStr})
+        VALUES (${valuesStr})
+      `);
+    } catch (error: any) {
+      console.error(`Failed to insert into ${tableName}:`, error);
+      console.error('Columns:', columns);
+      console.error('Data keys:', Object.keys(insertData));
+      throw error;
+    }
   }
 
   /**
@@ -238,32 +329,61 @@ export class SyncProcessor {
       // Skip undefined values
       if (value === undefined) continue;
       
-      if (value === null) {
-        setParts.push(`${key} = NULL`);
-      } else if (typeof value === 'boolean') {
-        setParts.push(`${key} = ${value ? '1' : '0'}`);
-      } else if (value instanceof Date) {
-        setParts.push(`${key} = '${value.toISOString()}'`);
-      } else if (typeof value === 'object') {
-        // Handle JSON/JSONB fields
-        setParts.push(`${key} = '${JSON.stringify(value).replace(/'/g, "''")}'::jsonb`);
-      } else if (typeof value === 'string') {
-        setParts.push(`${key} = '${value.replace(/'/g, "''")}'`);
+      // Use double quotes for column names to handle case sensitivity
+      const quotedKey = `"${key}"`;
+      
+      // Type value as any to handle Prisma Decimal and other complex types
+      const val: any = value;
+      
+      if (val === null) {
+        setParts.push(`${quotedKey} = NULL`);
+      } else if (typeof val === 'boolean') {
+        setParts.push(`${quotedKey} = ${val ? '1' : '0'}`);
+      } else if (val instanceof Date) {
+        setParts.push(`${quotedKey} = '${val.toISOString()}'`);
+      } else if (typeof val === 'number') {
+        // Handle numeric values (including Decimal from Prisma)
+        setParts.push(`${quotedKey} = ${val}`);
+      } else if (Array.isArray(val)) {
+        // Handle arrays as JSONB
+        setParts.push(`${quotedKey} = '${JSON.stringify(val).replace(/'/g, "''")}'::jsonb`);
+      } else if (typeof val === 'object' && val !== null) {
+        // Check if it's a Decimal-like object with toNumber or valueOf method
+        if (typeof val.toNumber === 'function') {
+          setParts.push(`${quotedKey} = ${val.toNumber()}`);
+        } else if (typeof val.valueOf === 'function' && typeof val.valueOf() === 'number') {
+          setParts.push(`${quotedKey} = ${val.valueOf()}`);
+        } else if (val.constructor === Object) {
+          // Only treat plain objects as JSONB
+          setParts.push(`${quotedKey} = '${JSON.stringify(val).replace(/'/g, "''")}'::jsonb`);
+        } else {
+          // For other objects, try to convert to string
+          setParts.push(`${quotedKey} = '${String(val).replace(/'/g, "''")}'`);
+        }
+      } else if (typeof val === 'string') {
+        setParts.push(`${quotedKey} = '${val.replace(/'/g, "''")}'`);
       } else {
-        setParts.push(`${key} = ${value}`);
+        setParts.push(`${quotedKey} = ${val}`);
       }
     }
 
     // Add sync_source
-    setParts.push(`sync_source = '${syncSource.replace(/'/g, "''")}'`);
+    setParts.push(`"sync_source" = '${syncSource.replace(/'/g, "''")}'`);
 
     const setClause = setParts.join(', ');
 
-    await locationPrisma.$executeRawUnsafe(`
-      UPDATE ${tableName}
-      SET ${setClause}
-      WHERE sync_id = '${syncId}'::UUID
-    `);
+    try {
+      await locationPrisma.$executeRawUnsafe(`
+        UPDATE ${tableName}
+        SET ${setClause}
+        WHERE sync_id = '${syncId}'::UUID
+      `);
+    } catch (error: any) {
+      console.error(`Failed to update ${tableName}:`, error);
+      console.error('Set parts:', setParts);
+      console.error('Data keys:', Object.keys(data));
+      throw error;
+    }
   }
 
   /**

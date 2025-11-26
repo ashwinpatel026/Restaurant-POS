@@ -157,6 +157,48 @@ model SyncLog {
   @@map("tbl_sync_log")
 }
 
+// Sync Log table for change detection (from migration)
+model SyncLogChange {
+  id            BigInt    @id @default(autoincrement()) @map("id")
+  tableName     String    @map("table_name") @db.Text
+  recordId      String    @map("record_id") @db.Uuid
+  operation     String    @map("operation") @db.Text // INSERT / UPDATE / DELETE
+  source        String    @map("source") @db.Text // server, terminal, website
+  data          Json?     @map("data") @db.JsonB
+  changeTime    DateTime  @default(now()) @map("change_time")
+  syncStatus    Int       @default(0) @map("sync_status") // 0=pending, 1=processed, 2=failed
+  locationCode  String?   @map("location_code") @db.VarChar(100)
+  errorMessage  String?   @map("error_message") @db.Text
+  retryCount    Int       @default(0) @map("retry_count")
+  lastRetryAt   DateTime? @map("last_retry_at")
+  syncedAt      DateTime? @map("synced_at")
+  syncedBy      Int?      @map("synced_by")
+
+  @@index([syncStatus, changeTime])
+  @@index([tableName, recordId])
+  @@index([locationCode])
+  @@index([syncStatus, locationCode, tableName])
+  @@map("sync_log")
+}
+
+// Sync Status table for tracking sync status per location/table
+model SyncStatus {
+  id                BigInt    @id @default(autoincrement()) @map("id")
+  locationCode      String    @map("location_code") @db.VarChar(100)
+  tableName         String    @map("table_name") @db.Text
+  lastSyncTime      DateTime? @map("last_sync_time")
+  lastSyncStatus    Int       @default(0) @map("last_sync_status") // 0=success, 1=failed
+  totalRecordsSynced BigInt    @default(0) @map("total_records_synced")
+  lastErrorMessage  String?   @map("last_error_message") @db.Text
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@unique([locationCode, tableName])
+  @@index([locationCode])
+  @@index([tableName])
+  @@map("sync_status")
+}
+
 enum AccessLevel {
   COMPANY   // Access all locations in company
   DEALER    // Access all locations in dealer
@@ -216,6 +258,8 @@ model MasterTimeEvent {
   createdDate            DateTime  @default(now()) @map("Created_date")
   createdBy              BigInt?   @map("Created_by")
   updatedOn              DateTime? @map("updated_on")
+  syncId                 String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource             String?   @default("server") @map("sync_source") @db.VarChar(20)
 
   @@map("tbl_master_time_events")
 }
@@ -234,6 +278,8 @@ model MasterPrepZone {
   createdOn          DateTime  @default(now()) @map("createdon")
   updatedBy          BigInt?   @map("updatedby")
   updatedOn          DateTime? @map("updatedon")
+  syncId             String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource         String?   @default("server") @map("sync_source") @db.VarChar(20)
 
   @@map("tbl_master_prep_zone")
 }
@@ -252,6 +298,8 @@ model MasterMenuMaster {
   createdOn         DateTime  @default(now()) @map("createdon")
   updatedBy         BigInt?   @map("updatedby")
   updatedOn         DateTime? @map("updatedon")
+  syncId            String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource        String?   @default("server") @map("sync_source") @db.VarChar(20)
 
   @@map("tbl_master_menu_master")
 }
@@ -278,6 +326,8 @@ model MasterMenuCategory {
   createdOn         DateTime  @default(now()) @map("createdon")
   updatedBy         BigInt?   @map("updatedby")
   updatedOn         DateTime? @map("updatedon")
+  syncId            String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource        String?   @default("server") @map("sync_source") @db.VarChar(20)
 
   @@map("tbl_master_menu_category")
 }
@@ -333,6 +383,8 @@ model MasterMenuItem {
   createdOn                      DateTime  @default(now()) @map("createdon")
   updatedBy                      BigInt?   @map("updatedby")
   updatedOn                      DateTime? @map("updatedon")
+  syncId                         String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource                     String?   @default("server") @map("sync_source") @db.VarChar(20)
 
   @@map("tbl_master_menu_item")
 }
@@ -355,6 +407,8 @@ model MasterModifierGroup {
   createdOn               DateTime @default(now()) @map("createdon")
   updatedBy               BigInt?  @map("updatedby")
   updatedOn               DateTime? @map("updatedon")
+  syncId                  String   @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource              String?  @default("server") @map("sync_source") @db.VarChar(20)
 
   @@index([modifierGroupCode])
   @@map("tbl_master_modifier_group")
@@ -375,6 +429,8 @@ model MasterModifierItem {
   createdOn          DateTime @default(now()) @map("createdon")
   updatedBy          BigInt?  @map("updatedby")
   updatedOn          DateTime? @map("updatedon")
+  syncId             String   @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource         String?  @default("server") @map("sync_source") @db.VarChar(20)
 
   @@map("tbl_master_modifier_item")
 }
@@ -403,7 +459,10 @@ model MasterTax {
   taxrate       Decimal  @map("taxrate") @db.Decimal(22, 2) @default(0.00)
   createdBy     BigInt?  @map("created_by")
   createdDate   DateTime @default(now()) @map("created_date")
+  updatedBy     BigInt?  @map("updated_by")
   updatedOn     DateTime? @map("updated_on")
+  syncId        String   @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource    String?  @default("server") @map("sync_source") @db.VarChar(20)
 
   @@map("tbl_master_tax")
 }
@@ -416,6 +475,8 @@ model MasterStation {
   stationGroups Json?   @map("station_groups")
   createdOn     DateTime @default(now()) @map("created_on")
   updatedOn     DateTime? @map("updated_on")
+  syncId        String  @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource    String? @default("server") @map("sync_source") @db.VarChar(20)
 
   @@map("tbl_master_station")
 }
@@ -429,6 +490,8 @@ model MasterPrinter {
   createdOn     DateTime  @default(now()) @map("createdon")
   updatedBy     BigInt?   @map("updatedby")
   updatedOn     DateTime? @map("updatedon")
+  syncId        String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource    String?   @default("server") @map("sync_source") @db.VarChar(20)
 
   @@map("tbl_master_printer")
 }
