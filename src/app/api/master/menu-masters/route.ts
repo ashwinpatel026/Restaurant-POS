@@ -12,15 +12,15 @@ async function generateMenuMasterCode(): Promise<string> {
   let nextNumber = 1
   
   if (latestMaster?.menuMasterCode) {
-    // Extract number from code like "MM001" or "W001"
-    const match = latestMaster.menuMasterCode.match(/^(MM|W)(\d+)$/)
+    // Extract number from code like "MM1", "MM2", etc.
+    const match = latestMaster.menuMasterCode.match(/^MM(\d+)$/)
     if (match) {
-      nextNumber = parseInt(match[2]) + 1
+      nextNumber = parseInt(match[1]) + 1
     }
   }
   
-  // Format as MM + padded 3-digit number
-  return `MM${String(nextNumber).padStart(3, '0')}`
+  // Format as MM + number starting from 1
+  return `MM${nextNumber}`
 }
 
 // Helper function to map menu master response

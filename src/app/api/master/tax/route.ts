@@ -13,15 +13,15 @@ async function generateTaxCode(): Promise<string> {
   let nextNumber = 1
   
   if (latestTax?.taxCode) {
-    // Extract number from code like "T001"
-    const match = latestTax.taxCode.match(/^T(\d+)$/)
+    // Extract number from code like "TAX1", "TAX2", etc.
+    const match = latestTax.taxCode.match(/^TAX(\d+)$/)
     if (match) {
       nextNumber = parseInt(match[1]) + 1
     }
   }
   
-  // Format as T + padded 3-digit number
-  return `T${String(nextNumber).padStart(3, '0')}`
+  // Format as TAX + number starting from 1
+  return `TAX${nextNumber}`
 }
 
 export async function GET(request: NextRequest) {

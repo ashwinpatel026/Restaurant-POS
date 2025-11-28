@@ -474,6 +474,10 @@ model MasterStation {
   stationname   String? @map("stationname") @db.VarChar(100)
   isActive      Int     @default(1) @map("is_active")
   stationGroups Json?   @map("station_groups")
+  isKitchen     Boolean @default(false) @map("is_kitchen")
+  isBar         Boolean @default(false) @map("is_bar")
+  isBill        Boolean @default(false) @map("is_bill")
+  isReport      Boolean @default(false) @map("is_report")
   createdOn     DateTime @default(now()) @map("created_on")
   updatedOn     DateTime? @map("updated_on")
   syncId        String  @unique @default(uuid()) @map("sync_id") @db.Uuid

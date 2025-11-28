@@ -13,15 +13,15 @@ async function generateEventCode(): Promise<string> {
   let nextNumber = 1
   
   if (latestEvent?.eventCode) {
-    // Extract number from code like "TE001"
+    // Extract number from code like "TE1", "TE2", etc.
     const match = latestEvent.eventCode.match(/^TE(\d+)$/)
     if (match) {
       nextNumber = parseInt(match[1]) + 1
     }
   }
   
-  // Format as TE + padded 3-digit number
-  return `TE${String(nextNumber).padStart(3, '0')}`
+  // Format as TE + number starting from 1
+  return `TE${nextNumber}`
 }
 
 // Helper function to validate and store time string directly

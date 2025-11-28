@@ -67,7 +67,7 @@ model TimeEvent {
   storeCode              String?   @map("store_code") @db.VarChar(100)
   isSyncToWeb            Int?      @map("is_sync_to_web")
   isSyncToLocal          Int?      @map("is_sync_to_local")
-  syncId                 String?   @unique @map("sync_id") @db.Uuid
+  syncId                 String?   @unique @default(uuid()) @map("sync_id") @db.Uuid
   syncSource             String?   @default("server") @map("sync_source") @db.VarChar(20)
 
   // Relationships
@@ -93,7 +93,7 @@ model PrepZone {
   isSyncToWeb        Int       @default(0) @map("is_sync_to_web")
   isSyncToLocal      Int       @default(0) @map("is_sync_to_local")
   storeCode          String?   @map("store_code") @db.VarChar(100)
-  syncId             String?   @unique @map("sync_id") @db.Uuid
+  syncId             String?   @unique @default(uuid()) @map("sync_id") @db.Uuid
   syncSource         String?   @default("server") @map("sync_source") @db.VarChar(20)
 
   @@map("tbl_prep_zone")
@@ -117,7 +117,7 @@ model MenuMaster {
   isSyncToWeb       Int       @default(0) @map("is_sync_to_web")
   isSyncToLocal     Int       @default(0) @map("is_sync_to_local")
   storeCode         String?   @map("store_code") @db.VarChar(100)
-  syncId            String?   @unique @map("sync_id") @db.Uuid
+  syncId            String?   @unique @default(uuid()) @map("sync_id") @db.Uuid
   syncSource        String?   @default("server") @map("sync_source") @db.VarChar(20)
 
   // Relationships
@@ -158,7 +158,7 @@ model MenuCategory {
   isSyncToWeb       Int       @default(0) @map("is_sync_to_web")
   isSyncToLocal     Int       @default(0) @map("is_sync_to_local")
   storeCode         String?   @map("store_code") @db.VarChar(100)
-  syncId            String?   @unique @map("sync_id") @db.Uuid
+  syncId            String?   @unique @default(uuid()) @map("sync_id") @db.Uuid
   syncSource        String?   @default("server") @map("sync_source") @db.VarChar(20)
 
   // Relationships
@@ -225,7 +225,7 @@ model MenuItem {
   isSyncToWeb                    Int       @default(0) @map("is_sync_to_web")
   isSyncToLocal                  Int       @default(0) @map("is_sync_to_local")
   storeCode                      String?   @map("store_code") @db.VarChar(100)
-  syncId                         String?   @unique @map("sync_id") @db.Uuid
+  syncId                         String?   @unique @default(uuid()) @map("sync_id") @db.Uuid
   syncSource                     String?   @default("server") @map("sync_source") @db.VarChar(20)
 
   @@map("tbl_menu_item")
@@ -301,7 +301,7 @@ model Tax {
   isSyncToWeb   Int      @default(0) @map("is_sync_to_web")
   isSyncToLocal Int      @default(0) @map("is_sync_to_local")
   storeCode     String?  @map("store_code") @db.VarChar(100)
-  syncId        String?  @unique @map("sync_id") @db.Uuid
+  syncId        String?  @unique @default(uuid()) @map("sync_id") @db.Uuid
   syncSource    String?  @default("server") @map("sync_source") @db.VarChar(20)
 
   @@map("tbl_tax")
@@ -326,7 +326,7 @@ model ModifierGroup {
   isSyncToWeb             Int      @default(0) @map("is_sync_to_web")
   isSyncToLocal           Int      @default(0) @map("is_sync_to_local")
   storeCode               String?  @map("store_code") @db.VarChar(100)
-  syncId                  String?  @unique @map("sync_id") @db.Uuid
+  syncId                  String?  @unique @default(uuid()) @map("sync_id") @db.Uuid
   syncSource              String?  @default("server") @map("sync_source") @db.VarChar(20)
 
   // Items in this group (by code)
@@ -352,7 +352,7 @@ model ModifierItem {
   isSyncToWeb        Int      @default(0) @map("is_sync_to_web")
   isSyncToLocal      Int      @default(0) @map("is_sync_to_local")
   storeCode          String?  @map("store_code") @db.VarChar(100)
-  syncId             String?  @unique @map("sync_id") @db.Uuid
+  syncId             String?  @unique @default(uuid()) @map("sync_id") @db.Uuid
   syncSource         String?  @default("server") @map("sync_source") @db.VarChar(20)
 
   @@map("tbl_modifier_item")
@@ -388,10 +388,15 @@ model Station {
   stationname   String? @map("stationname") @db.VarChar(100)
   isActive      Int?    @map("is_active")
   stationGroups Json?   @map("station_groups") 
+  isKitchen     Boolean @default(false) @map("is_kitchen")
+  isBar         Boolean @default(false) @map("is_bar")
+  isBill        Boolean @default(false) @map("is_bill")
+  isReport      Boolean @default(false) @map("is_report")
+  ipAddress     String? @map("ip_address") @db.VarChar(50)
   isSyncToWeb   Int     @default(0) @map("is_sync_to_web")
   isSyncToLocal Int     @default(0) @map("is_sync_to_local")
   storeCode     String? @map("store_code") @db.VarChar(100)
-  syncId        String? @unique @map("sync_id") @db.Uuid
+  syncId        String? @unique @default(uuid()) @map("sync_id") @db.Uuid
   syncSource    String? @default("server") @map("sync_source") @db.VarChar(20)
 
   // Relationship
@@ -449,7 +454,7 @@ model Printer {
   isSyncToWeb   Int       @default(0) @map("is_sync_to_web")
   isSyncToLocal Int       @default(0) @map("is_sync_to_local")
   storeCode     String?   @map("store_code") @db.VarChar(100)
-  syncId        String?   @unique @map("sync_id") @db.Uuid
+  syncId        String?   @unique @default(uuid()) @map("sync_id") @db.Uuid
   syncSource    String?   @default("server") @map("sync_source") @db.VarChar(20)
 
   @@map("tbl_printer")

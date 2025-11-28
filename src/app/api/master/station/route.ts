@@ -14,15 +14,15 @@ async function generateStationCode(): Promise<string> {
   let nextNumber = 1
   
   if (latestStation?.stationCode) {
-    // Extract number from code like "S001"
-    const match = latestStation.stationCode.match(/^S(\d+)$/)
+    // Extract number from code like "STA1", "STA2", etc.
+    const match = latestStation.stationCode.match(/^STA(\d+)$/)
     if (match) {
       nextNumber = parseInt(match[1]) + 1
     }
   }
   
-  // Format as S + padded 3-digit number
-  return `S${String(nextNumber).padStart(3, '0')}`
+  // Format as STA + number starting from 1
+  return `STA${nextNumber}`
 }
 
 function sanitizeStationGroups(input: unknown): string[] {
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { stationname, isActive, stationGroups } = body
+    const { stationname, isActive, stationGroups, isKitchen, isBar, isBill, isReport } = body
 
     const groups = sanitizeStationGroups(stationGroups)
 
@@ -110,6 +110,10 @@ export async function POST(request: NextRequest) {
       stationCode: stationCode,
       stationname,
       isActive: isActive ?? 1,
+      isKitchen: isKitchen ?? false,
+      isBar: isBar ?? false,
+      isBill: isBill ?? false,
+      isReport: isReport ?? false,
     }
 
     if (groups.length > 0) {

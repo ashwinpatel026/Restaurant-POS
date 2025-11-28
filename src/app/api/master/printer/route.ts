@@ -13,15 +13,15 @@ async function generatePrinterCode(): Promise<string> {
   let nextNumber = 1
   
   if (latestPrinter?.printerCode) {
-    // Extract number from code like "P001"
-    const match = latestPrinter.printerCode.match(/^P(\d+)$/)
+    // Extract number from code like "PRT1", "PRT2", etc.
+    const match = latestPrinter.printerCode.match(/^PRT(\d+)$/)
     if (match) {
       nextNumber = parseInt(match[1]) + 1
     }
   }
   
-  // Format as P + padded 3-digit number
-  return `P${String(nextNumber).padStart(3, '0')}`
+  // Format as PRT + number starting from 1
+  return `PRT${nextNumber}`
 }
 
 // Helper function to map printer response

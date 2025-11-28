@@ -211,6 +211,10 @@ export const SYNC_FIELD_MAP: Record<string, Record<string, string>> = {
     'stationname': 'stationname',
     'is_active': 'is_active',
     'station_groups': 'station_groups',
+    'is_kitchen': 'is_kitchen',
+    'is_bar': 'is_bar',
+    'is_bill': 'is_bill',
+    'is_report': 'is_report',
   },
   'tbl_master_time_events': {
     'Event_code': 'Event_code',

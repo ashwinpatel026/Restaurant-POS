@@ -13,15 +13,15 @@ async function generateModifierItemCode(): Promise<string> {
   let nextNumber = 1
   
   if (latestItem?.modifierItemCode) {
-    // Extract number from code like "MI001"
-    const match = latestItem.modifierItemCode.match(/^MI(\d+)$/)
+    // Extract number from code like "MOI1", "MOI2", etc.
+    const match = latestItem.modifierItemCode.match(/^MOI(\d+)$/)
     if (match) {
       nextNumber = parseInt(match[1]) + 1
     }
   }
   
-  // Format as MI + padded 3-digit number
-  return `MI${String(nextNumber).padStart(3, '0')}`
+  // Format as MOI + number starting from 1
+  return `MOI${nextNumber}`
 }
 
 // Helper function to map modifier item response

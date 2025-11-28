@@ -2,7 +2,42 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma, checkConnection } from '@/lib/database'
-import { generateUniqueCode } from '@/lib/codeGenerator'
+
+// Helper function to generate unique menu item code
+async function generateMenuItemCode(): Promise<string> {
+  const storeCode = process.env.STORE_CODE || ''
+  const prefix = `WL${storeCode}MI`
+  
+  // Get all menu item codes that match the WL pattern for this store
+  const menuItems = await prisma.menuItem.findMany({
+    where: {
+      menuItemCode: {
+        startsWith: prefix
+      }
+    },
+    select: { menuItemCode: true },
+    orderBy: { menuItemId: 'desc' }
+  })
+
+  let nextNumber = 1
+  
+  if (menuItems.length > 0) {
+    // Extract number from codes like "WLLOC01MI1", "WLLOC01MI2", etc.
+    const numbers = menuItems
+      .map(menuItem => {
+        const match = menuItem.menuItemCode.match(new RegExp(`^${prefix}(\\d+)$`))
+        return match ? parseInt(match[1]) : 0
+      })
+      .filter(num => num > 0)
+    
+    if (numbers.length > 0) {
+      nextNumber = Math.max(...numbers) + 1
+    }
+  }
+  
+  // Format as WL + STORE_CODE + MI + number starting from 1
+  return `${prefix}${nextNumber}`
+}
 
 // Helper function to handle database operations with retry
 async function withRetry<T>(operation: () => Promise<T>, maxRetries = 3): Promise<T> {
@@ -128,7 +163,8 @@ export async function POST(request: NextRequest) {
     } = body
 
     // Generate unique code for menu item
-    const menuItemCode = await generateUniqueCode('menuItem', 'menuItemCode')
+    // Generate unique menu item code
+    const menuItemCode = await generateMenuItemCode()
 
     // Check if menuImg is too large (base64 string length check)
     if (menuImg && menuImg.length > 2000000) { // ~2MB base64 string for 1MB file

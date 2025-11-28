@@ -12,15 +12,15 @@ async function generateMenuCategoryCode(): Promise<string> {
   let nextNumber = 1
   
   if (latestCategory?.menuCategoryCode) {
-    // Extract number from code like "MC001" or "W001"
-    const match = latestCategory.menuCategoryCode.match(/^(MC|W)(\d+)$/)
+    // Extract number from code like "MC1", "MC2", etc.
+    const match = latestCategory.menuCategoryCode.match(/^MC(\d+)$/)
     if (match) {
-      nextNumber = parseInt(match[2]) + 1
+      nextNumber = parseInt(match[1]) + 1
     }
   }
   
-  // Format as MC + padded 3-digit number
-  return `MC${String(nextNumber).padStart(3, '0')}`
+  // Format as MC + number starting from 1
+  return `MC${nextNumber}`
 }
 
 // Helper function to map menu category response

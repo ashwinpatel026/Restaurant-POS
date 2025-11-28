@@ -6,24 +6,38 @@ import { Prisma } from '@prisma/client'
 
 // Helper function to generate unique station code
 async function generateStationCode(): Promise<string> {
-  // Get the latest station code
-  const latestStation = await prisma.station.findFirst({
-    orderBy: { tblStationId: 'desc' },
-    select: { stationCode: true }
+  const storeCode = process.env.STORE_CODE || ''
+  const prefix = `WL${storeCode}STA`
+  
+  // Get all station codes that match the WL pattern for this store
+  const stations = await prisma.station.findMany({
+    where: {
+      stationCode: {
+        startsWith: prefix
+      }
+    },
+    select: { stationCode: true },
+    orderBy: { tblStationId: 'desc' }
   })
 
   let nextNumber = 1
   
-  if (latestStation?.stationCode) {
-    // Extract number from code like "S001"
-    const match = latestStation.stationCode.match(/^S(\d+)$/)
-    if (match) {
-      nextNumber = parseInt(match[1]) + 1
+  if (stations.length > 0) {
+    // Extract number from codes like "WLLOC01STA1", "WLLOC01STA2", etc.
+    const numbers = stations
+      .map(station => {
+        const match = station.stationCode.match(new RegExp(`^${prefix}(\\d+)$`))
+        return match ? parseInt(match[1]) : 0
+      })
+      .filter(num => num > 0)
+    
+    if (numbers.length > 0) {
+      nextNumber = Math.max(...numbers) + 1
     }
   }
   
-  // Format as S + padded 3-digit number
-  return `S${String(nextNumber).padStart(3, '0')}`
+  // Format as WL + STORE_CODE + STA + number starting from 1
+  return `${prefix}${nextNumber}`
 }
 
 function sanitizeStationGroups(input: unknown): string[] {
@@ -105,7 +119,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { stationname, isActive, stationGroups } = body
+    const { stationname, isActive, stationGroups, isKitchen, isBar, isBill, isReport, ipAddress } = body
 
     const groups = sanitizeStationGroups(stationGroups)
 
@@ -116,6 +130,11 @@ export async function POST(request: NextRequest) {
       stationCode: stationCode,
       stationname,
       isActive: isActive ?? 1,
+      isKitchen: isKitchen ?? false,
+      isBar: isBar ?? false,
+      isBill: isBill ?? false,
+      isReport: isReport ?? false,
+      ipAddress: ipAddress || null,
       storeCode: process.env.STORE_CODE || null,
     }
 

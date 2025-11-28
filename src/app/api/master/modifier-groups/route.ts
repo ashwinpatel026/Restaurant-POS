@@ -13,15 +13,15 @@ async function generateModifierGroupCode(): Promise<string> {
   let nextNumber = 1
   
   if (latestGroup?.modifierGroupCode) {
-    // Extract number from code like "MG001"
-    const match = latestGroup.modifierGroupCode.match(/^MG(\d+)$/)
+    // Extract number from code like "MOD1", "MOD2", etc.
+    const match = latestGroup.modifierGroupCode.match(/^MOD(\d+)$/)
     if (match) {
       nextNumber = parseInt(match[1]) + 1
     }
   }
   
-  // Format as MG + padded 3-digit number
-  return `MG${String(nextNumber).padStart(3, '0')}`
+  // Format as MOD + number starting from 1
+  return `MOD${nextNumber}`
 }
 
 // Helper function to map modifier group response

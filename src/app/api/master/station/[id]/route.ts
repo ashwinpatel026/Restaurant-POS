@@ -91,12 +91,16 @@ export async function PUT(
     const stationId = BigInt(idParam)
     const body = await request.json()
 
-    const { stationname, isActive, stationGroups } = body
+    const { stationname, isActive, stationGroups, isKitchen, isBar, isBill, isReport } = body
     const groups = sanitizeStationGroups(stationGroups)
 
     const updateData: Record<string, unknown> = {
       stationname,
       isActive,
+      isKitchen: isKitchen ?? false,
+      isBar: isBar ?? false,
+      isBill: isBill ?? false,
+      isReport: isReport ?? false,
     }
 
     if (groups.length > 0) {

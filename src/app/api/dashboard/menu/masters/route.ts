@@ -2,7 +2,42 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/database'
-import { generateUniqueCode } from '@/lib/codeGenerator'
+
+// Helper function to generate unique menu master code
+async function generateMenuMasterCode(): Promise<string> {
+  const storeCode = process.env.STORE_CODE || ''
+  const prefix = `WL${storeCode}MM`
+  
+  // Get all menu master codes that match the WL pattern for this store
+  const menuMasters = await prisma.menuMaster.findMany({
+    where: {
+      menuMasterCode: {
+        startsWith: prefix
+      }
+    },
+    select: { menuMasterCode: true },
+    orderBy: { menuMasterId: 'desc' }
+  })
+
+  let nextNumber = 1
+  
+  if (menuMasters.length > 0) {
+    // Extract number from codes like "WLLOC01MM1", "WLLOC01MM2", etc.
+    const numbers = menuMasters
+      .map(menuMaster => {
+        const match = menuMaster.menuMasterCode.match(new RegExp(`^${prefix}(\\d+)$`))
+        return match ? parseInt(match[1]) : 0
+      })
+      .filter(num => num > 0)
+    
+    if (numbers.length > 0) {
+      nextNumber = Math.max(...numbers) + 1
+    }
+  }
+  
+  // Format as WL + STORE_CODE + MM + number starting from 1
+  return `${prefix}${nextNumber}`
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -130,7 +165,7 @@ export async function POST(request: NextRequest) {
     } = body
 
     // Generate unique menu master code
-    const menuMasterCode = await generateUniqueCode('menuMaster', 'menuMasterCode')
+    const menuMasterCode = await generateMenuMasterCode()
 
     // Create menu master
     const createData = {

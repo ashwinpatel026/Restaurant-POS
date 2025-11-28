@@ -13,15 +13,15 @@ async function generatePrepZoneCode(): Promise<string> {
   let nextNumber = 1
   
   if (latestZone?.prepZoneCode) {
-    // Extract number from code like "PZ001"
+    // Extract number from code like "PZ1", "PZ2", etc.
     const match = latestZone.prepZoneCode.match(/^PZ(\d+)$/)
     if (match) {
       nextNumber = parseInt(match[1]) + 1
     }
   }
   
-  // Format as PZ + padded 3-digit number
-  return `PZ${String(nextNumber).padStart(3, '0')}`
+  // Format as PZ + number starting from 1
+  return `PZ${nextNumber}`
 }
 
 // Helper function to map prep zone response

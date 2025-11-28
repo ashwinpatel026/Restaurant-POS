@@ -5,24 +5,38 @@ import { prisma } from '@/lib/database'
 
 // Helper function to generate unique tax code
 async function generateTaxCode(): Promise<string> {
-  // Get the latest tax code
-  const latestTax = await prisma.tax.findFirst({
-    orderBy: { tblTaxId: 'desc' },
-    select: { taxCode: true }
+  const storeCode = process.env.STORE_CODE || ''
+  const prefix = `WL${storeCode}TAX`
+  
+  // Get all tax codes that match the WL pattern for this store
+  const taxes = await prisma.tax.findMany({
+    where: {
+      taxCode: {
+        startsWith: prefix
+      }
+    },
+    select: { taxCode: true },
+    orderBy: { tblTaxId: 'desc' }
   })
 
   let nextNumber = 1
   
-  if (latestTax?.taxCode) {
-    // Extract number from code like "T001"
-    const match = latestTax.taxCode.match(/^T(\d+)$/)
-    if (match) {
-      nextNumber = parseInt(match[1]) + 1
+  if (taxes.length > 0) {
+    // Extract number from codes like "WLLOC01TAX1", "WLLOC01TAX2", etc.
+    const numbers = taxes
+      .map(tax => {
+        const match = tax.taxCode.match(new RegExp(`^${prefix}(\\d+)$`))
+        return match ? parseInt(match[1]) : 0
+      })
+      .filter(num => num > 0)
+    
+    if (numbers.length > 0) {
+      nextNumber = Math.max(...numbers) + 1
     }
   }
   
-  // Format as T + padded 3-digit number
-  return `T${String(nextNumber).padStart(3, '0')}`
+  // Format as WL + STORE_CODE + TAX + number starting from 1
+  return `${prefix}${nextNumber}`
 }
 
 export async function GET() {

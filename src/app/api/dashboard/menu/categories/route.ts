@@ -2,7 +2,42 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/database'
-import { generateUniqueCode } from '@/lib/codeGenerator'
+
+// Helper function to generate unique menu category code
+async function generateMenuCategoryCode(): Promise<string> {
+  const storeCode = process.env.STORE_CODE || ''
+  const prefix = `WL${storeCode}MC`
+  
+  // Get all menu category codes that match the WL pattern for this store
+  const menuCategories = await prisma.menuCategory.findMany({
+    where: {
+      menuCategoryCode: {
+        startsWith: prefix
+      }
+    },
+    select: { menuCategoryCode: true },
+    orderBy: { menuCategoryId: 'desc' }
+  })
+
+  let nextNumber = 1
+  
+  if (menuCategories.length > 0) {
+    // Extract number from codes like "WLLOC01MC1", "WLLOC01MC2", etc.
+    const numbers = menuCategories
+      .map(menuCategory => {
+        const match = menuCategory.menuCategoryCode.match(new RegExp(`^${prefix}(\\d+)$`))
+        return match ? parseInt(match[1]) : 0
+      })
+      .filter(num => num > 0)
+    
+    if (numbers.length > 0) {
+      nextNumber = Math.max(...numbers) + 1
+    }
+  }
+  
+  // Format as WL + STORE_CODE + MC + number starting from 1
+  return `${prefix}${nextNumber}`
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -128,7 +163,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate unique menu category code
-    const menuCategoryCode = await generateUniqueCode('menuCategory', 'menuCategoryCode')
+    const menuCategoryCode = await generateMenuCategoryCode()
 
     const menuCategory = await prisma.menuCategory.create({
       data: {

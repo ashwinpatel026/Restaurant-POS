@@ -2,7 +2,42 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/database'
-import { generateUniqueCode } from '@/lib/codeGenerator'
+
+// Helper function to generate unique modifier group code
+async function generateModifierGroupCode(): Promise<string> {
+  const storeCode = process.env.STORE_CODE || ''
+  const prefix = `WL${storeCode}MOD`
+  
+  // Get all modifier group codes that match the WL pattern for this store
+  const modifierGroups = await (prisma as any).modifierGroup.findMany({
+    where: {
+      modifierGroupCode: {
+        startsWith: prefix
+      }
+    },
+    select: { modifierGroupCode: true },
+    orderBy: { id: 'desc' }
+  })
+
+  let nextNumber = 1
+  
+  if (modifierGroups.length > 0) {
+    // Extract number from codes like "WLLOC01MOD1", "WLLOC01MOD2", etc.
+    const numbers = modifierGroups
+      .map((group: any) => {
+        const match = group.modifierGroupCode.match(new RegExp(`^${prefix}(\\d+)$`))
+        return match ? parseInt(match[1]) : 0
+      })
+      .filter(num => num > 0)
+    
+    if (numbers.length > 0) {
+      nextNumber = Math.max(...numbers) + 1
+    }
+  }
+  
+  // Format as WL + STORE_CODE + MOD + number starting from 1
+  return `${prefix}${nextNumber}`
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -116,7 +151,8 @@ export async function POST(request: NextRequest) {
       isActive = 1,
     } = body
 
-    const modifierGroupCode = await generateUniqueCode('modifierGroup', 'modifierGroupCode')
+    // Generate unique modifier group code
+    const modifierGroupCode = await generateModifierGroupCode()
 
     const created = await (prisma as any).modifierGroup.create({
       data: {

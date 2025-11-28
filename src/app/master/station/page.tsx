@@ -20,12 +20,20 @@ interface Station {
   stationname: string | null;
   isActive: number | null;
   stationGroups?: string[];
+  isKitchen?: boolean;
+  isBar?: boolean;
+  isBill?: boolean;
+  isReport?: boolean;
 }
 
 interface StationFormData {
   stationname: string;
   isActive: number;
   stationGroups: string[];
+  isKitchen: boolean;
+  isBar: boolean;
+  isBill: boolean;
+  isReport: boolean;
 }
 
 const normalizeStationGroups = (value: unknown): string[] => {
@@ -391,6 +399,66 @@ export default function StationManagementPage() {
                   ),
                 },
                 {
+                  header: "Kitchen",
+                  accessor: "isKitchen",
+                  cell: (station: Station) => (
+                    <span
+                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        station.isKitchen
+                          ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
+                          : "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400"
+                      }`}
+                    >
+                      {station.isKitchen ? "Yes" : "No"}
+                    </span>
+                  ),
+                },
+                {
+                  header: "Bar",
+                  accessor: "isBar",
+                  cell: (station: Station) => (
+                    <span
+                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        station.isBar
+                          ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
+                          : "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400"
+                      }`}
+                    >
+                      {station.isBar ? "Yes" : "No"}
+                    </span>
+                  ),
+                },
+                {
+                  header: "Bill",
+                  accessor: "isBill",
+                  cell: (station: Station) => (
+                    <span
+                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        station.isBill
+                          ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
+                          : "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400"
+                      }`}
+                    >
+                      {station.isBill ? "Yes" : "No"}
+                    </span>
+                  ),
+                },
+                {
+                  header: "Report",
+                  accessor: "isReport",
+                  cell: (station: Station) => (
+                    <span
+                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        station.isReport
+                          ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
+                          : "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400"
+                      }`}
+                    >
+                      {station.isReport ? "Yes" : "No"}
+                    </span>
+                  ),
+                },
+                {
                   header: "Actions",
                   accessor: "tblStationId",
                   sortable: false,
@@ -471,6 +539,10 @@ function StationForm({
     stationname: "",
     isActive: 1,
     stationGroups: [],
+    isKitchen: false,
+    isBar: false,
+    isBill: false,
+    isReport: false,
   });
 
   const [loading, setLoading] = useState(false);
@@ -521,12 +593,20 @@ function StationForm({
         stationname: station.stationname || "",
         isActive: station.isActive ?? 1,
         stationGroups: normalizeStationGroups(station.stationGroups),
+        isKitchen: station.isKitchen ?? false,
+        isBar: station.isBar ?? false,
+        isBill: station.isBill ?? false,
+        isReport: station.isReport ?? false,
       });
     } else {
       setFormData({
         stationname: "",
         isActive: 1,
         stationGroups: [],
+        isKitchen: false,
+        isBar: false,
+        isBill: false,
+        isReport: false,
       });
     }
     setGroupInput("");
@@ -672,6 +752,58 @@ function StationForm({
           <option value={1}>Active</option>
           <option value={0}>Inactive</option>
         </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+          Station Type
+        </label>
+        <div className="space-y-3">
+          <label className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={formData.isKitchen}
+              onChange={(e) =>
+                setFormData({ ...formData, isKitchen: e.target.checked })
+              }
+              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300">Kitchen</span>
+          </label>
+          <label className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={formData.isBar}
+              onChange={(e) =>
+                setFormData({ ...formData, isBar: e.target.checked })
+              }
+              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300">Bar</span>
+          </label>
+          <label className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={formData.isBill}
+              onChange={(e) =>
+                setFormData({ ...formData, isBill: e.target.checked })
+              }
+              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300">Bill</span>
+          </label>
+          <label className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={formData.isReport}
+              onChange={(e) =>
+                setFormData({ ...formData, isReport: e.target.checked })
+              }
+              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+            />
+            <span className="text-sm text-gray-700 dark:text-gray-300">Report</span>
+          </label>
+        </div>
       </div>
 
       <div>

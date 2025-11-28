@@ -28,24 +28,38 @@ export async function GET(request: NextRequest) {
 
 // Helper function to generate next event code
 async function generateEventCode(): Promise<string> {
-  // Get the last event ordered by ID
-  const lastEvent = await prisma.timeEvent.findFirst({
-    orderBy: {
-      id: 'desc'
-    }
-  })
+  const storeCode = process.env.STORE_CODE || ''
+  const prefix = `WL${storeCode}TE`
   
+  // Get all event codes that match the WL pattern for this store
+  const events = await prisma.timeEvent.findMany({
+    where: {
+      eventCode: {
+        startsWith: prefix
+      }
+    },
+    select: { eventCode: true },
+    orderBy: { id: 'desc' }
+  })
+
   let nextNumber = 1
-  if (lastEvent && lastEvent.eventCode) {
-    // Extract number from code like "TE001"
-    const match = lastEvent.eventCode.match(/TE(\d+)/)
-    if (match) {
-      nextNumber = parseInt(match[1], 10) + 1
+  
+  if (events.length > 0) {
+    // Extract number from codes like "WLLOC01TE1", "WLLOC01TE2", etc.
+    const numbers = events
+      .map(event => {
+        const match = event.eventCode.match(new RegExp(`^${prefix}(\\d+)$`))
+        return match ? parseInt(match[1]) : 0
+      })
+      .filter(num => num > 0)
+    
+    if (numbers.length > 0) {
+      nextNumber = Math.max(...numbers) + 1
     }
   }
   
-  // Format as TE + padded 3-digit number
-  return `TE${String(nextNumber).padStart(3, '0')}`
+  // Format as WL + STORE_CODE + TE + number starting from 1
+  return `${prefix}${nextNumber}`
 }
 
 // Helper function to validate and store time string directly

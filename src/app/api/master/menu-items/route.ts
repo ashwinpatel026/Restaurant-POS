@@ -12,15 +12,15 @@ async function generateMenuItemCode(): Promise<string> {
   let nextNumber = 1
   
   if (latestItem?.menuItemCode) {
-    // Extract number from code like "MI001" or "W001"
-    const match = latestItem.menuItemCode.match(/^(MI|W)(\d+)$/)
+    // Extract number from code like "MI1", "MI2", etc.
+    const match = latestItem.menuItemCode.match(/^MI(\d+)$/)
     if (match) {
-      nextNumber = parseInt(match[2]) + 1
+      nextNumber = parseInt(match[1]) + 1
     }
   }
   
-  // Format as MI + padded 3-digit number
-  return `MI${String(nextNumber).padStart(3, '0')}`
+  // Format as MI + number starting from 1
+  return `MI${nextNumber}`
 }
 
 // Helper function to map menu item response

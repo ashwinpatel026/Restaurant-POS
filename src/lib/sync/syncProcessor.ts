@@ -23,6 +23,10 @@ export class SyncProcessor {
     'inherit_dining_tax',
     'disqualify_dining_tax_exemption',
     'inherit_modifier_group',
+    'is_kitchen',
+    'is_bar',
+    'is_bill',
+    'is_report',
   ]);
 
   /**
@@ -142,7 +146,7 @@ export class SyncProcessor {
     const { sync_id, sync_source, ...recordData } = parsedData;
 
     // Map field names from master table to location table
-    const mappedData = this.mapFieldsToLocationTable(tableName, recordData);
+    const mappedData = this.mapFieldsToLocationTable(tableName, recordData, locationCode);
     
     // Add store_code from locationCode (all location tables have store_code column)
     // This maps the sync location_code to the location database's store_code column
@@ -152,15 +156,27 @@ export class SyncProcessor {
 
     switch (operation) {
       case 'INSERT':
-        await this.handleInsert(locationTableName, recordId, mappedData, parsedData.sync_source || 'server');
+        await this.handleInsert(
+          locationTableName,
+          recordId,
+          mappedData,
+          parsedData.sync_source || 'server',
+          locationCode
+        );
         break;
 
       case 'UPDATE':
-        await this.handleUpdate(locationTableName, recordId, mappedData, parsedData.sync_source || 'server');
+        await this.handleUpdate(
+          locationTableName,
+          recordId,
+          mappedData,
+          parsedData.sync_source || 'server',
+          locationCode
+        );
         break;
 
       case 'DELETE':
-        await this.handleDelete(locationTableName, recordId);
+        await this.handleDelete(locationTableName, recordId, locationCode);
         break;
 
       default:
@@ -172,7 +188,7 @@ export class SyncProcessor {
    * Map field names from master table to location table
    * Only includes columns defined in SYNC_FIELD_MAP (whitelist approach)
    */
-  private mapFieldsToLocationTable(masterTableName: string, data: Record<string, any>): Record<string, any> {
+  private mapFieldsToLocationTable(masterTableName: string, data: Record<string, any>, locationCode?: string): Record<string, any> {
     const fieldMap = SYNC_FIELD_MAP[masterTableName];
     if (!fieldMap) {
       // No mapping defined - return empty object (don't sync anything)
@@ -232,7 +248,134 @@ export class SyncProcessor {
       
       // Only include if field is in the sync map (whitelist)
       if (mappedKey) {
-        mappedData[mappedKey] = value;
+        // Special handling for code fields: transform from master format to dashboard format
+        if (locationCode) {
+          // Handle tax_code
+          if (masterTableName === 'tbl_master_tax' && key === 'tax_code') {
+            // Master format: TAX1, TAX2, etc.
+            // Dashboard format: WM + STORE_CODE + TAX1 (e.g., WMLOC01TAX1)
+            const taxCodeValue = String(value || '');
+            const taxMatch = taxCodeValue.match(/^(TAX\d+)$/);
+            if (taxMatch) {
+              mappedData[mappedKey] = `WM${locationCode}${taxMatch[1]}`;
+            } else {
+              mappedData[mappedKey] = value;
+            }
+          }
+          // Handle printer_code
+          else if (masterTableName === 'tbl_master_printer' && key === 'printer_code') {
+            // Master format: PRT1, PRT2, etc.
+            // Dashboard format: WM + STORE_CODE + PRT1 (e.g., WMLOC01PRT1)
+            const printerCodeValue = String(value || '');
+            const printerMatch = printerCodeValue.match(/^(PRT\d+)$/);
+            if (printerMatch) {
+              mappedData[mappedKey] = `WM${locationCode}${printerMatch[1]}`;
+            } else {
+              mappedData[mappedKey] = value;
+            }
+          }
+          // Handle station_code
+          else if (masterTableName === 'tbl_master_station' && key === 'station_code') {
+            // Master format: STA1, STA2, etc.
+            // Dashboard format: WM + STORE_CODE + STA1 (e.g., WMLOC01STA1)
+            const stationCodeValue = String(value || '');
+            const stationMatch = stationCodeValue.match(/^(STA\d+)$/);
+            if (stationMatch) {
+              mappedData[mappedKey] = `WM${locationCode}${stationMatch[1]}`;
+            } else {
+              mappedData[mappedKey] = value;
+            }
+          }
+          // Handle Event_code (time events) - key is normalized to lowercase
+          else if (masterTableName === 'tbl_master_time_events' && key === 'event_code') {
+            // Master format: TE1, TE2, etc.
+            // Dashboard format: WM + STORE_CODE + TE1 (e.g., WMLOC01TE1)
+            const eventCodeValue = String(value || '');
+            const eventMatch = eventCodeValue.match(/^(TE\d+)$/);
+            if (eventMatch) {
+              mappedData[mappedKey] = `WM${locationCode}${eventMatch[1]}`;
+            } else {
+              mappedData[mappedKey] = value;
+            }
+          }
+          // Handle prep_zone_code
+          else if (masterTableName === 'tbl_master_prep_zone' && key === 'prep_zone_code') {
+            // Master format: PZ1, PZ2, etc.
+            // Dashboard format: WM + STORE_CODE + PZ1 (e.g., WMLOC01PZ1)
+            const prepZoneCodeValue = String(value || '');
+            const prepZoneMatch = prepZoneCodeValue.match(/^(PZ\d+)$/);
+            if (prepZoneMatch) {
+              mappedData[mappedKey] = `WM${locationCode}${prepZoneMatch[1]}`;
+            } else {
+              mappedData[mappedKey] = value;
+            }
+          }
+          // Handle menu_master_code
+          else if (masterTableName === 'tbl_master_menu_master' && key === 'menu_master_code') {
+            // Master format: MM1, MM2, etc.
+            // Dashboard format: WM + STORE_CODE + MM1 (e.g., WMLOC01MM1)
+            const menuMasterCodeValue = String(value || '');
+            const menuMasterMatch = menuMasterCodeValue.match(/^(MM\d+)$/);
+            if (menuMasterMatch) {
+              mappedData[mappedKey] = `WM${locationCode}${menuMasterMatch[1]}`;
+            } else {
+              mappedData[mappedKey] = value;
+            }
+          }
+          // Handle menu_category_code
+          else if (masterTableName === 'tbl_master_menu_category' && key === 'menu_category_code') {
+            // Master format: MC1, MC2, etc.
+            // Dashboard format: WM + STORE_CODE + MC1 (e.g., WMLOC01MC1)
+            const menuCategoryCodeValue = String(value || '');
+            const menuCategoryMatch = menuCategoryCodeValue.match(/^(MC\d+)$/);
+            if (menuCategoryMatch) {
+              mappedData[mappedKey] = `WM${locationCode}${menuCategoryMatch[1]}`;
+            } else {
+              mappedData[mappedKey] = value;
+            }
+          }
+          // Handle menu_item_code
+          else if (masterTableName === 'tbl_master_menu_item' && key === 'menu_item_code') {
+            // Master format: MI1, MI2, etc.
+            // Dashboard format: WM + STORE_CODE + MI1 (e.g., WMLOC01MI1)
+            const menuItemCodeValue = String(value || '');
+            const menuItemMatch = menuItemCodeValue.match(/^(MI\d+)$/);
+            if (menuItemMatch) {
+              mappedData[mappedKey] = `WM${locationCode}${menuItemMatch[1]}`;
+            } else {
+              mappedData[mappedKey] = value;
+            }
+          }
+          // Handle modifier_group_code
+          else if (masterTableName === 'tbl_master_modifier_group' && key === 'modifier_group_code') {
+            // Master format: MOD1, MOD2, etc.
+            // Dashboard format: WM + STORE_CODE + MOD1 (e.g., WMLOC01MOD1)
+            const modifierGroupCodeValue = String(value || '');
+            const modifierGroupMatch = modifierGroupCodeValue.match(/^(MOD\d+)$/);
+            if (modifierGroupMatch) {
+              mappedData[mappedKey] = `WM${locationCode}${modifierGroupMatch[1]}`;
+            } else {
+              mappedData[mappedKey] = value;
+            }
+          }
+          // Handle modifier_item_code
+          else if (masterTableName === 'tbl_master_modifier_item' && key === 'modifier_item_code') {
+            // Master format: MOI1, MOI2, etc.
+            // Dashboard format: WM + STORE_CODE + MOI1 (e.g., WMLOC01MOI1)
+            const modifierItemCodeValue = String(value || '');
+            const modifierItemMatch = modifierItemCodeValue.match(/^(MOI\d+)$/);
+            if (modifierItemMatch) {
+              mappedData[mappedKey] = `WM${locationCode}${modifierItemMatch[1]}`;
+            } else {
+              mappedData[mappedKey] = value;
+            }
+          }
+          else {
+            mappedData[mappedKey] = value;
+          }
+        } else {
+          mappedData[mappedKey] = value;
+        }
       }
     }
 
@@ -246,16 +389,19 @@ export class SyncProcessor {
     tableName: string,
     syncId: string,
     data: Record<string, any>,
-    syncSource: string
+    syncSource: string,
+    locationCode: string
   ): Promise<void> {
     // Check if record already exists
     const existing = await locationPrisma.$queryRawUnsafe(`
-      SELECT sync_id FROM ${tableName} WHERE sync_id = '${syncId}'::UUID
+      SELECT sync_id FROM ${tableName}
+      WHERE sync_id = '${syncId}'::UUID
+        AND store_code = '${locationCode.replace(/'/g, "''")}'::VARCHAR
     `);
 
     if (existing && (existing as any[]).length > 0) {
       // Record exists, treat as UPDATE instead
-      await this.handleUpdate(tableName, syncId, data, syncSource);
+      await this.handleUpdate(tableName, syncId, data, syncSource, locationCode);
       return;
     }
 
@@ -355,16 +501,19 @@ export class SyncProcessor {
     tableName: string,
     syncId: string,
     data: Record<string, any>,
-    syncSource: string
+    syncSource: string,
+    locationCode: string
   ): Promise<void> {
     // Check if record exists
     const existing = await locationPrisma.$queryRawUnsafe(`
-      SELECT sync_id FROM ${tableName} WHERE sync_id = '${syncId}'::UUID
+      SELECT sync_id FROM ${tableName}
+      WHERE sync_id = '${syncId}'::UUID
+        AND store_code = '${locationCode.replace(/'/g, "''")}'::VARCHAR
     `);
 
     if (!existing || (existing as any[]).length === 0) {
       // Record doesn't exist, treat as INSERT
-      await this.handleInsert(tableName, syncId, data, syncSource);
+      await this.handleInsert(tableName, syncId, data, syncSource, locationCode);
       return;
     }
 
@@ -440,6 +589,7 @@ export class SyncProcessor {
         UPDATE ${tableName}
         SET ${setClause}
         WHERE sync_id = '${syncId}'::UUID
+          AND store_code = '${locationCode.replace(/'/g, "''")}'::VARCHAR
       `);
     } catch (error: any) {
       console.error(`Failed to update ${tableName}:`, error);
@@ -452,10 +602,15 @@ export class SyncProcessor {
   /**
    * Handle DELETE operation
    */
-  private async handleDelete(tableName: string, syncId: string): Promise<void> {
+  private async handleDelete(
+    tableName: string,
+    syncId: string,
+    locationCode: string
+  ): Promise<void> {
     await locationPrisma.$executeRawUnsafe(`
       DELETE FROM ${tableName}
       WHERE sync_id = '${syncId}'::UUID
+        AND store_code = '${locationCode.replace(/'/g, "''")}'::VARCHAR
     `);
   }
 

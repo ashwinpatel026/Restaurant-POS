@@ -2,7 +2,42 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/database'
-import { generateUniqueCode } from '@/lib/codeGenerator'
+
+// Helper function to generate unique prep zone code
+async function generatePrepZoneCode(): Promise<string> {
+  const storeCode = process.env.STORE_CODE || ''
+  const prefix = `WL${storeCode}PZ`
+  
+  // Get all prep zone codes that match the WL pattern for this store
+  const prepZones = await prisma.prepZone.findMany({
+    where: {
+      prepZoneCode: {
+        startsWith: prefix
+      }
+    },
+    select: { prepZoneCode: true },
+    orderBy: { prepZoneId: 'desc' }
+  })
+
+  let nextNumber = 1
+  
+  if (prepZones.length > 0) {
+    // Extract number from codes like "WLLOC01PZ1", "WLLOC01PZ2", etc.
+    const numbers = prepZones
+      .map(prepZone => {
+        const match = prepZone.prepZoneCode.match(new RegExp(`^${prefix}(\\d+)$`))
+        return match ? parseInt(match[1]) : 0
+      })
+      .filter(num => num > 0)
+    
+    if (numbers.length > 0) {
+      nextNumber = Math.max(...numbers) + 1
+    }
+  }
+  
+  // Format as WL + STORE_CODE + PZ + number starting from 1
+  return `${prefix}${nextNumber}`
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -56,8 +91,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate prep zone code automatically
-    const prepZoneCode = await generateUniqueCode('prepZone', 'prepZoneCode')
+    // Generate unique prep zone code
+    const prepZoneCode = await generatePrepZoneCode()
 
     const prepZone = await prisma.prepZone.create({
       data: {
