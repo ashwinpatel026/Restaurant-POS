@@ -309,6 +309,8 @@ model MasterMenuMasterEvent {
   id              BigInt    @id @default(autoincrement()) @map("id")
   menuMasterCode  String    @map("menu_master_code") @db.VarChar(100)
   eventCode       String    @map("event_code") @db.VarChar(100)
+  syncId             String   @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource         String?  @default("server") @map("sync_source") @db.VarChar(20)
   createdBy       BigInt?   @map("createdby")
   createdOn       DateTime  @default(now()) @map("createdon")
 
@@ -337,6 +339,8 @@ model MasterMenuCategoryModifier {
   id                   BigInt    @id @default(autoincrement()) @map("id")
   menuCategoryCode     String    @map("menu_category_code") @db.VarChar(100)
   modifierGroupCode    String    @map("modifier_group_code") @db.VarChar(100)
+  syncId               String   @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource           String?  @default("server") @map("sync_source") @db.VarChar(20)
   createdBy            BigInt?   @map("createdby")
   createdOn            DateTime  @default(now()) @map("createdon")
 
@@ -446,6 +450,8 @@ model MasterMenuItemModifierGroup {
   isMultiselect              Int       @default(0) @map("is_multiselect")
   minSelection               Int?      @map("min_selection")
   maxSelection               Int?      @map("max_selection")
+  syncId                     String   @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource                 String?  @default("server") @map("sync_source") @db.VarChar(20)
   createdBy                  BigInt?   @map("createdby")
   createdOn                  DateTime  @default(now()) @map("createdon")
 

@@ -43,6 +43,14 @@ export interface SyncRequest {
   forceSync?: boolean; // Optional: force sync even if already synced
 }
 
+export interface LocationToLocationSyncRequest {
+  sourceLocationCode: string;  // Source location (e.g., "LOC001")
+  targetLocationCode: string;  // Target location (e.g., "LOC002")
+  tableName?: string;           // Optional: sync specific table
+  fullSync?: boolean;          // Full sync vs incremental
+  cloneMode?: 'clone' | 'merge'; // Clone (replace) or merge (keep existing)
+}
+
 export interface SyncResult {
   success: boolean;
   locationCode: string;
@@ -98,6 +106,10 @@ export const SYNC_TABLE_MAP: Record<string, string> = {
   'tbl_master_station': 'tbl_station',
   'tbl_master_tax': 'tbl_tax',
   'tbl_master_time_events': 'tbl_time_events',
+  // Relationship/junction tables
+  'tbl_master_menu_master_event': 'tbl_menu_master_event',
+  'tbl_master_menu_category_modifier': 'tbl_menu_category_modifier',
+  'tbl_master_menu_item_modifier_group': 'tbl_menu_item_modifier_group',
 };
 
 // Field mapping: Master table column -> Location table column
@@ -248,6 +260,26 @@ export const SYNC_FIELD_MAP: Record<string, Record<string, string>> = {
     'Event_End_Date': 'Event_End_Date',
     'is_active': 'is_active',
   },
+  // Relationship/junction tables
+  'tbl_master_menu_master_event': {
+    'menu_master_code': 'menu_master_code',
+    'event_code': 'event_code',
+    'global_code': 'global_code',
+  },
+  'tbl_master_menu_category_modifier': {
+    'menu_category_code': 'menu_category_code',
+    'modifier_group_code': 'modifier_group_code',
+  },
+  'tbl_master_menu_item_modifier_group': {
+    'menu_item_code': 'menu_item_code',
+    'modifier_group_code': 'modifier_group_code',
+    'inherit_from_menu_group': 'inherit_from_menu_group',
+    'is_inherit_from_menu_category': 'is_inherit_from_menu_category',
+    'is_required': 'is_required',
+    'is_multiselect': 'is_multiselect',
+    'min_selection': 'min_selection',
+    'max_selection': 'max_selection',
+  },
 };
 
 // Column name for ordering records (varies by table)
@@ -259,11 +291,52 @@ export const SYNC_ORDER_BY_COLUMN: Record<string, string> = {
   'tbl_master_modifier_group': 'createdon',
   'tbl_master_modifier_item': 'createdon',
   'tbl_master_prep_zone': 'createdon',
-  'tbl_master_station': 'created_on',
+  'tbl_master_station': 'station_code', // Station table doesn't have createdon/created_date
   'tbl_master_tax': 'created_date',
   'tbl_master_time_events': 'created_date',
+  // Relationship/junction tables
+  'tbl_master_menu_master_event': 'createdon',
+  'tbl_master_menu_category_modifier': 'createdon',
+  'tbl_master_menu_item_modifier_group': 'createdon',
 };
 
 // List of tables that support syncing
 export const SYNCABLE_TABLES = Object.keys(SYNC_TABLE_MAP);
+
+// Table sync order: parent tables must be synced before child tables
+// This ensures foreign key constraints are satisfied during sync
+export const SYNC_TABLE_ORDER: string[] = [
+  // Independent tables (no dependencies)
+  'tbl_master_tax',
+  'tbl_master_printer',
+  'tbl_master_station',
+  'tbl_master_time_events',
+  'tbl_master_prep_zone',
+  
+  // Menu hierarchy (parent -> child)
+  'tbl_master_menu_master',      // Must sync before menu_category and menu_master_event
+  'tbl_master_menu_category',    // Depends on menu_master
+  'tbl_master_menu_item',         // Depends on menu_master and menu_category
+  
+  // Modifier hierarchy
+  'tbl_master_modifier_group',   // Independent
+  'tbl_master_modifier_item',     // Depends on modifier_group
+  
+  // Relationship/junction tables (must sync after all parent tables)
+  'tbl_master_menu_master_event',        // Depends on menu_master and time_events
+  'tbl_master_menu_category_modifier',   // Depends on menu_category and modifier_group
+  'tbl_master_menu_item_modifier_group', // Depends on menu_item and modifier_group
+];
+
+// Table dependencies: child table -> parent table(s)
+export const SYNC_TABLE_DEPENDENCIES: Record<string, string[]> = {
+  'tbl_master_menu_category': ['tbl_master_menu_master'],
+  'tbl_master_menu_item': ['tbl_master_menu_master', 'tbl_master_menu_category'],
+  'tbl_master_modifier_item': ['tbl_master_modifier_group'],
+  'tbl_master_prep_zone': ['tbl_master_station', 'tbl_master_printer'],
+  // Relationship/junction tables
+  'tbl_master_menu_master_event': ['tbl_master_menu_master', 'tbl_master_time_events'],
+  'tbl_master_menu_category_modifier': ['tbl_master_menu_category', 'tbl_master_modifier_group'],
+  'tbl_master_menu_item_modifier_group': ['tbl_master_menu_item', 'tbl_master_modifier_group'],
+};
 

@@ -10,6 +10,7 @@ import {
   InformationCircleIcon,
   ArrowDownTrayIcon,
   ExclamationTriangleIcon,
+  DocumentDuplicateIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
@@ -53,10 +54,14 @@ export default function SyncManagementPage() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus[]>([]);
   const [syncLog, setSyncLog] = useState<SyncLogEntry[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
-  const [activeTab, setActiveTab] = useState<"status" | "log" | "sync">(
-    "status"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "status" | "log" | "sync" | "clone"
+  >("status");
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [sourceLocation, setSourceLocation] = useState<string>("");
+  const [targetLocation, setTargetLocation] = useState<string>("");
+  const [cloneMode, setCloneMode] = useState<"clone" | "merge">("clone");
+  const [cloning, setCloning] = useState(false);
 
   const syncableTables = [
     { value: "", label: "All Tables" },
@@ -70,6 +75,15 @@ export default function SyncManagementPage() {
     { value: "tbl_master_station", label: "Station" },
     { value: "tbl_master_tax", label: "Tax" },
     { value: "tbl_master_time_events", label: "Time Events" },
+    { value: "tbl_master_menu_master_event", label: "Menu Master Event" },
+    {
+      value: "tbl_master_menu_category_modifier",
+      label: "Menu Category Modifier",
+    },
+    {
+      value: "tbl_master_menu_item_modifier_group",
+      label: "Menu Item Modifier Group",
+    },
   ];
 
   // Initial load - fetch locations only
@@ -96,9 +110,11 @@ export default function SyncManagementPage() {
       });
       if (response.ok) {
         const data = await response.json();
-        const activeLocations = data.filter((loc: Location) => loc.isActive === 1);
+        const activeLocations = data.filter(
+          (loc: Location) => loc.isActive === 1
+        );
         setLocations(activeLocations);
-        
+
         // Mark initial load as complete and fetch data (with empty location = All Locations)
         if (isInitialLoad) {
           setIsInitialLoad(false);
@@ -228,6 +244,56 @@ export default function SyncManagementPage() {
       console.error("Error:", error);
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const handleLocationClone = async () => {
+    if (!sourceLocation || !targetLocation) {
+      toast.error("Please select both source and target locations");
+      return;
+    }
+
+    if (sourceLocation === targetLocation) {
+      toast.error("Source and target locations cannot be the same");
+      return;
+    }
+
+    setCloning(true);
+    try {
+      const token = localStorage.getItem("master_admin_token");
+      const response = await fetch("/api/master/sync/location-to-location", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          sourceLocationCode: sourceLocation,
+          targetLocationCode: targetLocation,
+          tableName: selectedTable || undefined,
+          fullSync: true,
+          cloneMode: cloneMode,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        toast.success(
+          `Location clone completed! Processed: ${data.data.recordsProcessed}, Succeeded: ${data.data.recordsSucceeded}, Failed: ${data.data.recordsFailed}`
+        );
+        // Refresh data
+        fetchSyncStatus();
+        fetchSyncLog();
+        fetchPendingCount();
+      } else {
+        toast.error(data.error || data.message || "Location clone failed");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Error cloning location data");
+      console.error("Error:", error);
+    } finally {
+      setCloning(false);
     }
   };
 
@@ -383,6 +449,16 @@ export default function SyncManagementPage() {
               }`}
             >
               Manual Sync
+            </button>
+            <button
+              onClick={() => setActiveTab("clone")}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === "clone"
+                  ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
+              }`}
+            >
+              Location Clone
             </button>
           </nav>
         </div>
@@ -625,6 +701,180 @@ export default function SyncManagementPage() {
                   </li>
                   <li>
                     • <strong>Pending Syncs:</strong> {pendingCount} record(s)
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "clone" && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  Location-to-Location Clone Sync
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Clone all syncable data from one location to another. All
+                  codes will be automatically transformed to match the target
+                  location.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Source Location
+                  </label>
+                  <select
+                    value={sourceLocation}
+                    onChange={(e) => setSourceLocation(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="">Select source location...</option>
+                    {locations.map((loc) => (
+                      <option key={loc.locationId} value={loc.storeCode}>
+                        {loc.locationName} ({loc.storeCode})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Target Location
+                  </label>
+                  <select
+                    value={targetLocation}
+                    onChange={(e) => setTargetLocation(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="">Select target location...</option>
+                    {locations
+                      .filter((loc) => loc.storeCode !== sourceLocation)
+                      .map((loc) => (
+                        <option key={loc.locationId} value={loc.storeCode}>
+                          {loc.locationName} ({loc.storeCode})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Table (Optional)
+                  </label>
+                  <select
+                    value={selectedTable}
+                    onChange={(e) => setSelectedTable(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  >
+                    {syncableTables.map((table) => (
+                      <option key={table.value} value={table.value}>
+                        {table.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Clone Mode
+                  </label>
+                  <select
+                    value={cloneMode}
+                    onChange={(e) =>
+                      setCloneMode(e.target.value as "clone" | "merge")
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="clone">Clone (Replace All)</option>
+                    <option value="merge">Merge (Skip Existing)</option>
+                  </select>
+                </div>
+              </div>
+
+              {(!sourceLocation || !targetLocation) && (
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                  <div className="flex">
+                    <InformationCircleIcon className="h-5 w-5 text-yellow-400 mr-2" />
+                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                      Please select both source and target locations to proceed.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {sourceLocation &&
+                targetLocation &&
+                sourceLocation === targetLocation && (
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                    <div className="flex">
+                      <ExclamationTriangleIcon className="h-5 w-5 text-red-400 mr-2" />
+                      <p className="text-sm text-red-800 dark:text-red-200">
+                        Source and target locations cannot be the same.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+              <button
+                onClick={handleLocationClone}
+                disabled={
+                  !sourceLocation ||
+                  !targetLocation ||
+                  sourceLocation === targetLocation ||
+                  cloning
+                }
+                className="w-full flex items-center justify-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {cloning ? (
+                  <>
+                    <ArrowPathIcon className="w-5 h-5 mr-2 animate-spin" />
+                    Cloning Data...
+                  </>
+                ) : (
+                  <>
+                    <DocumentDuplicateIcon className="w-5 h-5 mr-2" />
+                    Clone Location Data
+                  </>
+                )}
+              </button>
+
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                  Clone Information
+                </h4>
+                <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                  <li>
+                    • <strong>Clone Mode:</strong>{" "}
+                    {cloneMode === "clone"
+                      ? "Replace all existing data in target location"
+                      : "Only add new records, skip existing ones"}
+                  </li>
+                  <li>
+                    • <strong>Code Transformation:</strong> All codes will be
+                    automatically transformed (e.g., WMLOC001TAX1 →
+                    WMLOC002TAX1)
+                  </li>
+                  <li>
+                    • <strong>Source Location:</strong>{" "}
+                    {sourceLocation || "Not selected"}
+                  </li>
+                  <li>
+                    • <strong>Target Location:</strong>{" "}
+                    {targetLocation || "Not selected"}
+                  </li>
+                  <li>
+                    • <strong>Selected Table:</strong>{" "}
+                    {selectedTable || "All Tables"}
+                  </li>
+                  <li>
+                    • <strong>What Gets Cloned:</strong> All syncable tables
+                    (Tax, Printer, Station, Menu, Modifiers, etc.)
                   </li>
                 </ul>
               </div>

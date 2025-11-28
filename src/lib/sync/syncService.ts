@@ -6,6 +6,7 @@
 import { masterPrisma, locationPrisma } from '@/lib/databaseManager';
 import {
   SyncRequest,
+  LocationToLocationSyncRequest,
   SyncResult,
   SyncError,
   SyncLogEntry,
@@ -14,6 +15,8 @@ import {
   SYNC_TABLE_MAP,
   SYNCABLE_TABLES,
   SYNC_ORDER_BY_COLUMN,
+  SYNC_TABLE_ORDER,
+  SYNC_TABLE_DEPENDENCIES,
   SyncOperation,
 } from './types';
 import { syncProcessor } from './syncProcessor';
@@ -58,11 +61,14 @@ export class SyncService {
       }
 
       // Determine which tables to sync
-      const tablesToSync = tableName
+      let tablesToSync = tableName
         ? [tableName]
         : fullSync
         ? SYNCABLE_TABLES
         : await this.getTablesWithPendingSyncs(locationCode);
+
+      // Sort tables by dependency order (parent tables first)
+      tablesToSync = this.sortTablesByDependencies(tablesToSync);
 
       // Process each table
       for (const table of tablesToSync) {
@@ -371,6 +377,42 @@ export class SyncService {
   }
 
   /**
+   * Sort tables by dependency order (parent tables before child tables)
+   */
+  private sortTablesByDependencies(tables: string[]): string[] {
+    // Create a map of table -> order index
+    const orderMap = new Map<string, number>();
+    SYNC_TABLE_ORDER.forEach((table, index) => {
+      orderMap.set(table, index);
+    });
+
+    // Sort tables: first by defined order, then by dependency depth
+    return tables.sort((a, b) => {
+      const orderA = orderMap.get(a) ?? 999;
+      const orderB = orderMap.get(b) ?? 999;
+      
+      // If both have defined order, use that
+      if (orderA !== 999 && orderB !== 999) {
+        return orderA - orderB;
+      }
+      
+      // Check dependencies: if A depends on B, B should come first
+      const depsA = SYNC_TABLE_DEPENDENCIES[a] || [];
+      const depsB = SYNC_TABLE_DEPENDENCIES[b] || [];
+      
+      if (depsA.includes(b)) {
+        return 1; // B should come before A
+      }
+      if (depsB.includes(a)) {
+        return -1; // A should come before B
+      }
+      
+      // Fallback to defined order
+      return orderA - orderB;
+    });
+  }
+
+  /**
    * Create batches from array
    */
   private createBatches<T>(items: T[], batchSize: number): T[][] {
@@ -400,6 +442,231 @@ export class SyncService {
       } catch (error) {
         console.error(`Failed to sync location ${location.storeCode}:`, error);
       }
+    }
+  }
+
+  /**
+   * Sync data from one location to another (location-to-location clone)
+   * Clones all syncable data from source location to target location
+   */
+  async syncLocationToLocation(request: LocationToLocationSyncRequest): Promise<SyncResult> {
+    const startTime = Date.now();
+    const { 
+      sourceLocationCode, 
+      targetLocationCode, 
+      tableName, 
+      fullSync = true, 
+      cloneMode = 'clone' 
+    } = request;
+
+    const result: SyncResult = {
+      success: true,
+      locationCode: targetLocationCode,
+      tableName,
+      recordsProcessed: 0,
+      recordsSucceeded: 0,
+      recordsFailed: 0,
+      errors: [],
+      duration: 0,
+      startedAt: new Date(),
+      completedAt: new Date(),
+    };
+
+    try {
+      // Validate both locations exist
+      const [sourceLocation, targetLocation] = await Promise.all([
+        masterPrisma.location.findUnique({
+          where: { storeCode: sourceLocationCode },
+        }),
+        masterPrisma.location.findUnique({
+          where: { storeCode: targetLocationCode },
+        }),
+      ]);
+
+      if (!sourceLocation) {
+        throw new Error(`Source location ${sourceLocationCode} not found`);
+      }
+      if (!targetLocation) {
+        throw new Error(`Target location ${targetLocationCode} not found`);
+      }
+      if (sourceLocationCode === targetLocationCode) {
+        throw new Error('Source and target locations cannot be the same');
+      }
+
+      // Determine which tables to sync
+      const tablesToSync = tableName
+        ? [tableName]
+        : SYNCABLE_TABLES;
+
+      // Sort tables by dependency order (parent tables first)
+      const sortedTables = this.sortTablesByDependencies(tablesToSync);
+
+      console.log(`Starting location-to-location sync: ${sourceLocationCode} -> ${targetLocationCode}`);
+      console.log(`Mode: ${cloneMode}, Tables: ${sortedTables.length}`);
+
+      // Process each table
+      for (const masterTableName of sortedTables) {
+        if (!SYNCABLE_TABLES.includes(masterTableName)) {
+          console.warn(`Table ${masterTableName} is not syncable, skipping`);
+          continue;
+        }
+
+        const tableResult = await this.cloneLocationTable(
+          sourceLocationCode,
+          targetLocationCode,
+          masterTableName,
+          cloneMode
+        );
+
+        result.recordsProcessed += tableResult.recordsProcessed;
+        result.recordsSucceeded += tableResult.recordsSucceeded;
+        result.recordsFailed += tableResult.recordsFailed;
+        result.errors.push(...tableResult.errors);
+
+        if (!tableResult.success) {
+          result.success = false;
+        }
+      }
+
+      result.completedAt = new Date();
+      result.duration = Date.now() - startTime;
+
+      console.log(`Location-to-location sync completed: ${result.recordsSucceeded}/${result.recordsProcessed} records synced`);
+
+      return result;
+    } catch (error: any) {
+      result.success = false;
+      result.completedAt = new Date();
+      result.duration = Date.now() - startTime;
+      result.errors.push({
+        recordId: '',
+        operation: 'INSERT',
+        error: error.message || 'Unknown error',
+        tableName: tableName || 'unknown',
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Clone a table from source location to target location
+   */
+  private async cloneLocationTable(
+    sourceLocationCode: string,
+    targetLocationCode: string,
+    masterTableName: string,
+    cloneMode: 'clone' | 'merge'
+  ): Promise<SyncResult> {
+    const startTime = Date.now();
+    const locationTableName = SYNC_TABLE_MAP[masterTableName];
+    
+    if (!locationTableName) {
+      return {
+        success: false,
+        locationCode: targetLocationCode,
+        tableName: masterTableName,
+        recordsProcessed: 0,
+        recordsSucceeded: 0,
+        recordsFailed: 0,
+        errors: [{
+          recordId: '',
+          operation: 'INSERT',
+          error: `No mapping found for table ${masterTableName}`,
+          tableName: masterTableName,
+        }],
+        duration: 0,
+        startedAt: new Date(),
+        completedAt: new Date(),
+      };
+    }
+
+    const result: SyncResult = {
+      success: true,
+      locationCode: targetLocationCode,
+      tableName: masterTableName,
+      recordsProcessed: 0,
+      recordsSucceeded: 0,
+      recordsFailed: 0,
+      errors: [],
+      duration: 0,
+      startedAt: new Date(),
+      completedAt: new Date(),
+    };
+
+    try {
+      // Get order by column
+      const orderByColumn = SYNC_ORDER_BY_COLUMN[masterTableName] || 'createdon';
+      const escapedSourceCode = sourceLocationCode.replace(/'/g, "''");
+
+      // Fetch records from source location
+      const sourceRecords = await locationPrisma.$queryRawUnsafe<any[]>(`
+        SELECT * FROM ${locationTableName}
+        WHERE store_code = '${escapedSourceCode}'::VARCHAR
+        ORDER BY ${orderByColumn} DESC
+      `);
+
+      console.log(`Found ${sourceRecords.length} records in ${locationTableName} for source location ${sourceLocationCode}`);
+
+      if (sourceRecords.length === 0) {
+        result.completedAt = new Date();
+        result.duration = Date.now() - startTime;
+        return result;
+      }
+
+      // Process in batches
+      const batches = this.createBatches(sourceRecords, this.config.batchSize);
+
+      for (const batch of batches) {
+        // Convert to sync entries with location code transformation
+        const syncEntries = batch.map((record) => ({
+          id: BigInt(0),
+          tableName: masterTableName,
+          recordId: record.sync_id,
+          operation: 'UPDATE' as SyncOperation,
+          source: 'location' as const,
+          data: record,
+          changeTime: new Date(),
+          syncStatus: 0 as const,
+          locationCode: targetLocationCode,
+          retryCount: 0,
+        }));
+
+        // Process batch with location-to-location transformation
+        const batchResult = await syncProcessor.processLocationToLocationBatch(
+          sourceLocationCode,
+          targetLocationCode,
+          masterTableName,
+          syncEntries,
+          this.config,
+          cloneMode
+        );
+
+        result.recordsProcessed += batchResult.recordsProcessed;
+        result.recordsSucceeded += batchResult.recordsSucceeded;
+        result.recordsFailed += batchResult.recordsFailed;
+        result.errors.push(...batchResult.errors);
+
+        if (!batchResult.success) {
+          result.success = false;
+        }
+      }
+
+      result.completedAt = new Date();
+      result.duration = Date.now() - startTime;
+
+      return result;
+    } catch (error: any) {
+      result.success = false;
+      result.errors.push({
+        recordId: '',
+        operation: 'INSERT',
+        error: error.message,
+        tableName: masterTableName,
+      });
+      result.completedAt = new Date();
+      result.duration = Date.now() - startTime;
+      return result;
     }
   }
 }
