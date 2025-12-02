@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import {
+  getUserAccessInfo,
+  getSelectedStoreCode,
+  canAccessStore,
+} from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 import { Prisma } from '@prisma/client'
 
@@ -52,9 +57,16 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
 
     const { id: idParam } = await params
     const stationId = BigInt(idParam)
@@ -65,6 +77,13 @@ export async function GET(
 
     if (!station) {
       return NextResponse.json({ error: 'Station not found' }, { status: 404 })
+    }
+
+    // If storeCode is provided, verify the station belongs to that store or user has access
+    if (selectedStoreCode && station.storeCode !== selectedStoreCode) {
+      if (!canAccessStore(accessInfo, station.storeCode || '')) {
+        return NextResponse.json({ error: 'Station not found' }, { status: 404 })
+      }
     }
 
     return NextResponse.json(mapStationResponse(station))
@@ -84,8 +103,26 @@ export async function PUT(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || !['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
     }
 
     const { id: idParam } = await params
@@ -95,6 +132,22 @@ export async function PUT(
     const { stationname, isActive, stationGroups, isKitchen, isBar, isBill, isReport, ipAddress } = body
     const groups = sanitizeStationGroups(stationGroups)
 
+    // First check if station exists and belongs to a store the user can access
+    const existingStation = await prisma.station.findUnique({
+      where: { tblStationId: stationId },
+    })
+
+    if (!existingStation) {
+      return NextResponse.json({ error: 'Station not found' }, { status: 404 })
+    }
+
+    if (
+      existingStation.storeCode &&
+      !canAccessStore(accessInfo, existingStation.storeCode)
+    ) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
     const updateData: Record<string, unknown> = {
       stationname,
       isActive,
@@ -103,7 +156,10 @@ export async function PUT(
       isBill: isBill ?? false,
       isReport: isReport ?? false,
       ipAddress: ipAddress || null,
-      storeCode: process.env.STORE_CODE || null,
+      // Keep original storeCode; if missing, set to currently selected store
+      storeCode: existingStation.storeCode || selectedStoreCode,
+      // Mark updates from dashboard/location
+      syncSource: 'location',
     }
 
     if (groups.length > 0) {
@@ -134,15 +190,37 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || !['SUPER_ADMIN'].includes(session.user.role)) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    if (!['SUPER_ADMIN'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
 
     const { id: idParam } = await params
     const stationId = BigInt(idParam)
 
+    // First check if station exists and user has access
+    const existingStation = await prisma.station.findUnique({
+      where: { tblStationId: stationId },
+    })
+
+    if (!existingStation) {
+      return NextResponse.json({ error: 'Station not found' }, { status: 404 })
+    }
+
+    if (
+      existingStation.storeCode &&
+      !canAccessStore(accessInfo, existingStation.storeCode)
+    ) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
     await prisma.station.delete({
-      where: { tblStationId: stationId }
+      where: { tblStationId: stationId },
     })
 
     return NextResponse.json({ message: 'Station deleted successfully' })

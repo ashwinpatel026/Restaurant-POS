@@ -10,6 +10,7 @@ import SystemColorPicker, {
 } from "@/components/ui/SystemColorPicker";
 import { CheckIcon } from "@heroicons/react/24/solid";
 import StatusToggle from "@/components/forms/StatusToggle";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 interface MenuMaster {
   menuMasterId: string;
@@ -37,6 +38,7 @@ export default function EditCategoryPage() {
   const router = useRouter();
   const params = useParams();
   const categoryId = params.id as string;
+  const { selectedStoreCode, buildApiUrl } = useApiWithStore();
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [menuMasters, setMenuMasters] = useState<MenuMaster[]>([]);
@@ -53,15 +55,17 @@ export default function EditCategoryPage() {
   });
 
   useEffect(() => {
-    fetchData();
-  }, [categoryId]);
+    if (categoryId && selectedStoreCode) {
+      fetchData();
+    }
+  }, [categoryId, selectedStoreCode]);
 
   const fetchData = async () => {
     try {
       const [categoryRes, mastersRes, modifierGroupsRes] = await Promise.all([
-        fetch(`/api/dashboard/menu/categories/${categoryId}`, { cache: "no-store" }),
-        fetch("/api/dashboard/menu/masters", { cache: "no-store" }),
-        fetch("/api/dashboard/modifier-groups", { cache: "no-store" }),
+        fetch(buildApiUrl(`/api/dashboard/menu/categories/${categoryId}`), { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/menu/masters"), { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/modifier-groups"), { cache: "no-store" }),
       ]);
 
       if (categoryRes.ok) {
@@ -160,7 +164,7 @@ export default function EditCategoryPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(`/api/dashboard/menu/categories/${categoryId}`, {
+      const response = await fetch(buildApiUrl(`/api/dashboard/menu/categories/${categoryId}`), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

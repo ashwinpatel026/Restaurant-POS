@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { getUserAccessInfo, getSelectedStoreCode, canAccessStore } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 
 // Helper function to validate and store time string directly
@@ -14,12 +17,39 @@ function validateTimeString(time: string | null): string | null {
   return null
 }
 
+// Helper function to convert BigInt and Decimal fields for JSON serialization
+function convertEventForJson(event: any): any {
+  return {
+    ...event,
+    id: event.id.toString(),
+    createdBy: event.createdBy ? event.createdBy.toString() : null,
+    updatedBy: event.updatedBy ? event.updatedBy.toString() : null,
+    globalPriceAmountAdd: event.globalPriceAmountAdd ? Number(event.globalPriceAmountAdd) : null,
+    globalPriceAmountDisc: event.globalPriceAmountDisc ? Number(event.globalPriceAmountDisc) : null,
+    globalPricePerAdd: event.globalPricePerAdd ? Number(event.globalPricePerAdd) : null,
+    globalPricePerDisc: event.globalPricePerDisc ? Number(event.globalPricePerDisc) : null,
+  }
+}
+
 // GET single time event by ID
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+
     const { id: idParam } = await params
     const id = BigInt(idParam)
     
@@ -33,12 +63,16 @@ export async function GET(
         { status: 404 }
       )
     }
-    
-    // Convert BigInt to string for JSON serialization
-    const eventWithStringId = {
-      ...event,
-      id: event.id.toString()
+
+    // If storeCode is provided, verify the event belongs to that store or user has access
+    if (selectedStoreCode && event.storeCode !== selectedStoreCode) {
+      if (!canAccessStore(accessInfo, event.storeCode || '')) {
+        return NextResponse.json({ error: 'Time event not found' }, { status: 404 })
+      }
     }
+    
+    // Convert BigInt and Decimal to string/number for JSON serialization
+    const eventWithStringId = convertEventForJson(event)
     
     return NextResponse.json(eventWithStringId, { status: 200 })
   } catch (error) {
@@ -56,28 +90,47 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+    
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
+    }
+
     const { id: idParam } = await params
     const id = BigInt(idParam)
     const body = await request.json()
     
-    // Debug logging
-    console.log('PUT request body:', JSON.stringify(body, null, 2))
-    console.log('Monday times:', { 
-      monStartTime: body.monStartTime, 
-      monEndTime: body.monEndTime,
-      monday: body.monday 
+    // First check if event exists and belongs to the selected store
+    const existingEvent = await prisma.timeEvent.findUnique({
+      where: { id }
     })
-    
-    // Debug validation
-    console.log('Validating times:')
-    console.log('monStartTime validation:', {
-      input: body.monStartTime,
-      validated: validateTimeString(body.monStartTime)
-    })
-    console.log('monEndTime validation:', {
-      input: body.monEndTime,
-      validated: validateTimeString(body.monEndTime)
-    })
+
+    if (!existingEvent) {
+      return NextResponse.json({ error: 'Time event not found' }, { status: 404 })
+    }
+
+    // Verify user has access to this event's store
+    if (existingEvent.storeCode && !canAccessStore(accessInfo, existingEvent.storeCode)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
     
     const event = await prisma.timeEvent.update({
       where: { id },
@@ -111,9 +164,12 @@ export async function PUT(
         eventStartDate: body.eventStartDate && body.eventStartDate.trim() !== "" ? new Date(body.eventStartDate) : null,
         eventEndDate: body.eventEndDate && body.eventEndDate.trim() !== "" ? new Date(body.eventEndDate) : null,
         isActive: body.isActive,
-        storeCode: body.storeCode || null,
+        // Keep the original storeCode, don't change it
+        storeCode: existingEvent.storeCode || selectedStoreCode,
         isSyncToWeb: body.isSyncToWeb,
-        isSyncToLocal: body.isSyncToLocal
+        isSyncToLocal: body.isSyncToLocal,
+        // Set sync_source to 'location' when updated from dashboard
+        syncSource: 'location'
       }
     })
     
@@ -124,11 +180,8 @@ export async function PUT(
       monday: event.monday
     })
     
-    // Convert BigInt to string for JSON serialization
-    const eventWithStringId = {
-      ...event,
-      id: event.id.toString()
-    }
+    // Convert BigInt and Decimal to string/number for JSON serialization
+    const eventWithStringId = convertEventForJson(event)
     
     return NextResponse.json(eventWithStringId, { status: 200 })
   } catch (error: any) {
@@ -161,6 +214,18 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!['SUPER_ADMIN'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+
     const { id: idParam } = await params
     const id = BigInt(idParam)
     
@@ -174,6 +239,11 @@ export async function DELETE(
         { error: 'Time event not found' },
         { status: 404 }
       )
+    }
+
+    // Verify user has access to this event's store
+    if (event.storeCode && !canAccessStore(accessInfo, event.storeCode)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
     
     // Delete all MenuMasterEvent records that reference this event

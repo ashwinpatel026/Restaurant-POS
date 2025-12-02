@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserAccessInfo, getSelectedStoreCode, buildStoreFilter, canAccessStore } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 
 // Helper function to generate unique modifier item code
-async function generateModifierItemCode(): Promise<string> {
-  const storeCode = process.env.STORE_CODE || ''
+async function generateModifierItemCode(storeCode: string): Promise<string> {
   const prefix = `WL${storeCode}MOI`
   
   // Get all modifier item codes that match the WL pattern for this store
@@ -13,7 +13,8 @@ async function generateModifierItemCode(): Promise<string> {
     where: {
       modifierItemCode: {
         startsWith: prefix
-      }
+      },
+      storeCode: storeCode
     },
     select: { modifierItemCode: true },
     orderBy: { id: 'desc' }
@@ -42,12 +43,33 @@ async function generateModifierItemCode(): Promise<string> {
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-    const { searchParams } = new URL(request.url)
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+    
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
+    }
+    
+    // Filter by ONE store only
+    const storeFilter = buildStoreFilter(accessInfo, selectedStoreCode)
+
     const modifierGroupCode = searchParams.get('modifierGroupCode') || undefined
 
-    const where: any = {}
+    const where: any = {
+      ...storeFilter
+    }
     if (modifierGroupCode) where.modifierGroupCode = modifierGroupCode
 
     const items = await (prisma as any).modifierItem.findMany({
@@ -71,8 +93,27 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || !['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+    
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+    
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()
@@ -87,8 +128,30 @@ export async function POST(request: NextRequest) {
       isActive = 1,
     } = body
 
-    // Generate unique modifier item code
-    const modifierItemCode = await generateModifierItemCode()
+    // If modifierGroupCode is provided, fetch the modifier group to get its storeCode
+    let finalStoreCode = selectedStoreCode
+    if (modifierGroupCode) {
+      const modifierGroup = await (prisma as any).modifierGroup.findFirst({
+        where: { modifierGroupCode },
+        select: { storeCode: true }
+      })
+      
+      if (modifierGroup && modifierGroup.storeCode) {
+        // Use the modifier group's storeCode to ensure consistency
+        finalStoreCode = modifierGroup.storeCode
+        
+        // Validate user has access to this store
+        if (!canAccessStore(accessInfo, finalStoreCode)) {
+          return NextResponse.json(
+            { error: 'Unauthorized: You do not have access to this modifier group\'s store' },
+            { status: 403 }
+          )
+        }
+      }
+    }
+
+    // Generate unique modifier item code for the store (from group or selected)
+    const modifierItemCode = await generateModifierItemCode(finalStoreCode)
 
     const created = await (prisma as any).modifierItem.create({
       data: {
@@ -102,7 +165,8 @@ export async function POST(request: NextRequest) {
         displayOrder: typeof displayOrder === 'number' ? displayOrder : null,
         isActive,
         createdBy: parseInt(session.user.id),
-        storeCode: process.env.STORE_CODE || null,
+        storeCode: finalStoreCode, // Use the storeCode from modifier group if available
+        syncSource: 'location' // Set sync_source to 'location' when created from dashboard
       },
     })
 

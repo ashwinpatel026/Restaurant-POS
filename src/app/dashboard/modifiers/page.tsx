@@ -6,8 +6,11 @@ import { CogIcon, TagIcon, ArrowRightIcon } from "@heroicons/react/24/outline";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 export default function ModifiersDashboardPage() {
+  const { selectedStoreCode, buildApiUrl } = useApiWithStore();
+  
   const [stats, setStats] = useState({
     modifiers: 0,
     modifierItems: 0,
@@ -16,13 +19,13 @@ export default function ModifiersDashboardPage() {
 
   useEffect(() => {
     fetchStats();
-  }, []);
+  }, [selectedStoreCode]);
 
   const fetchStats = async () => {
     try {
       const [modifiersRes, modifierItemsRes] = await Promise.all([
-        fetch("/api/dashboard/modifier-groups"),
-        fetch("/api/dashboard/modifier-items"),
+        fetch(buildApiUrl("/api/dashboard/modifier-groups")),
+        fetch(buildApiUrl("/api/dashboard/modifier-items")),
       ]);
 
       const newStats = {
@@ -35,6 +38,7 @@ export default function ModifiersDashboardPage() {
       setStats(newStats);
     } catch (error) {
       console.error("Error loading stats:", error);
+      toast.error("Error loading modifier statistics");
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserAccessInfo, getSelectedStoreCode, canAccessStore } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 
 export async function GET(
@@ -10,9 +11,16 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
 
     const resolvedParams = await params
     const masterId = BigInt(resolvedParams.id)
@@ -24,6 +32,16 @@ export async function GET(
 
     if (!menuMaster) {
       return NextResponse.json({ error: 'Menu master not found' }, { status: 404 })
+    }
+
+    // Validate store access
+    if (menuMaster.storeCode) {
+      if (!canAccessStore(accessInfo, menuMaster.storeCode)) {
+        return NextResponse.json(
+          { error: 'Access denied to this store' },
+          { status: 403 }
+        )
+      }
     }
 
     // Get all event associations for this menu master

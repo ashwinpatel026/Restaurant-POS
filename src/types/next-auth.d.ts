@@ -8,6 +8,8 @@ declare module 'next-auth' {
       name: string
       role: string
       outletId: string | null
+      accessLevel: string | null
+      defaultStoreCode: string | null
     }
   }
 
@@ -17,6 +19,8 @@ declare module 'next-auth' {
     name: string
     role: string
     outletId: string | null
+    accessLevel: string | null
+    defaultStoreCode: string | null
   }
 }
 
@@ -25,6 +29,8 @@ declare module 'next-auth/jwt' {
     id: string
     role: string
     outletId: string | null
+    accessLevel: string | null
+    defaultStoreCode: string | null
   }
 }
 

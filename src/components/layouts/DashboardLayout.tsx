@@ -31,6 +31,7 @@ import {
   BuildingStorefrontIcon,
 } from "@heroicons/react/24/outline";
 import { useTheme } from "@/contexts/ThemeContext";
+import StoreSelector from "@/components/store/StoreSelector";
 
 interface MenuItem {
   name: string;
@@ -384,6 +385,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <div className="flex-1 lg:flex-none" />
 
           <div className="flex items-center space-x-4">
+            {/* Store Selector */}
+            <StoreSelector />
+
             {/* Dark Mode Toggle Button */}
             <button
               onClick={toggleTheme}

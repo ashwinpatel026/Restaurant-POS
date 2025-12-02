@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { masterPrisma } from '@/lib/databaseManager'
+import { masterPrisma, locationPrisma } from '@/lib/databaseManager'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { syncMasterDataToLocation } from '@/services/syncService'
 
@@ -251,7 +251,40 @@ export async function DELETE(
       return NextResponse.json({ error: 'Location not found' }, { status: 404 })
     }
 
-    // Soft delete
+    const storeCode = location.storeCode
+
+    // Delete all user store access records for this location
+    // This ensures users lose access when the location is removed
+    
+    // Delete from master database (by locationId)
+    try {
+      const masterDeletedCount = await masterPrisma.userStoreAccess.deleteMany({
+        where: {
+          locationId: locationId
+        }
+      })
+      console.log(`Deleted ${masterDeletedCount.count} user store access records from master DB for location ${locationId}`)
+    } catch (error: any) {
+      // Log error but don't fail the location deletion
+      console.error(`Error deleting user store access from master DB for location ${locationId}:`, error.message)
+    }
+
+    // Delete from location database (by storeCode)
+    if (storeCode) {
+      try {
+        const locationDeletedCount = await locationPrisma.userStoreAccess.deleteMany({
+          where: {
+            storeCode: storeCode
+          }
+        })
+        console.log(`Deleted ${locationDeletedCount.count} user store access records from location DB for store ${storeCode}`)
+      } catch (error: any) {
+        // Log error but don't fail the location deletion
+        console.error(`Error deleting user store access from location DB for store ${storeCode}:`, error.message)
+      }
+    }
+
+    // Soft delete location
     await masterPrisma.location.update({
       where: { locationId },
       data: {
@@ -262,7 +295,8 @@ export async function DELETE(
 
     return NextResponse.json({ 
       message: 'Location deactivated successfully',
-      locationId: locationId.toString()
+      locationId: locationId.toString(),
+      storeCode: storeCode
     })
   } catch (error) {
     console.error('Error deleting location:', error)

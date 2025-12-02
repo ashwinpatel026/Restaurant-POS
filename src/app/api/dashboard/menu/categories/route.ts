@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserAccessInfo, getSelectedStoreCode, buildStoreFilter } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 
 // Helper function to generate unique menu category code
-async function generateMenuCategoryCode(): Promise<string> {
-  const storeCode = process.env.STORE_CODE || ''
+async function generateMenuCategoryCode(storeCode: string): Promise<string> {
   const prefix = `WL${storeCode}MC`
   
   // Get all menu category codes that match the WL pattern for this store
@@ -13,7 +13,8 @@ async function generateMenuCategoryCode(): Promise<string> {
     where: {
       menuCategoryCode: {
         startsWith: prefix
-      }
+      },
+      storeCode: storeCode
     },
     select: { menuCategoryCode: true },
     orderBy: { menuCategoryId: 'desc' }
@@ -43,14 +44,32 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { searchParams } = new URL(request.url)
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+    
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
+    }
+    
+    // Filter by ONE store only
+    const storeFilter = buildStoreFilter(accessInfo, selectedStoreCode)
+
     const menuMasterCode = searchParams.get('menuMasterCode')
 
-    const where: any = {}
+    const where: any = {
+      ...storeFilter
+    }
     if (menuMasterCode) {
       where.menuMasterCode = menuMasterCode
     }
@@ -145,8 +164,26 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || !['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+    
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()
@@ -155,15 +192,26 @@ export async function POST(request: NextRequest) {
     // Get the menu master to get its code
     const menuMaster = await prisma.menuMaster.findUnique({
       where: { menuMasterId: BigInt(menuMasterId) },
-      select: { menuMasterCode: true }
+      select: { menuMasterCode: true, storeCode: true }
     })
 
     if (!menuMaster) {
       return NextResponse.json({ error: 'Menu master not found' }, { status: 404 })
     }
 
-    // Generate unique menu category code
-    const menuCategoryCode = await generateMenuCategoryCode()
+    // Validate store access - ensure menu master belongs to accessible store
+    if (menuMaster.storeCode) {
+      const { canAccessStore } = await import('@/lib/auth/accessControl')
+      if (!canAccessStore(accessInfo, menuMaster.storeCode)) {
+        return NextResponse.json(
+          { error: 'Access denied to this store' },
+          { status: 403 }
+        )
+      }
+    }
+
+    // Generate unique menu category code for the selected store
+    const menuCategoryCode = await generateMenuCategoryCode(selectedStoreCode)
 
     const menuCategory = await prisma.menuCategory.create({
       data: {
@@ -172,21 +220,21 @@ export async function POST(request: NextRequest) {
         menuMasterCode: menuMaster.menuMasterCode,
         menuCategoryCode,
         createdBy: parseInt(session.user.id),
-        storeCode: process.env.STORE_CODE || null
+        storeCode: selectedStoreCode,
+        syncSource: 'location' // Set sync_source to 'location' when created from dashboard
       }
     })
 
     // Create menu category modifier relationships if modifier groups are selected
     if (modifierGroupCodes && modifierGroupCodes.length > 0) {
       const createdBy = parseInt(session.user.id)
-      const storeCode = process.env.STORE_CODE || null
       
       // Insert each modifier group relationship
       // Using individual inserts to avoid SQL injection and ensure data integrity
       for (const modifierGroupCode of modifierGroupCodes) {
         await prisma.$executeRaw`
-          INSERT INTO tbl_menu_category_modifier (menu_category_code, modifier_group_code, createdby, createdon, is_sync_to_web, is_sync_to_local, store_code)
-          VALUES (${menuCategory.menuCategoryCode}, ${modifierGroupCode}, ${createdBy}, NOW(), 0, 0, ${storeCode})
+          INSERT INTO tbl_menu_category_modifier (menu_category_code, modifier_group_code, createdby, createdon, is_sync_to_web, is_sync_to_local, store_code, sync_source, sync_id)
+          VALUES (${menuCategory.menuCategoryCode}, ${modifierGroupCode}, ${createdBy}, NOW(), 0, 0, ${selectedStoreCode}, 'location', gen_random_uuid())
           ON CONFLICT DO NOTHING
         `
       }

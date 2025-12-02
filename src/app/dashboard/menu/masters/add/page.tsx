@@ -10,6 +10,7 @@ import SystemColorPicker, {
 } from "@/components/ui/SystemColorPicker";
 import { CheckIcon } from "@heroicons/react/24/solid";
 import StatusToggle from "@/components/forms/StatusToggle";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 interface PrepZone {
   prepZoneId: string;
@@ -34,6 +35,7 @@ interface TimeEvent {
 
 export default function AddMenuMasterPage() {
   const router = useRouter();
+  const { selectedStoreCode, buildApiUrl } = useApiWithStore();
   const [loading, setLoading] = useState(false);
   const [prepZones, setPrepZones] = useState<PrepZone[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
@@ -56,15 +58,17 @@ export default function AddMenuMasterPage() {
   useEffect(() => {
     // Set default color to primary color on mount
     setFormData((prev) => ({ ...prev, colorCode: getPrimaryColor() }));
-    fetchData();
-  }, []);
+    if (selectedStoreCode) {
+      fetchData();
+    }
+  }, [selectedStoreCode]);
 
   const fetchData = async () => {
     try {
       const [prepZonesRes, stationsRes, eventsRes] = await Promise.all([
-        fetch("/api/dashboard/menu/prep-zone", { cache: "no-store" }),
-        fetch("/api/dashboard/station", { cache: "no-store" }),
-        fetch("/api/dashboard/events", { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/menu/prep-zone"), { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/station"), { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/events"), { cache: "no-store" }),
       ]);
 
       if (prepZonesRes.ok) {
@@ -132,7 +136,7 @@ export default function AddMenuMasterPage() {
     try {
       const prepZoneCodes = Array.from(selectedPrepZones);
       const stationCodes = Array.from(selectedStations);
-      const response = await fetch("/api/dashboard/menu/masters", {
+      const response = await fetch(buildApiUrl("/api/dashboard/menu/masters"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

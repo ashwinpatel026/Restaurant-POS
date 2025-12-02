@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserAccessInfo, getSelectedStoreCode, canAccessStore } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 
 export async function GET(
@@ -10,9 +11,16 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
 
     const resolvedParams = await params
     const categoryId = BigInt(resolvedParams.id)
@@ -32,6 +40,16 @@ export async function GET(
 
     if (!category) {
       return NextResponse.json({ error: 'Category not found' }, { status: 404 })
+    }
+
+    // Validate store access
+    if (category.storeCode) {
+      if (!canAccessStore(accessInfo, category.storeCode)) {
+        return NextResponse.json(
+          { error: 'Access denied to this store' },
+          { status: 403 }
+        )
+      }
     }
 
     // Fetch modifier group NAMES and CODES for this category
@@ -75,9 +93,20 @@ export async function PUT(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || !['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    if (!['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
 
     const resolvedParams = await params
     const categoryId = BigInt(resolvedParams.id)
@@ -88,21 +117,41 @@ export async function PUT(
     // Get the category first to get its code
     const existingCategory = await prisma.menuCategory.findUnique({
       where: { menuCategoryId: categoryId },
-      select: { menuCategoryCode: true }
+      select: { menuCategoryCode: true, storeCode: true }
     })
 
     if (!existingCategory) {
       return NextResponse.json({ error: 'Category not found' }, { status: 404 })
     }
 
+    // Validate store access
+    if (existingCategory.storeCode) {
+      if (!canAccessStore(accessInfo, existingCategory.storeCode)) {
+        return NextResponse.json(
+          { error: 'Access denied to this store' },
+          { status: 403 }
+        )
+      }
+    }
+
     // Get the menu master to get its code
     const menuMaster = await prisma.menuMaster.findUnique({
       where: { menuMasterId: BigInt(menuMasterId) },
-      select: { menuMasterCode: true }
+      select: { menuMasterCode: true, storeCode: true }
     })
 
     if (!menuMaster) {
       return NextResponse.json({ error: 'Menu master not found' }, { status: 404 })
+    }
+
+    // Validate menu master store access
+    if (menuMaster.storeCode) {
+      if (!canAccessStore(accessInfo, menuMaster.storeCode)) {
+        return NextResponse.json(
+          { error: 'Access denied to menu master store' },
+          { status: 403 }
+        )
+      }
     }
 
     const category = await prisma.menuCategory.update({
@@ -111,7 +160,8 @@ export async function PUT(
         name,
         colorCode,
         isActive,
-        menuMasterCode: menuMaster.menuMasterCode
+        menuMasterCode: menuMaster.menuMasterCode,
+        syncSource: 'location' // Set sync_source to 'location' when updated from dashboard
       }
     })
 
@@ -125,12 +175,12 @@ export async function PUT(
     // Then, insert new relationships if any
     if (modifierGroupCodes && modifierGroupCodes.length > 0) {
       const createdBy = parseInt(session.user.id)
-      const storeCode = process.env.STORE_CODE || null
+      const storeCodeToUse = existingCategory.storeCode || selectedStoreCode || null
       
       for (const modifierGroupCode of modifierGroupCodes) {
         await prisma.$executeRaw`
-          INSERT INTO tbl_menu_category_modifier (menu_category_code, modifier_group_code, createdby, createdon, is_sync_to_web, is_sync_to_local, store_code)
-          VALUES (${category.menuCategoryCode}, ${modifierGroupCode}, ${createdBy}, NOW(), 0, 0, ${storeCode})
+          INSERT INTO tbl_menu_category_modifier (menu_category_code, modifier_group_code, createdby, createdon, is_sync_to_web, is_sync_to_local, store_code, sync_source, sync_id)
+          VALUES (${category.menuCategoryCode}, ${modifierGroupCode}, ${createdBy}, NOW(), 0, 0, ${storeCodeToUse}, 'location', gen_random_uuid())
           ON CONFLICT DO NOTHING
         `
       }
@@ -161,9 +211,20 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || !['SUPER_ADMIN'].includes(session.user.role)) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    if (!['SUPER_ADMIN'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
 
     const resolvedParams = await params
     const categoryId = BigInt(resolvedParams.id)
@@ -175,6 +236,16 @@ export async function DELETE(
 
     if (!category) {
       return NextResponse.json({ error: 'Category not found' }, { status: 404 })
+    }
+
+    // Validate store access
+    if (category.storeCode) {
+      if (!canAccessStore(accessInfo, category.storeCode)) {
+        return NextResponse.json(
+          { error: 'Access denied to this store' },
+          { status: 403 }
+        )
+      }
     }
 
     // Check if category has any menu items

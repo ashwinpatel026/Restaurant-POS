@@ -14,6 +14,7 @@ import CRUDModal from "@/components/modals/CRUDModal";
 import DeleteConfirmationModal from "@/components/modals/DeleteConfirmationModal";
 import DataTable from "@/components/tables/DataTable";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 interface Tax {
   tblTaxId: number;
@@ -27,6 +28,8 @@ interface Tax {
 }
 
 export default function TaxManagementPage() {
+  const { selectedStoreCode, buildApiUrl } = useApiWithStore();
+  
   const [taxes, setTaxes] = useState<Tax[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -38,15 +41,19 @@ export default function TaxManagementPage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [selectedStoreCode]);
 
   const fetchData = async () => {
     try {
-      const response = await fetch("/api/dashboard/tax");
+      const url = buildApiUrl("/api/dashboard/tax");
+      const response = await fetch(url);
 
       if (response.ok) {
         const data = await response.json();
         setTaxes(data);
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Error loading data");
       }
     } catch (error) {
       toast.error("Error loading data");
@@ -69,7 +76,10 @@ export default function TaxManagementPage() {
 
   const handleSave = async (formData: any) => {
     try {
-      const url = editingTax ? `/api/dashboard/tax/${editingTax.tblTaxId}` : "/api/dashboard/tax";
+      const baseUrl = editingTax 
+        ? `/api/dashboard/tax/${editingTax.tblTaxId}` 
+        : "/api/dashboard/tax";
+      const url = buildApiUrl(baseUrl);
 
       const method = editingTax ? "PUT" : "POST";
 
@@ -90,7 +100,8 @@ export default function TaxManagementPage() {
         setEditingTax(null);
         fetchData(); // Refresh data
       } else {
-        throw new Error("Failed to save tax");
+        const error = await response.json();
+        throw new Error(error.error || "Failed to save tax");
       }
     } catch (error) {
       toast.error("Error saving tax");
@@ -107,7 +118,9 @@ export default function TaxManagementPage() {
     if (!taxToDelete) return;
 
     try {
-      const response = await fetch(`/api/dashboard/tax/${taxToDelete.tblTaxId}`, {
+      const url = buildApiUrl(`/api/dashboard/tax/${taxToDelete.tblTaxId}`);
+
+      const response = await fetch(url, {
         method: "DELETE",
       });
 
@@ -117,7 +130,8 @@ export default function TaxManagementPage() {
         setShowDeleteModal(false);
         setTaxToDelete(null);
       } else {
-        throw new Error("Failed to delete tax");
+        const error = await response.json();
+        throw new Error(error.error || "Failed to delete tax");
       }
     } catch (error) {
       toast.error("Error deleting tax");

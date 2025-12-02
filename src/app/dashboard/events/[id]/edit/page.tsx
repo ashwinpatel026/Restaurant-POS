@@ -6,11 +6,13 @@ import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { ArrowLeftIcon, CheckIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 export default function EditEventPage() {
   const router = useRouter();
   const params = useParams();
   const eventId = params?.id as string;
+  const { buildApiUrl } = useApiWithStore();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -49,7 +51,6 @@ export default function EditEventPage() {
     eventStartDate: "",
     eventEndDate: "",
     isActive: 1,
-    storeCode: "",
   });
 
   useEffect(() => {
@@ -58,7 +59,8 @@ export default function EditEventPage() {
 
   const fetchEvent = async () => {
     try {
-      const response = await fetch(`/api/events/${eventId}`);
+      const url = buildApiUrl(`/api/dashboard/events/${eventId}`);
+      const response = await fetch(url);
       if (response.ok) {
         const event = await response.json();
 
@@ -144,7 +146,6 @@ export default function EditEventPage() {
             ? event.eventEndDate.toString().split("T")[0]
             : "",
           isActive: event.isActive || 0,
-          storeCode: event.storeCode || "",
         });
 
         // Check which days have the same schedule as Monday
@@ -241,7 +242,8 @@ export default function EditEventPage() {
           break;
       }
 
-      const response = await fetch(`/api/events/${eventId}`, {
+      const url = buildApiUrl(`/api/dashboard/events/${eventId}`);
+      const response = await fetch(url, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submitData),

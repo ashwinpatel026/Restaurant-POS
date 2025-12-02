@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserAccessInfo, getSelectedStoreCode, canAccessStore } from '@/lib/auth/accessControl'
 import { prisma, checkConnection } from '@/lib/database'
 
 // Helper function to handle database operations with retry
@@ -39,9 +40,16 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
 
     const resolvedParams = await params
     const itemId = BigInt(resolvedParams.id)
@@ -52,6 +60,16 @@ export async function GET(
 
     if (!menuItem) {
       return NextResponse.json({ error: 'Menu item not found' }, { status: 404 })
+    }
+
+    // Validate store access
+    if ((menuItem as any).storeCode) {
+      if (!canAccessStore(accessInfo, (menuItem as any).storeCode)) {
+        return NextResponse.json(
+          { error: 'Access denied to this store' },
+          { status: 403 }
+        )
+      }
     }
 
     // Fetch modifier group assignments for this menu item
@@ -144,13 +162,44 @@ export async function PUT(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || !['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    if (!['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
 
     const resolvedParams = await params
     const itemId = BigInt(resolvedParams.id)
     const body = await request.json()
+
+    // Get existing menu item to validate access
+    const existingItem = await (prisma as any).menuItem.findUnique({
+      where: { menuItemId: itemId } as any,
+      select: { storeCode: true }
+    })
+
+    if (!existingItem) {
+      return NextResponse.json({ error: 'Menu item not found' }, { status: 404 })
+    }
+
+    // Validate store access
+    if (existingItem.storeCode) {
+      if (!canAccessStore(accessInfo, existingItem.storeCode)) {
+        return NextResponse.json(
+          { error: 'Access denied to this store' },
+          { status: 403 }
+        )
+      }
+    }
 
     const {
       name,
@@ -239,7 +288,8 @@ export async function PUT(
           menuMasterCode: menuMasterCode || null,
           menuCategoryCode: Array.isArray(menuCategoryCode) && menuCategoryCode.length > 0 
             ? menuCategoryCode 
-            : menuCategoryCode || null
+            : menuCategoryCode || null,
+          syncSource: 'location' // Set sync_source to 'location' when updated from dashboard
         }
       })
     })
@@ -277,7 +327,7 @@ export async function PUT(
                 weight: weight || null,
                 prepTimeMinutes: prepTimeMinutes ? parseInt(prepTimeMinutes.toString()) : 0,
                 createdBy: parseInt(session.user.id),
-                storeCode: process.env.STORE_CODE || null
+                storeCode: existingItem.storeCode || selectedStoreCode || null
               }
             })
           }
@@ -326,7 +376,8 @@ export async function PUT(
                 minSelection: null,
                 maxSelection: null,
                 createdBy: parseInt(session.user.id),
-                storeCode: process.env.STORE_CODE || null
+                storeCode: existingItem.storeCode || selectedStoreCode || null,
+                syncSource: 'location' // Set sync_source to 'location' when created from dashboard
               })
               seenGroups.add(code)
             }
@@ -355,7 +406,8 @@ export async function PUT(
                   minSelection: typeof opts.minSelection === 'number' ? opts.minSelection : null,
                   maxSelection: typeof opts.maxSelection === 'number' ? opts.maxSelection : null,
                   createdBy: parseInt(session.user.id),
-                  storeCode: process.env.STORE_CODE || null
+                  storeCode: existingItem.storeCode || selectedStoreCode || null,
+                  syncSource: 'location' // Set sync_source to 'location' when created from dashboard
                 })
                 seenGroups.add(g.modifierGroupCode)
               }
@@ -395,9 +447,20 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || !['SUPER_ADMIN'].includes(session.user.role)) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    if (!['SUPER_ADMIN'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
 
     const resolvedParams = await params
     const itemId = BigInt(resolvedParams.id)
@@ -409,6 +472,16 @@ export async function DELETE(
 
     if (!menuItem) {
       return NextResponse.json({ error: 'Menu item not found' }, { status: 404 })
+    }
+
+    // Validate store access
+    if ((menuItem as any).storeCode) {
+      if (!canAccessStore(accessInfo, (menuItem as any).storeCode)) {
+        return NextResponse.json(
+          { error: 'Access denied to this store' },
+          { status: 403 }
+        )
+      }
     }
 
     // Now safe to delete the menu item

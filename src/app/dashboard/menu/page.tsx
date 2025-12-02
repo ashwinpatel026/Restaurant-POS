@@ -12,8 +12,10 @@ import {
 import Link from "next/link";
 import toast from "react-hot-toast";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 export default function MenuManagementPage() {
+  const { selectedStoreCode, buildApiUrl } = useApiWithStore();
   const [stats, setStats] = useState({
     menuMasters: 0,
     categories: 0,
@@ -24,9 +26,9 @@ export default function MenuManagementPage() {
     const fetchCounts = async () => {
       try {
         const [mastersRes, categoriesRes, itemsRes] = await Promise.all([
-          fetch("/api/dashboard/menu/masters"),
-          fetch("/api/dashboard/menu/categories"),
-          fetch("/api/dashboard/menu/items"),
+          fetch(buildApiUrl("/api/dashboard/menu/masters")),
+          fetch(buildApiUrl("/api/dashboard/menu/categories")),
+          fetch(buildApiUrl("/api/dashboard/menu/items")),
         ]);
 
         setStats({
@@ -40,8 +42,11 @@ export default function MenuManagementPage() {
         console.error("Failed to load menu counts", e);
       }
     };
-    fetchCounts();
-  }, []);
+    
+    if (selectedStoreCode) {
+      fetchCounts();
+    }
+  }, [selectedStoreCode, buildApiUrl]);
 
   const managementSections = [
     {

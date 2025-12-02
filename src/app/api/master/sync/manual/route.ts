@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper';
 import { syncService } from '@/lib/sync/syncService';
-import { SyncRequest } from '@/lib/sync/types';
+import { SyncRequest, SYNC_TABLE_DEPENDENCIES } from '@/lib/sync/types';
 
 export async function POST(request: NextRequest) {
   try {
@@ -56,20 +56,58 @@ export async function POST(request: NextRequest) {
       errors: result.errors,
     });
 
+    // If syncing a table that has dependent tables, automatically sync those too
+    // For example: when syncing tbl_user, also sync tbl_user_store_access
+    const dependentTables: string[] = [];
+    if (tableName && SYNC_TABLE_DEPENDENCIES) {
+      // Find tables that depend on the current table
+      Object.entries(SYNC_TABLE_DEPENDENCIES).forEach(([childTable, parentTables]) => {
+        if (parentTables.includes(tableName)) {
+          dependentTables.push(childTable);
+        }
+      });
+    }
+
+    const dependentResults: any[] = [];
+    if (dependentTables.length > 0) {
+      console.log(`Auto-syncing dependent tables: ${dependentTables.join(', ')}`);
+      for (const depTable of dependentTables) {
+        const depSyncRequest: SyncRequest = {
+          locationCode,
+          tableName: depTable,
+          fullSync: fullSync || false,
+          forceSync: forceSync || false,
+        };
+        const depResult = await syncService.syncToLocation(depSyncRequest);
+        dependentResults.push({
+          tableName: depTable,
+          ...depResult,
+        });
+      }
+    }
+
+    // Combine results
+    const totalRecordsProcessed = result.recordsProcessed + dependentResults.reduce((sum, r) => sum + r.recordsProcessed, 0);
+    const totalRecordsSucceeded = result.recordsSucceeded + dependentResults.reduce((sum, r) => sum + r.recordsSucceeded, 0);
+    const totalRecordsFailed = result.recordsFailed + dependentResults.reduce((sum, r) => sum + r.recordsFailed, 0);
+    const allErrors = [...result.errors, ...dependentResults.flatMap(r => r.errors)];
+    const overallSuccess = result.success && dependentResults.every(r => r.success);
+
     // Return result
     return NextResponse.json({
-      success: result.success,
-      message: result.success
-        ? `Sync completed successfully for location ${locationCode}`
+      success: overallSuccess,
+      message: overallSuccess
+        ? `Sync completed successfully for location ${locationCode}${dependentTables.length > 0 ? ` (including ${dependentTables.length} dependent table(s))` : ''}`
         : `Sync completed with errors for location ${locationCode}`,
       data: {
         locationCode: result.locationCode,
         tableName: result.tableName,
-        recordsProcessed: result.recordsProcessed,
-        recordsSucceeded: result.recordsSucceeded,
-        recordsFailed: result.recordsFailed,
+        recordsProcessed: totalRecordsProcessed,
+        recordsSucceeded: totalRecordsSucceeded,
+        recordsFailed: totalRecordsFailed,
         duration: result.duration,
-        errors: result.errors.slice(0, 10), // Limit errors in response
+        errors: allErrors.slice(0, 10), // Limit errors in response
+        dependentTables: dependentTables.length > 0 ? dependentResults : undefined,
       },
     });
   } catch (error: any) {

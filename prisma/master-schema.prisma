@@ -74,6 +74,8 @@ model Location {
   createdOn        DateTime  @default(now()) @map("created_on")
   updatedOn        DateTime? @map("updated_on")
 
+  userStoreAccesses UserStoreAccess[]
+
   @@index([companyId])
   @@index([dealerId])
   @@index([storeCode])
@@ -111,9 +113,14 @@ model User {
   locationId      BigInt?     @map("location_id")
   role            UserRole    @map("role")
   accessLevel     AccessLevel  @map("access_level")
+  defaultStoreCode String?     @map("default_store_code") @db.VarChar(100)
   isActive        Boolean     @default(true) @map("is_active")
   createdOn       DateTime    @default(now()) @map("created_on")
   updatedOn       DateTime?   @map("updated_on")
+  syncId          String?     @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource      String?     @default("server") @map("sync_source") @db.VarChar(20)
+  
+  storeAccesses   UserStoreAccess[]
 
   @@index([companyId])
   @@index([dealerId])
@@ -121,6 +128,26 @@ model User {
   @@index([email])
   @@index([username])
   @@map("tbl_user")
+}
+
+model UserStoreAccess {
+  id          BigInt    @id @default(autoincrement()) @map("id")
+  userId      BigInt    @map("user_id")
+  locationId  BigInt    @map("location_id")
+  storeCode   String    @map("store_code") @db.VarChar(100)
+  isDefault   Boolean   @default(false) @map("is_default")
+  createdOn   DateTime  @default(now()) @map("created_on")
+  syncId      String?   @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource  String?   @default("server") @map("sync_source") @db.VarChar(20)
+  
+  user        User      @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  location    Location  @relation(fields: [locationId], references: [locationId])
+  
+  @@unique([userId, storeCode])
+  @@index([userId])
+  @@index([storeCode])
+  @@index([locationId])
+  @@map("tbl_user_store_access")
 }
 
 // Master Data Templates (for syncing to locations)
@@ -200,9 +227,10 @@ model SyncStatus {
 }
 
 enum AccessLevel {
-  COMPANY   // Access all locations in company
-  DEALER    // Access all locations in dealer
-  LOCATION  // Access only specific location
+  SUPER_ADMIN  // Full access to all companies, dealers, and locations
+  COMPANY      // Access all locations in company
+  DEALER       // Access all locations in dealer
+  LOCATION     // Access only specific location
 }
 
 enum AdminRole {

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { XMarkIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { Fragment } from "react";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 interface ModifierItem {
   id: number;
@@ -48,6 +49,7 @@ export default function ModifierSelectionModal({
   menuItemId,
   useMasterApi = false,
 }: ModifierSelectionModalProps) {
+  const { buildApiUrl, selectedStoreCode } = useApiWithStore();
   const [modifiers, setModifiers] = useState<ModifierGroup[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -61,10 +63,10 @@ export default function ModifierSelectionModal({
   }, [selectedModifierIds]);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && (!useMasterApi ? selectedStoreCode : true)) {
       fetchModifiers();
     }
-  }, [isOpen, searchTerm, menuItemId, useMasterApi]);
+  }, [isOpen, searchTerm, menuItemId, useMasterApi, selectedStoreCode]);
 
   const fetchModifiers = async () => {
     setLoading(true);
@@ -74,11 +76,20 @@ export default function ModifierSelectionModal({
       if (menuItemId) params.append("excludeMenuItemId", menuItemId.toString());
 
       const apiPrefix = useMasterApi ? "/api/master" : "/api/dashboard";
-      const apiPath = useMasterApi
-        ? "/modifier-groups"
-        : "/menu/modifiers/available";
+      const apiPath = "/modifier-groups";
+      
+      // Build URL with query params
+      let url = `${apiPrefix}${apiPath}`;
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+      
+      // Use buildApiUrl for dashboard to automatically include storeCode
+      if (!useMasterApi) {
+        url = buildApiUrl(url);
+      }
 
-      const response = await fetch(`${apiPrefix}${apiPath}?${params}`, {
+      const response = await fetch(url, {
         headers: useMasterApi
           ? {
               Authorization: `Bearer ${localStorage.getItem(
@@ -90,95 +101,97 @@ export default function ModifierSelectionModal({
 
       if (response.ok) {
         const data = await response.json();
-        // If using master API, map the response to expected format
-        if (useMasterApi) {
-          // Fetch modifier items for each group
-          const groupsWithItems = await Promise.all(
-            data.map(async (group: any) => {
-              try {
-                const itemsResponse = await fetch(
-                  `/api/master/modifier-items?modifierGroupCode=${encodeURIComponent(
+        // Map the response to expected format for both master and dashboard APIs
+        // Fetch modifier items for each group
+        const groupsWithItems = await Promise.all(
+          data.map(async (group: any) => {
+            try {
+              const itemsApiPrefix = useMasterApi ? "/api/master" : "/api/dashboard";
+              const itemsUrl = useMasterApi
+                ? `${itemsApiPrefix}/modifier-items?modifierGroupCode=${encodeURIComponent(
                     group.modifierGroupCode
-                  )}`,
-                  {
-                    headers: {
+                  )}`
+                : buildApiUrl(`/modifier-items?modifierGroupCode=${encodeURIComponent(
+                    group.modifierGroupCode
+                  )}`);
+              
+              const itemsResponse = await fetch(itemsUrl, {
+                headers: useMasterApi
+                  ? {
                       Authorization: `Bearer ${localStorage.getItem(
                         "master_admin_token"
                       )}`,
-                    },
-                  }
-                );
-                let modifierItems: any[] = [];
-                if (itemsResponse.ok) {
-                  const itemsData = await itemsResponse.json();
-                  modifierItems = itemsData || [];
-                }
-
-                return {
-                  id:
-                    parseInt(group.id) ||
-                    parseInt(group.modifierGroupId || "0"),
-                  name: group.groupName || group.labelName,
-                  labelName: group.labelName || group.groupName,
-                  posName: group.labelName || group.groupName,
-                  colorCode: "#3B82F6",
-                  required: group.isRequired || 0,
-                  isMultiselect: group.isMultiselect || 0,
-                  minSelection: group.minSelection,
-                  maxSelection: group.maxSelection,
-                  itemCount: modifierItems.length,
-                  sampleItems: modifierItems
-                    .slice(0, 3)
-                    .map((item: any) => item.name || item.labelName),
-                  configSummary: `${
-                    group.isRequired === 1 ? "Required" : "Optional"
-                  } • ${
-                    group.isMultiselect === 1 ? "Multi-select" : "Single-select"
-                  }`,
-                  modifierItems: modifierItems.map((item: any) => ({
-                    id:
-                      parseInt(item.id) || parseInt(item.modifierItemId || "0"),
-                    name: item.name || item.labelName,
-                    labelName: item.labelName || item.name,
-                    posName: item.labelName || item.name,
-                    price: parseFloat(
-                      item.price || item.additionalCharge || "0"
-                    ),
-                  })),
-                };
-              } catch (error) {
-                console.error(
-                  `Error fetching items for group ${group.modifierGroupCode}:`,
-                  error
-                );
-                return {
-                  id:
-                    parseInt(group.id) ||
-                    parseInt(group.modifierGroupId || "0"),
-                  name: group.groupName || group.labelName,
-                  labelName: group.labelName || group.groupName,
-                  posName: group.labelName || group.groupName,
-                  colorCode: "#3B82F6",
-                  required: group.isRequired || 0,
-                  isMultiselect: group.isMultiselect || 0,
-                  minSelection: group.minSelection,
-                  maxSelection: group.maxSelection,
-                  itemCount: 0,
-                  sampleItems: [],
-                  configSummary: `${
-                    group.isRequired === 1 ? "Required" : "Optional"
-                  } • ${
-                    group.isMultiselect === 1 ? "Multi-select" : "Single-select"
-                  }`,
-                  modifierItems: [],
-                };
+                    }
+                  : {},
+              });
+              let modifierItems: any[] = [];
+              if (itemsResponse.ok) {
+                const itemsData = await itemsResponse.json();
+                modifierItems = itemsData || [];
               }
-            })
-          );
-          setModifiers(groupsWithItems);
-        } else {
-          setModifiers(data);
-        }
+
+              return {
+                id:
+                  parseInt(group.id) ||
+                  parseInt(group.modifierGroupId || "0"),
+                name: group.groupName || group.labelName,
+                labelName: group.labelName || group.groupName,
+                posName: group.labelName || group.groupName,
+                colorCode: "#3B82F6",
+                required: group.isRequired || 0,
+                isMultiselect: group.isMultiselect || 0,
+                minSelection: group.minSelection,
+                maxSelection: group.maxSelection,
+                itemCount: modifierItems.length,
+                sampleItems: modifierItems
+                  .slice(0, 3)
+                  .map((item: any) => item.name || item.labelName),
+                configSummary: `${
+                  group.isRequired === 1 ? "Required" : "Optional"
+                } • ${
+                  group.isMultiselect === 1 ? "Multi-select" : "Single-select"
+                }`,
+                modifierItems: modifierItems.map((item: any) => ({
+                  id:
+                    parseInt(item.id) || parseInt(item.modifierItemId || "0"),
+                  name: item.name || item.labelName,
+                  labelName: item.labelName || item.name,
+                  posName: item.labelName || item.name,
+                  price: parseFloat(
+                    item.price || item.additionalCharge || "0"
+                  ),
+                })),
+              };
+            } catch (error) {
+              console.error(
+                `Error fetching items for group ${group.modifierGroupCode}:`,
+                error
+              );
+              return {
+                id:
+                  parseInt(group.id) ||
+                  parseInt(group.modifierGroupId || "0"),
+                name: group.groupName || group.labelName,
+                labelName: group.labelName || group.groupName,
+                posName: group.labelName || group.groupName,
+                colorCode: "#3B82F6",
+                required: group.isRequired || 0,
+                isMultiselect: group.isMultiselect || 0,
+                minSelection: group.minSelection,
+                maxSelection: group.maxSelection,
+                itemCount: 0,
+                sampleItems: [],
+                configSummary: `${
+                  group.isRequired === 1 ? "Required" : "Optional"
+                } • ${
+                  group.isMultiselect === 1 ? "Multi-select" : "Single-select"
+                }`,
+                modifierItems: [],
+              };
+            }
+          })
+        );
+        setModifiers(groupsWithItems);
       } else {
         console.error("Failed to fetch modifiers");
       }

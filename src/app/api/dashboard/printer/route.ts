@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import {
+  getUserAccessInfo,
+  getSelectedStoreCode,
+  buildStoreFilter,
+} from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 
 // Helper function to generate unique printer code
-async function generatePrinterCode(): Promise<string> {
-  const storeCode = process.env.STORE_CODE || ''
+async function generatePrinterCode(storeCode: string): Promise<string> {
   const prefix = `WL${storeCode}PRT`
   
   // Get all printer codes that match the WL pattern for this store
@@ -39,16 +43,36 @@ async function generatePrinterCode(): Promise<string> {
   return `${prefix}${nextNumber}`
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
+    }
+
+    // Filter by ONE store only
+    const storeFilter = buildStoreFilter(accessInfo, selectedStoreCode)
+
     const printers = await prisma.printer.findMany({
-      orderBy: { createdOn: 'desc' }
+      where: {
+        ...storeFilter,
+      },
+      orderBy: { createdOn: 'desc' },
     })
 
     // Serialize BigInt to string
@@ -72,8 +96,26 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session || !['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()
@@ -87,8 +129,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate unique printer code
-    const printerCode = await generatePrinterCode()
+    // Generate unique printer code for the selected store
+    const printerCode = await generatePrinterCode(selectedStoreCode)
 
     const printer = await prisma.printer.create({
       data: {
@@ -96,7 +138,9 @@ export async function POST(request: NextRequest) {
         printerName,
         isActive: isActive ? 1 : 0,
         createdBy: parseInt(session.user.id),
-        storeCode: process.env.STORE_CODE || null
+        storeCode: selectedStoreCode,
+        // Mark records created from dashboard/location
+        syncSource: 'location',
       }
     })
 

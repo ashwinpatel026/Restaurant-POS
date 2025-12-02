@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { ArrowLeftIcon, CheckIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 export default function AddEventPage() {
   const router = useRouter();
+  const { buildApiUrl } = useApiWithStore();
+  
   const [loading, setLoading] = useState(false);
   const [selectedDaysToApply, setSelectedDaysToApply] = useState<Set<string>>(
     new Set()
@@ -44,7 +47,6 @@ export default function AddEventPage() {
     eventStartDate: "",
     eventEndDate: "",
     isActive: 1,
-    storeCode: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -77,7 +79,8 @@ export default function AddEventPage() {
           break;
       }
 
-      const response = await fetch("/api/dashboard/events", {
+      const url = buildApiUrl("/api/dashboard/events");
+      const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(submitData),

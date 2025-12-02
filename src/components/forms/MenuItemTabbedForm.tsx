@@ -10,6 +10,7 @@ import MenuMasterCategorySelectionModal from "@/components/modals/MenuMasterCate
 import { LoadingOverlay } from "@/components/ui/SkeletonLoader";
 import { CheckIcon } from "@heroicons/react/24/solid";
 import { XMarkIcon } from "@heroicons/react/24/outline";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 interface MenuItemFormProps {
   menuItem?: any;
@@ -26,6 +27,7 @@ export default function MenuItemTabbedForm({
   onSave,
   onCancel,
 }: MenuItemFormProps) {
+  const { selectedStoreCode, buildApiUrl } = useApiWithStore();
   const [formData, setFormData] = useState({
     name: "",
     kitchenName: "",
@@ -103,10 +105,12 @@ export default function MenuItemTabbedForm({
   const [filteredCategories, setFilteredCategories] = useState<any[]>([]);
 
   useEffect(() => {
-    fetchModifiers();
-    fetchTaxes();
-    fetchPrepZones();
-  }, []);
+    if (selectedStoreCode) {
+      fetchModifiers();
+      fetchTaxes();
+      fetchPrepZones();
+    }
+  }, [selectedStoreCode]);
 
   // Update selectedMenuMaster when menuMasterCode changes
   useEffect(() => {
@@ -294,7 +298,7 @@ export default function MenuItemTabbedForm({
   useEffect(() => {
     const load = async () => {
       try {
-        if (!inheritModifiers || selectedCategories.size === 0) {
+        if (!inheritModifiers || selectedCategories.size === 0 || !selectedStoreCode) {
           setInheritedModifiers([]);
           return;
         }
@@ -307,9 +311,11 @@ export default function MenuItemTabbedForm({
         for (const categoryCode of categoryCodes) {
           try {
             const res = await fetch(
-              `/api/dashboard/modifier-groups?menuCategoryCode=${encodeURIComponent(
-                categoryCode
-              )}`
+              buildApiUrl(
+                `/api/dashboard/modifier-groups?menuCategoryCode=${encodeURIComponent(
+                  categoryCode
+                )}`
+              )
             );
             if (res.ok) {
               const data = await res.json();
@@ -340,11 +346,11 @@ export default function MenuItemTabbedForm({
       }
     };
     load();
-  }, [inheritModifiers, selectedCategoriesKey]);
+  }, [inheritModifiers, selectedCategoriesKey, selectedStoreCode]);
 
   const fetchModifiers = async () => {
     try {
-      const response = await fetch("/api/dashboard/menu/modifiers");
+      const response = await fetch(buildApiUrl("/api/dashboard/modifier-groups"));
       if (response.ok) {
         const modifiersData = await response.json();
         setModifiers(modifiersData);
@@ -356,7 +362,7 @@ export default function MenuItemTabbedForm({
 
   const fetchTaxes = async () => {
     try {
-      const res = await fetch("/api/dashboard/tax");
+      const res = await fetch(buildApiUrl("/api/dashboard/tax"));
       if (res.ok) {
         const data = await res.json();
         setTaxes(data);
@@ -368,7 +374,7 @@ export default function MenuItemTabbedForm({
 
   const fetchPrepZones = async () => {
     try {
-      const res = await fetch("/api/dashboard/menu/prep-zone");
+      const res = await fetch(buildApiUrl("/api/dashboard/menu/prep-zone"));
       if (res.ok) {
         const data = await res.json();
         setPrepZones(data);

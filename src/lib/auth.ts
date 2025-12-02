@@ -20,8 +20,13 @@ export const authOptions: NextAuthOptions = {
           where: { email: credentials.email }
         })
 
-        if (!user || !user.isActive) {
+        if (!user) {
           throw new Error('Invalid credentials')
+        }
+
+        // Check if user is active
+        if (!user.isActive) {
+          throw new Error('Account is not active. Please contact administrator.')
         }
 
         const isPasswordValid = await bcrypt.compare(
@@ -67,6 +72,8 @@ export const authOptions: NextAuthOptions = {
           name: `${user.firstName} ${user.lastName}`,
           role: user.role,
           outletId: (user as any).outletId?.toString() || null,
+          accessLevel: user.accessLevel || null,
+          defaultStoreCode: user.defaultStoreCode || null,
         }
       }
     })
@@ -77,6 +84,8 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id
         token.role = user.role
         token.outletId = user.outletId
+        token.accessLevel = user.accessLevel
+        token.defaultStoreCode = user.defaultStoreCode
       }
       return token
     },
@@ -85,6 +94,8 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.id as string
         session.user.role = token.role as string
         session.user.outletId = token.outletId as string | null
+        session.user.accessLevel = token.accessLevel as string | null
+        session.user.defaultStoreCode = token.defaultStoreCode as string | null
       }
       return session
     }

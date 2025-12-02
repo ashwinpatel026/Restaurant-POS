@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserAccessInfo, getSelectedStoreCode, buildStoreFilter } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 
 // Helper function to generate unique menu master code
-async function generateMenuMasterCode(): Promise<string> {
-  const storeCode = process.env.STORE_CODE || ''
+async function generateMenuMasterCode(storeCode: string): Promise<string> {
   const prefix = `WL${storeCode}MM`
   
   // Get all menu master codes that match the WL pattern for this store
@@ -13,7 +13,8 @@ async function generateMenuMasterCode(): Promise<string> {
     where: {
       menuMasterCode: {
         startsWith: prefix
-      }
+      },
+      storeCode: storeCode
     },
     select: { menuMasterCode: true },
     orderBy: { menuMasterId: 'desc' }
@@ -48,19 +49,57 @@ export async function GET(request: NextRequest) {
     // Only require auth if not a public request
     if (!isPublic) {
       const session = await getServerSession(authOptions)
-      if (!session) {
+      
+      if (!session?.user?.id) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
+
+      const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+      
+      // Get selected store from query
+      const searchParams = request.nextUrl.searchParams
+      const queryStoreCode = searchParams.get('storeCode')
+      const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+      
+      if (!selectedStoreCode) {
+        return NextResponse.json(
+          { error: 'No accessible store selected' },
+          { status: 403 }
+        )
+      }
+      
+      // Filter by ONE store only for authenticated requests
+      const storeFilter = buildStoreFilter(accessInfo, selectedStoreCode)
+
+      // Fetch menu masters filtered by store
+      const menuMasters = await prisma.menuMaster.findMany({
+        where: {
+          ...storeFilter
+        },
+        orderBy: { createdOn: 'desc' }
+      })
+
+      // For authenticated requests, return simple structure
+      const menusWithStringId = menuMasters.map((menu: any) => ({
+        ...menu,
+        menuMasterId: menu.menuMasterId.toString()
+      }))
+
+      // Cache response for 60 seconds
+      return NextResponse.json(menusWithStringId, {
+        headers: {
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+        },
+      })
     }
 
+    // Public request handling (QR orders) - no store filtering
     // Fetch menu masters with categories and items for public QR orders
     const menuMasters = await prisma.menuMaster.findMany({
-      where: isPublic
-        ? {
-            isActive: 1, // Only active menus for QR orders
-          }
-        : undefined,
-      include: isPublic ? {
+      where: {
+        isActive: 1, // Only active menus for QR orders
+      },
+      include: {
         menuCategories: {
           where: {
             isActive: 1,
@@ -73,11 +112,11 @@ export async function GET(request: NextRequest) {
             createdOn: 'asc'
           }
         }
-      } : undefined,
+      },
       orderBy: { createdOn: 'desc' }
     })
 
-    // If public request, fetch menu items for each category
+    // Public request: fetch menu items for each category
     if (isPublic) {
       // Fetch all menu items
       const allMenuItems = await prisma.menuItem.findMany({
@@ -122,19 +161,6 @@ export async function GET(request: NextRequest) {
         },
       })
     }
-
-    // For authenticated requests, return simple structure
-    const menusWithStringId = menuMasters.map((menu: any) => ({
-      ...menu,
-      menuMasterId: menu.menuMasterId.toString()
-    }))
-
-    // Cache response for 60 seconds
-    return NextResponse.json(menusWithStringId, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
-      },
-    })
   } catch (error) {
     console.error('Error fetching menu masters:', error)
     return NextResponse.json(
@@ -148,8 +174,26 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || !['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+    
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()
@@ -164,8 +208,8 @@ export async function POST(request: NextRequest) {
       isActive
     } = body
 
-    // Generate unique menu master code
-    const menuMasterCode = await generateMenuMasterCode()
+    // Generate unique menu master code for the selected store
+    const menuMasterCode = await generateMenuMasterCode(selectedStoreCode)
 
     // Create menu master
     const createData = {
@@ -178,7 +222,8 @@ export async function POST(request: NextRequest) {
       isEventMenu: isEventMenu || 0,
       isActive: isActive ?? 1,
       createdBy: parseInt(session.user.id),
-      storeCode: process.env.STORE_CODE || null
+      storeCode: selectedStoreCode,
+      syncSource: 'location' // Set sync_source to 'location' when created from dashboard
     }
 
     const menuMaster = await prisma.menuMaster.create({
@@ -192,7 +237,8 @@ export async function POST(request: NextRequest) {
           menuMasterCode: menuMasterCode,
           eventCode: eventCode,
           createdBy: parseInt(session.user.id),
-          storeCode: process.env.STORE_CODE || null
+          storeCode: selectedStoreCode,
+          syncSource: 'location' // Set sync_source to 'location' when created from dashboard
         }
       })
     }

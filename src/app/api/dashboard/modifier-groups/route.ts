@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserAccessInfo, getSelectedStoreCode, buildStoreFilter } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 
 // Helper function to generate unique modifier group code
-async function generateModifierGroupCode(): Promise<string> {
-  const storeCode = process.env.STORE_CODE || ''
+async function generateModifierGroupCode(storeCode: string): Promise<string> {
   const prefix = `WL${storeCode}MOD`
   
   // Get all modifier group codes that match the WL pattern for this store
@@ -13,7 +13,8 @@ async function generateModifierGroupCode(): Promise<string> {
     where: {
       modifierGroupCode: {
         startsWith: prefix
-      }
+      },
+      storeCode: storeCode
     },
     select: { modifierGroupCode: true },
     orderBy: { id: 'desc' }
@@ -42,9 +43,28 @@ async function generateModifierGroupCode(): Promise<string> {
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-    const { searchParams } = new URL(request.url)
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+    
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
+    }
+    
+    // Filter by ONE store only
+    const storeFilter = buildStoreFilter(accessInfo, selectedStoreCode)
+
     const filterCategory = searchParams.get('menuCategoryCode') || undefined
 
     // Use parameterized query instead of raw SQL with string interpolation
@@ -66,13 +86,17 @@ export async function GET(request: NextRequest) {
       
       groups = await (prisma as any).modifierGroup.findMany({
         where: {
-          modifierGroupCode: { in: groupCodes }
+          modifierGroupCode: { in: groupCodes },
+          ...storeFilter
         },
         orderBy: { createdOn: 'desc' }
       })
     } else {
-      // Fetch all groups without filtering
+      // Fetch all groups filtered by store
       groups = await (prisma as any).modifierGroup.findMany({
+        where: {
+          ...storeFilter
+        },
         orderBy: { createdOn: 'desc' }
       })
     }
@@ -132,8 +156,27 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || !['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+    
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+    
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()
@@ -151,8 +194,8 @@ export async function POST(request: NextRequest) {
       isActive = 1,
     } = body
 
-    // Generate unique modifier group code
-    const modifierGroupCode = await generateModifierGroupCode()
+    // Generate unique modifier group code for the selected store
+    const modifierGroupCode = await generateModifierGroupCode(selectedStoreCode)
 
     const created = await (prisma as any).modifierGroup.create({
       data: {
@@ -169,7 +212,8 @@ export async function POST(request: NextRequest) {
         price: typeof price === 'number' && price > 0 ? price : null,
         isActive,
         createdBy: parseInt(session.user.id),
-        storeCode: process.env.STORE_CODE || null,
+        storeCode: selectedStoreCode,
+        syncSource: 'location' // Set sync_source to 'location' when created from dashboard
       },
     })
 

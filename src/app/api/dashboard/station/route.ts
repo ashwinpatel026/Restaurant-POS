@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import {
+  getUserAccessInfo,
+  getSelectedStoreCode,
+  buildStoreFilter,
+} from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 import { Prisma } from '@prisma/client'
 
 // Helper function to generate unique station code
-async function generateStationCode(): Promise<string> {
-  const storeCode = process.env.STORE_CODE || ''
+async function generateStationCode(storeCode: string): Promise<string> {
   const prefix = `WL${storeCode}STA`
   
   // Get all station codes that match the WL pattern for this store
@@ -81,16 +85,36 @@ function mapStationResponse(station: any) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
+    }
+
+    // Filter by ONE store only
+    const storeFilter = buildStoreFilter(accessInfo, selectedStoreCode)
+
     const stations = await prisma.station.findMany({
-      orderBy: { stationname: 'asc' }
+      where: {
+        ...storeFilter,
+      },
+      orderBy: { stationname: 'asc' },
     })
 
     const stationsWithStringId = stations.map(mapStationResponse)
@@ -114,8 +138,26 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session || !['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()
@@ -123,8 +165,8 @@ export async function POST(request: NextRequest) {
 
     const groups = sanitizeStationGroups(stationGroups)
 
-    // Generate unique station code
-    const stationCode = await generateStationCode()
+    // Generate unique station code for the selected store
+    const stationCode = await generateStationCode(selectedStoreCode)
 
     const stationData: Record<string, unknown> = {
       stationCode: stationCode,
@@ -135,7 +177,9 @@ export async function POST(request: NextRequest) {
       isBill: isBill ?? false,
       isReport: isReport ?? false,
       ipAddress: ipAddress || null,
-      storeCode: process.env.STORE_CODE || null,
+      storeCode: selectedStoreCode,
+      // Mark records created from dashboard/location
+      syncSource: 'location',
     }
 
     if (groups.length > 0) {

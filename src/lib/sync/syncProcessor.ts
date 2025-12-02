@@ -29,6 +29,18 @@ export class SyncProcessor {
     'is_bar',
     'is_bill',
     'is_report',
+    'isActive',   // Location database users table column (camelCase)
+  ]);
+
+  // List of integer columns that might come as boolean but should be converted to integer
+  // These columns are integers in the database but might be stored/read as boolean
+  private readonly INTEGER_COLUMNS = new Set([
+    'is_default',  // ModifierItem.is_default is Int, not Boolean
+    'is_active',
+    'is_required',
+    'is_multiselect',
+    'is_sync_to_web',
+    'is_sync_to_local',
   ]);
 
   /**
@@ -349,9 +361,11 @@ export class SyncProcessor {
     // Map field names from master table to location table
     const mappedData = this.mapFieldsToLocationTable(tableName, recordData, locationCode);
     
-    // Add store_code from locationCode (all location tables have store_code column)
-    // This maps the sync location_code to the location database's store_code column
-    mappedData.store_code = locationCode;
+    // Add store_code from locationCode (most location tables have store_code column)
+    // Exception: users table doesn't have store_code
+    if (locationTableName !== 'users') {
+      mappedData.store_code = locationCode;
+    }
     
     console.log(`Mapped data for ${tableName} -> ${locationTableName}:`, Object.keys(mappedData));
 
@@ -438,25 +452,11 @@ export class SyncProcessor {
             locationCode
           );
         } else {
-          // Check if sync_id exists for this store_code
-          const syncIdForStore = await locationPrisma.$queryRawUnsafe<any[]>(`
-            SELECT sync_id FROM ${locationTableName}
-            WHERE sync_id = '${recordId}'::UUID
-              AND store_code = '${locationCode.replace(/'/g, "''")}'::VARCHAR
-            LIMIT 1
-          `);
-
-          if (syncIdForStore && syncIdForStore.length > 0) {
-            // Update existing record
-            await this.handleUpdate(
-              locationTableName,
-              recordId,
-              mappedData,
-              parsedData.sync_source || 'server',
-              locationCode
-            );
-          } else {
-            // sync_id doesn't exist for this store_code, check if it exists globally
+          // Special handling for tbl_user and tbl_user_store_access: sync by sync_id only (no store_code)
+          const isUserTable = tableName === 'tbl_user' || tableName === 'tbl_user_store_access';
+          
+          if (isUserTable) {
+            // For user tables, check if sync_id exists globally (no store_code check)
             const syncIdExists = await locationPrisma.$queryRawUnsafe<any[]>(`
               SELECT sync_id FROM ${locationTableName}
               WHERE sync_id = '${recordId}'::UUID
@@ -464,18 +464,16 @@ export class SyncProcessor {
             `);
 
             if (syncIdExists && syncIdExists.length > 0) {
-              // sync_id exists from another location, insert as new record with new sync_id
-              const newSyncId = randomUUID();
-              console.log(`sync_id ${recordId} exists in another location, inserting as new record with sync_id ${newSyncId} for ${locationCode}`);
-              await this.handleInsert(
+              // Update existing record by sync_id
+              await this.handleUpdate(
                 locationTableName,
-                newSyncId,
+                recordId,
                 mappedData,
                 parsedData.sync_source || 'server',
                 locationCode
               );
             } else {
-              // sync_id doesn't exist at all, insert as new
+              // sync_id doesn't exist, insert as new
               await this.handleInsert(
                 locationTableName,
                 recordId,
@@ -483,6 +481,54 @@ export class SyncProcessor {
                 parsedData.sync_source || 'server',
                 locationCode
               );
+            }
+          } else {
+            // For other tables, check if sync_id exists for this store_code
+            const syncIdForStore = await locationPrisma.$queryRawUnsafe<any[]>(`
+              SELECT sync_id FROM ${locationTableName}
+              WHERE sync_id = '${recordId}'::UUID
+                AND store_code = '${locationCode.replace(/'/g, "''")}'::VARCHAR
+              LIMIT 1
+            `);
+
+            if (syncIdForStore && syncIdForStore.length > 0) {
+              // Update existing record
+              await this.handleUpdate(
+                locationTableName,
+                recordId,
+                mappedData,
+                parsedData.sync_source || 'server',
+                locationCode
+              );
+            } else {
+              // sync_id doesn't exist for this store_code, check if it exists globally
+              const syncIdExists = await locationPrisma.$queryRawUnsafe<any[]>(`
+                SELECT sync_id FROM ${locationTableName}
+                WHERE sync_id = '${recordId}'::UUID
+                LIMIT 1
+              `);
+
+              if (syncIdExists && syncIdExists.length > 0) {
+                // sync_id exists from another location, insert as new record with new sync_id
+                const newSyncId = randomUUID();
+                console.log(`sync_id ${recordId} exists in another location, inserting as new record with sync_id ${newSyncId} for ${locationCode}`);
+                await this.handleInsert(
+                  locationTableName,
+                  newSyncId,
+                  mappedData,
+                  parsedData.sync_source || 'server',
+                  locationCode
+                );
+              } else {
+                // sync_id doesn't exist at all, insert as new
+                await this.handleInsert(
+                  locationTableName,
+                  recordId,
+                  mappedData,
+                  parsedData.sync_source || 'server',
+                  locationCode
+                );
+              }
             }
           }
         }
@@ -905,10 +951,50 @@ export class SyncProcessor {
       } else if (parentTable === 'tbl_master_time_events') {
         foreignKeyField = 'Event_code';
         foreignKeyValue = mappedData.event_code;
+      } else if (parentTable === 'tbl_user') {
+        // For user_store_access, user_id references users.id (not a code field)
+        // We'll validate by checking if user exists by email (since user_id needs to be mapped)
+        foreignKeyField = 'email';  // Use email to validate user exists
+        // Get email from the user_id in the sync log data
+        // This will be handled specially in the validation
+        foreignKeyValue = mappedData.user_id;  // This is the master user_id, will be validated differently
       }
 
       if (!foreignKeyField || !foreignKeyValue) {
         continue;
+      }
+
+      // Special handling for tbl_user dependency: validate by email instead of code
+      if (parentTable === 'tbl_user' && masterTableName === 'tbl_user_store_access') {
+        // Get user email from master DB using user_id
+        try {
+          const masterUserId = foreignKeyValue;
+          const masterUser = await masterPrisma.$queryRawUnsafe<any[]>(`
+            SELECT email FROM tbl_user WHERE user_id = ${BigInt(masterUserId)}::BIGINT LIMIT 1
+          `);
+          
+          if (!masterUser || masterUser.length === 0) {
+            return `User with user_id ${masterUserId} not found in master database`;
+          }
+          
+          const userEmail = masterUser[0].email;
+          const escapedEmail = userEmail.replace(/'/g, "''");
+          
+          // Check if user exists in location DB by email
+          const userExists = await locationPrisma.$queryRawUnsafe<Array<{ count: bigint }>>(`
+            SELECT COUNT(*) as count
+            FROM users
+            WHERE email = '${escapedEmail}'
+          `);
+          
+          const count = userExists[0]?.count || BigInt(0);
+          if (count === BigInt(0)) {
+            return `User with email ${userEmail} not found in location database. User must be synced first.`;
+          }
+        } catch (error: any) {
+          return `Error validating user dependency: ${error.message}`;
+        }
+        continue; // Skip the normal validation for user dependency
       }
 
       // Check if parent record exists in location database
@@ -987,11 +1073,50 @@ export class SyncProcessor {
       } else if (parentTable === 'tbl_master_time_events') {
         foreignKeyField = 'Event_code';
         foreignKeyValue = mappedData.event_code;
+      } else if (parentTable === 'tbl_user') {
+        // For user_store_access, user_id references users.id (not a code field)
+        // We'll validate by checking if user exists by sync_id (since user_id needs to be mapped)
+        foreignKeyField = 'sync_id';  // Use sync_id to validate user exists
+        // Get sync_id from the user_id in the sync log data
+        // This will be handled specially in the validation
+        foreignKeyValue = mappedData.user_id;  // This is the master user_id, will be validated differently
       }
 
       if (!foreignKeyField || !foreignKeyValue) {
         // Skip if the foreign key field is not present (might be optional)
         continue;
+      }
+
+      // Special handling for tbl_user dependency: validate by sync_id instead of code
+      if (parentTable === 'tbl_user' && masterTableName === 'tbl_user_store_access') {
+        // Get user sync_id from master DB using user_id
+        try {
+          const masterUserId = foreignKeyValue;
+          const masterUser = await masterPrisma.$queryRawUnsafe<any[]>(`
+            SELECT sync_id FROM tbl_user WHERE user_id = ${BigInt(masterUserId)}::BIGINT LIMIT 1
+          `);
+          
+          if (!masterUser || masterUser.length === 0 || !masterUser[0].sync_id) {
+            return `User with user_id ${masterUserId} not found in master database or missing sync_id`;
+          }
+          
+          const userSyncId = masterUser[0].sync_id;
+          
+          // Check if user exists in location DB by sync_id
+          const userExists = await locationPrisma.$queryRawUnsafe<Array<{ count: bigint }>>(`
+            SELECT COUNT(*) as count
+            FROM users
+            WHERE sync_id = '${userSyncId}'::UUID
+          `);
+          
+          const count = userExists[0]?.count || BigInt(0);
+          if (count === BigInt(0)) {
+            return `User with sync_id ${userSyncId} not found in location database. User must be synced first.`;
+          }
+        } catch (error: any) {
+          return `Error validating user dependency: ${error.message}`;
+        }
+        continue; // Skip the normal validation for user dependency
       }
 
       // Check if parent record exists in location database
@@ -1038,12 +1163,25 @@ export class SyncProcessor {
     syncSource: string,
     locationCode: string
   ): Promise<void> {
-    // Check if record already exists for this store_code
-    const existing = await locationPrisma.$queryRawUnsafe(`
-      SELECT sync_id FROM ${tableName}
-      WHERE sync_id = '${syncId}'::UUID
-        AND store_code = '${locationCode.replace(/'/g, "''")}'::VARCHAR
-    `);
+    // Check if record already exists
+    // Special handling for user tables: check by sync_id only (no store_code)
+    const isUserTable = tableName === 'users' || tableName === 'tbl_user_store_access';
+    let existing: any[] = [];
+    
+    if (isUserTable) {
+      // For user tables, check by sync_id only
+      existing = await locationPrisma.$queryRawUnsafe(`
+        SELECT sync_id FROM ${tableName}
+        WHERE sync_id = '${syncId}'::UUID
+      `) as any[];
+    } else {
+      // For other tables, check by sync_id and store_code
+      existing = await locationPrisma.$queryRawUnsafe(`
+        SELECT sync_id FROM ${tableName}
+        WHERE sync_id = '${syncId}'::UUID
+          AND store_code = '${locationCode.replace(/'/g, "''")}'::VARCHAR
+      `) as any[];
+    }
 
     if (existing && (existing as any[]).length > 0) {
       // Record exists for this store_code, treat as UPDATE instead
@@ -1072,11 +1210,101 @@ export class SyncProcessor {
     }
 
     // Insert new record
-    const insertData = {
+    let insertData = {
       ...data,
       sync_id: syncId,
       sync_source: syncSource,
     };
+
+    // Special handling for tbl_user_store_access: map user_id from master to location user id
+    if (tableName === 'tbl_user_store_access' && insertData.user_id) {
+      try {
+        // user_id in sync log is the master user_id (BigInt as string)
+        // We need to find the corresponding user in location DB by sync_id
+        // First, get the user sync_id from master DB using user_id
+        const masterUserId = insertData.user_id;
+        const masterUser = await masterPrisma.$queryRawUnsafe<any[]>(`
+          SELECT sync_id FROM tbl_user WHERE user_id = ${BigInt(masterUserId)}::BIGINT LIMIT 1
+        `);
+        
+        if (masterUser && masterUser.length > 0 && masterUser[0].sync_id) {
+          const userSyncId = masterUser[0].sync_id;
+          // Find user in location DB by sync_id
+          const locationUser = await locationPrisma.$queryRawUnsafe<any[]>(`
+            SELECT id FROM users WHERE sync_id = '${userSyncId}'::UUID LIMIT 1
+          `);
+          
+          if (locationUser && locationUser.length > 0) {
+            // Replace master user_id with location user id
+            const locationUserId = locationUser[0].id;
+            insertData.user_id = locationUserId;
+            console.log(`Mapped user_id from master ${masterUserId} to location user id ${locationUserId} using sync_id ${userSyncId}`);
+            
+            // Check if store access already exists by sync_id (sync_id is the primary identifier)
+            const storeCode = insertData.store_code || locationCode;
+            const existingAccess = await locationPrisma.$queryRawUnsafe<any[]>(`
+              SELECT id, sync_id FROM tbl_user_store_access
+              WHERE sync_id = '${syncId}'::UUID
+              LIMIT 1
+            `);
+            
+            if (existingAccess && existingAccess.length > 0) {
+              // Record exists by sync_id, update it directly to avoid infinite loop
+              // Use the existing record's sync_id
+              const existingSyncId = existingAccess[0].sync_id || syncId;
+              const existingId = existingAccess[0].id;
+              console.log(`Store access already exists with sync_id ${existingSyncId}, updating record id ${existingId}`);
+              
+              // Build UPDATE query directly to avoid recursion
+              const setParts: string[] = [];
+              
+              // Add all data fields
+              for (const [key, value] of Object.entries({
+                ...data,
+                user_id: locationUserId,
+                store_code: storeCode,
+                sync_id: existingSyncId,
+                sync_source: syncSource
+              })) {
+                if (value === undefined) continue;
+                
+                const quotedKey = `"${key}"`;
+                const val: any = value;
+                
+                if (val === null) {
+                  setParts.push(`${quotedKey} = NULL`);
+                } else if (typeof val === 'boolean') {
+                  setParts.push(`${quotedKey} = ${val ? 'true' : 'false'}`);
+                } else if (val instanceof Date) {
+                  setParts.push(`${quotedKey} = '${val.toISOString()}'`);
+                } else if (typeof val === 'number') {
+                  setParts.push(`${quotedKey} = ${val}`);
+                } else if (typeof val === 'string') {
+                  setParts.push(`${quotedKey} = '${val.replace(/'/g, "''")}'`);
+                } else {
+                  setParts.push(`${quotedKey} = '${String(val).replace(/'/g, "''")}'`);
+                }
+              }
+              
+              // Update the record directly
+              await locationPrisma.$executeRawUnsafe(`
+                UPDATE tbl_user_store_access
+                SET ${setParts.join(', ')}
+                WHERE id = ${existingId}
+              `);
+              return;
+            }
+          } else {
+            throw new Error(`User with sync_id ${userSyncId} not found in location database. User must be synced first.`);
+          }
+        } else {
+          throw new Error(`User with user_id ${masterUserId} not found in master database or missing sync_id`);
+        }
+      } catch (error: any) {
+        console.error('Error mapping user_id for store access:', error);
+        throw new Error(`Failed to map user_id: ${error.message}`);
+      }
+    }
 
     // Build dynamic INSERT query with proper value formatting
     const columns: string[] = [];
@@ -1095,12 +1323,27 @@ export class SyncProcessor {
       if (val === null) {
         values.push('NULL');
       } else if (typeof val === 'boolean') {
-        // Check if this is a boolean column - if so, use PostgreSQL boolean, otherwise convert to int
+        // Check if this is a boolean column - if so, use PostgreSQL boolean
+        // If it's an integer column, convert to int
+        // Otherwise convert to int as fallback
         if (this.BOOLEAN_COLUMNS.has(key)) {
           values.push(val ? 'true' : 'false');
         } else {
+          // Convert boolean to integer (0 or 1)
           values.push(val ? '1' : '0');
         }
+      } else if (this.INTEGER_COLUMNS.has(key) && typeof val !== 'number') {
+        // Handle integer columns that might come as boolean or string - always convert to integer
+        let intVal: number;
+        if (typeof val === 'boolean') {
+          intVal = val ? 1 : 0;
+        } else if (typeof val === 'string') {
+          const normalized = val.toLowerCase().trim();
+          intVal = (normalized === 'true' || normalized === '1') ? 1 : 0;
+        } else {
+          intVal = val ? 1 : 0;
+        }
+        values.push(String(intVal));
       } else if (this.BOOLEAN_COLUMNS.has(key)) {
         // Handle boolean columns - convert various formats to boolean
         if (typeof val === 'number') {
@@ -1170,12 +1413,25 @@ export class SyncProcessor {
     syncSource: string,
     locationCode: string
   ): Promise<void> {
+    // Special handling for tbl_user and tbl_user_store_access: check by sync_id only (no store_code)
+    const isUserTable = tableName === 'users' || tableName === 'tbl_user_store_access';
+    
     // Check if record exists
-    const existing = await locationPrisma.$queryRawUnsafe(`
-      SELECT sync_id FROM ${tableName}
-      WHERE sync_id = '${syncId}'::UUID
-        AND store_code = '${locationCode.replace(/'/g, "''")}'::VARCHAR
-    `);
+    let existing;
+    if (isUserTable) {
+      // For user tables, check by sync_id only
+      existing = await locationPrisma.$queryRawUnsafe(`
+        SELECT sync_id FROM ${tableName}
+        WHERE sync_id = '${syncId}'::UUID
+      `);
+    } else {
+      // For other tables, check by sync_id and store_code
+      existing = await locationPrisma.$queryRawUnsafe(`
+        SELECT sync_id FROM ${tableName}
+        WHERE sync_id = '${syncId}'::UUID
+          AND store_code = '${locationCode.replace(/'/g, "''")}'::VARCHAR
+      `);
+    }
 
     if (!existing || (existing as any[]).length === 0) {
       // Record doesn't exist, treat as INSERT
@@ -1199,12 +1455,26 @@ export class SyncProcessor {
       if (val === null) {
         setParts.push(`${quotedKey} = NULL`);
       } else if (typeof val === 'boolean') {
-        // Check if this is a boolean column - if so, use PostgreSQL boolean, otherwise convert to int
+        // Check if this is a boolean column - if so, use PostgreSQL boolean
+        // Otherwise convert to integer (0 or 1)
         if (this.BOOLEAN_COLUMNS.has(key)) {
           setParts.push(`${quotedKey} = ${val ? 'true' : 'false'}`);
         } else {
+          // Convert boolean to integer (0 or 1)
           setParts.push(`${quotedKey} = ${val ? '1' : '0'}`);
         }
+      } else if (this.INTEGER_COLUMNS.has(key) && typeof val !== 'number') {
+        // Handle integer columns that might come as boolean or string - always convert to integer
+        let intVal: number;
+        if (typeof val === 'boolean') {
+          intVal = val ? 1 : 0;
+        } else if (typeof val === 'string') {
+          const normalized = val.toLowerCase().trim();
+          intVal = (normalized === 'true' || normalized === '1') ? 1 : 0;
+        } else {
+          intVal = val ? 1 : 0;
+        }
+        setParts.push(`${quotedKey} = ${intVal}`);
       } else if (this.BOOLEAN_COLUMNS.has(key)) {
         // Handle boolean columns - convert various formats to boolean
         if (typeof val === 'number') {
@@ -1251,12 +1521,21 @@ export class SyncProcessor {
     const setClause = setParts.join(', ');
 
     try {
-      await locationPrisma.$executeRawUnsafe(`
-        UPDATE ${tableName}
-        SET ${setClause}
-        WHERE sync_id = '${syncId}'::UUID
-          AND store_code = '${locationCode.replace(/'/g, "''")}'::VARCHAR
-      `);
+      // Special handling for user tables: update by sync_id only (no store_code)
+      if (isUserTable) {
+        await locationPrisma.$executeRawUnsafe(`
+          UPDATE ${tableName}
+          SET ${setClause}
+          WHERE sync_id = '${syncId}'::UUID
+        `);
+      } else {
+        await locationPrisma.$executeRawUnsafe(`
+          UPDATE ${tableName}
+          SET ${setClause}
+          WHERE sync_id = '${syncId}'::UUID
+            AND store_code = '${locationCode.replace(/'/g, "''")}'::VARCHAR
+        `);
+      }
     } catch (error: any) {
       console.error(`Failed to update ${tableName}:`, error);
       console.error('Set parts:', setParts);

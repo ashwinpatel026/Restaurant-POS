@@ -13,6 +13,7 @@ import CRUDModal from "@/components/modals/CRUDModal";
 import DeleteConfirmationModal from "@/components/modals/DeleteConfirmationModal";
 import DataTable from "@/components/tables/DataTable";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 interface Station {
   tblStationId: string;
@@ -70,6 +71,8 @@ const mapStation = (station: any): Station => ({
 });
 
 export default function StationManagementPage() {
+  const { selectedStoreCode, buildApiUrl } = useApiWithStore();
+
   const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -81,12 +84,14 @@ export default function StationManagementPage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [selectedStoreCode]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await fetch("/api/dashboard/station", {
+      const url = buildApiUrl("/api/dashboard/station");
+
+      const response = await fetch(url, {
         cache: "no-store",
       });
 
@@ -115,9 +120,10 @@ export default function StationManagementPage() {
 
   const handleSave = async (formData: StationFormData) => {
     try {
-      const url = editingStation
+      const baseUrl = editingStation
         ? `/api/dashboard/station/${editingStation.tblStationId}`
         : "/api/dashboard/station";
+      const url = buildApiUrl(baseUrl);
 
       const method = editingStation ? "PUT" : "POST";
 
@@ -166,12 +172,11 @@ export default function StationManagementPage() {
     if (!stationToDelete) return;
 
     try {
-      const response = await fetch(
-        `/api/dashboard/station/${stationToDelete.tblStationId}`,
-        {
-          method: "DELETE",
-        }
-      );
+      const url = buildApiUrl(`/api/dashboard/station/${stationToDelete.tblStationId}`);
+
+      const response = await fetch(url, {
+        method: "DELETE",
+      });
 
       if (response.ok) {
         setStations((prev) =>

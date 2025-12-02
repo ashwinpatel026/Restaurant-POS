@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserAccessInfo, getSelectedStoreCode, canAccessStore } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 
 export async function GET(
@@ -9,13 +10,30 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
 
     const { id } = await params
     const groupId = BigInt(id)
 
     const group = await (prisma as any).modifierGroup.findUnique({ where: { id: groupId } })
     if (!group) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    // If storeCode is provided, verify the group belongs to that store or user has access
+    if (selectedStoreCode && group.storeCode !== selectedStoreCode) {
+      if (!canAccessStore(accessInfo, group.storeCode || '')) {
+        return NextResponse.json({ error: 'Modifier group not found' }, { status: 404 })
+      }
+    }
 
     // Fetch assigned categories for this group
     const assigned = group.modifierGroupCode
@@ -28,10 +46,23 @@ export async function GET(
         )
       : []
 
+    // Fetch modifier items for this group
+    const items = group.modifierGroupCode
+      ? await (prisma as any).modifierItem.findMany({
+          where: { modifierGroupCode: group.modifierGroupCode },
+          orderBy: [{ displayOrder: 'asc' }, { createdOn: 'asc' }]
+        })
+      : []
+
     const data: any = { 
       ...group, 
       id: group.id.toString(),
-      assignedCategories: assigned?.map(a => ({ code: a.menu_category_code, name: a.category_name })) || []
+      assignedCategories: assigned?.map(a => ({ code: a.menu_category_code, name: a.category_name })) || [],
+      items: items.map((item: any) => ({
+        ...item,
+        id: item.id.toString(),
+        price: item.price ? Number(item.price) : null
+      }))
     }
     return NextResponse.json(data)
   } catch (error) {
@@ -46,12 +77,46 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || !['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+    
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+    
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
     }
 
     const { id } = await params
     const groupId = BigInt(id)
+    
+    // First check if group exists and belongs to the selected store
+    const existingGroup = await (prisma as any).modifierGroup.findUnique({ 
+      where: { id: groupId } 
+    })
+    
+    if (!existingGroup) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+
+    // Verify user has access to this group's store
+    if (existingGroup.storeCode && !canAccessStore(accessInfo, existingGroup.storeCode)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
     const body = await request.json()
     const {
       groupName,
@@ -77,6 +142,10 @@ export async function PUT(
         showDefaultTop: typeof showDefaultTop === 'number' ? showDefaultTop : undefined,
         inheritFromMenuGroup: typeof inheritFromMenuGroup === 'number' ? inheritFromMenuGroup : undefined,
         isActive: typeof isActive === 'number' ? isActive : undefined,
+        // Keep the original storeCode, don't change it
+        storeCode: existingGroup.storeCode || selectedStoreCode,
+        // Set sync_source to 'location' when updated from dashboard
+        syncSource: 'location'
       }
     })
 
@@ -94,15 +163,27 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || !['SUPER_ADMIN'].includes(session.user.role)) {
+    
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    if (!['SUPER_ADMIN'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
 
     const { id } = await params
     const groupId = BigInt(id)
 
     const group = await (prisma as any).modifierGroup.findUnique({ where: { id: groupId } })
     if (!group) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    // Verify user has access to this group's store
+    if (group.storeCode && !canAccessStore(accessInfo, group.storeCode)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
 
     // If items exist under this group, delete them first, then delete group
     if (group.modifierGroupCode) {

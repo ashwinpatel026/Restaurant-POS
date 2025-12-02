@@ -13,6 +13,7 @@ import {
 import toast from "react-hot-toast";
 import CRUDModal from "@/components/modals/CRUDModal";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 interface ModifierItem {
   id?: string;
@@ -36,6 +37,8 @@ interface ModifierGroup {
 
 export default function ModifierItemsPage() {
   const router = useRouter();
+  const { selectedStoreCode, buildApiUrl } = useApiWithStore();
+  
   const [modifierItems, setModifierItems] = useState<ModifierItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<ModifierItem[]>([]);
   const [modifiers, setModifiers] = useState<ModifierGroup[]>([]);
@@ -52,7 +55,7 @@ export default function ModifierItemsPage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [selectedStoreCode]);
 
 
   // Apply filters effect
@@ -92,8 +95,8 @@ export default function ModifierItemsPage() {
     try {
       setLoading(true);
       const [itemsRes, modifiersRes] = await Promise.all([
-        fetch("/api/dashboard/modifier-items"),
-        fetch("/api/dashboard/modifier-groups"),
+        fetch(buildApiUrl("/api/dashboard/modifier-items")),
+        fetch(buildApiUrl("/api/dashboard/modifier-groups")),
       ]);
 
       if (itemsRes.ok) {
@@ -152,7 +155,8 @@ export default function ModifierItemsPage() {
     if (!deletingId) return;
 
     try {
-      const response = await fetch(`/api/menu/modifier-items/${deletingId}`, {
+      const url = buildApiUrl(`/api/dashboard/modifier-items/${deletingId}`);
+      const response = await fetch(url, {
         method: "DELETE",
       });
 
@@ -162,10 +166,11 @@ export default function ModifierItemsPage() {
         );
         toast.success("Modifier item deleted successfully");
       } else {
-        throw new Error("Failed to delete modifier item");
+        const error = await response.json();
+        throw new Error(error.error || "Failed to delete modifier item");
       }
-    } catch (error) {
-      toast.error("Error deleting modifier item");
+    } catch (error: any) {
+      toast.error(error.message || "Error deleting modifier item");
       console.error("Error:", error);
     } finally {
       setShowConfirmModal(false);

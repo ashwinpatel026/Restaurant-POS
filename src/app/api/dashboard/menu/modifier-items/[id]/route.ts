@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserAccessInfo, getSelectedStoreCode, canAccessStore } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 
 export async function GET(
@@ -10,15 +11,22 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+
     const resolvedParams = await params
-    const itemId = parseInt(resolvedParams.id)
+    const itemId = BigInt(resolvedParams.id)
 
     const modifierItem = await (prisma as any).modifierItem.findUnique({
-      where: { tblModifierItemId: itemId },
+      where: { id: itemId },
       include: {
         modifier: {
           include: {
@@ -40,6 +48,13 @@ export async function GET(
       return NextResponse.json({ error: 'Modifier item not found' }, { status: 404 })
     }
 
+    // If storeCode is provided, verify the item belongs to that store or user has access
+    if (selectedStoreCode && modifierItem.storeCode !== selectedStoreCode) {
+      if (!canAccessStore(accessInfo, modifierItem.storeCode || '')) {
+        return NextResponse.json({ error: 'Modifier item not found' }, { status: 404 })
+      }
+    }
+
     return NextResponse.json(modifierItem)
   } catch (error) {
     console.error('Error fetching modifier item:', error)
@@ -57,43 +72,64 @@ export async function PUT(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || !['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    if (!['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+    
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
+    }
+
     const resolvedParams = await params
-    const itemId = parseInt(resolvedParams.id)
+    const itemId = BigInt(resolvedParams.id)
+    
+    // First check if item exists and belongs to the selected store
+    const existingItem = await (prisma as any).modifierItem.findUnique({
+      where: { id: itemId }
+    })
+
+    if (!existingItem) {
+      return NextResponse.json({ error: 'Modifier item not found' }, { status: 404 })
+    }
+
+    // Verify user has access to this item's store
+    if (existingItem.storeCode && !canAccessStore(accessInfo, existingItem.storeCode)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
     const body = await request.json()
 
-    const { name, labelName, colorCode, price, tblModifierId } = body;
+    const { name, labelName, colorCode, price } = body;
 
     const modifierItem = await (prisma as any).modifierItem.update({
-      where: { tblModifierItemId: itemId },
+      where: { id: itemId },
       data: {
         name,
         labelName,
         colorCode,
-        price: parseFloat(price),
-        tblModifierId: parseInt(tblModifierId)
+        price: typeof price === 'number' ? price : (price ? parseFloat(price) : null),
+        // Keep the original storeCode, don't change it
+        storeCode: existingItem.storeCode || selectedStoreCode,
+        // Set sync_source to 'location' when updated from dashboard
+        syncSource: 'location'
       }
     })
 
-    // Fetch modifier data for the updated item
-    const modifier = await (prisma as any).modifier.findUnique({
-      where: { tblModifierId: modifierItem.tblModifierId },
-      select: {
-        tblModifierId: true,
-        name: true,
-        labelName: true
-      }
-    })
-
-    const itemWithModifier = {
-      ...modifierItem,
-      modifier
-    }
-
-    return NextResponse.json(itemWithModifier)
+    return NextResponse.json(modifierItem)
   } catch (error) {
     console.error('Error updating modifier item:', error)
 
@@ -128,15 +164,35 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || !['SUPER_ADMIN'].includes(session.user.role)) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    if (!['SUPER_ADMIN'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+
     const resolvedParams = await params
-    const itemId = parseInt(resolvedParams.id)
+    const itemId = BigInt(resolvedParams.id)
+
+    // First check if item exists and user has access
+    const existingItem = await (prisma as any).modifierItem.findUnique({
+      where: { id: itemId }
+    })
+
+    if (!existingItem) {
+      return NextResponse.json({ error: 'Modifier item not found' }, { status: 404 })
+    }
+
+    // Verify user has access to this item's store
+    if (existingItem.storeCode && !canAccessStore(accessInfo, existingItem.storeCode)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
 
     await (prisma as any).modifierItem.delete({
-      where: { tblModifierItemId: itemId }
+      where: { id: itemId }
     })
 
     return NextResponse.json({ message: 'Modifier item deleted successfully' })

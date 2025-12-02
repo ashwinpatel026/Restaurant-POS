@@ -19,10 +19,18 @@ export async function POST(request: NextRequest) {
       where: { email }
     })
 
-    if (!admin || !admin.isActive) {
+    if (!admin) {
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }
+      )
+    }
+
+    // Check if admin is active
+    if (!admin.isActive) {
+      return NextResponse.json(
+        { error: 'Account is not active. Please contact administrator.' },
+        { status: 403 }
       )
     }
 

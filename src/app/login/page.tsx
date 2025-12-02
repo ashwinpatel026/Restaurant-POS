@@ -28,7 +28,16 @@ export default function LoginPage() {
       });
 
       if (result?.error) {
-        toast.error("Invalid credentials");
+        // Check for specific error messages
+        const errorMessage = result.error.toLowerCase();
+        if (
+          errorMessage.includes("not active") ||
+          errorMessage.includes("account is not active")
+        ) {
+          toast.error("Account is not active. Please contact administrator.");
+        } else {
+          toast.error("Invalid credentials");
+        }
       } else {
         toast.success("Login successful!");
         router.push("/dashboard");

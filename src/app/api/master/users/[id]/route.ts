@@ -112,6 +112,8 @@ export async function PUT(
       locationId,
       role,
       accessLevel,
+      defaultStoreCode,
+      storeCodes, // Array of store codes for LOCATION access level
       isActive
     } = body
 
@@ -150,20 +152,44 @@ export async function PUT(
       }
     }
 
+    // Auto-determine accessLevel from role if role is being updated
+    let determinedAccessLevel: string | undefined = accessLevel
+    const roleToUse = role || existingUser.role
+    
+    if (role) {
+      // Role is being updated, auto-determine accessLevel
+      if (role === 'SUPER_ADMIN') {
+        determinedAccessLevel = 'SUPER_ADMIN'
+      } else if (role === 'COMPANY_ADMIN') {
+        determinedAccessLevel = 'COMPANY'
+      } else if (role === 'DEALER_ADMIN') {
+        determinedAccessLevel = 'DEALER'
+      } else {
+        // For other roles, use provided accessLevel or keep existing
+        determinedAccessLevel = accessLevel || existingUser.accessLevel || 'LOCATION'
+      }
+    } else if (accessLevel) {
+      // Only accessLevel is being updated, use it
+      determinedAccessLevel = accessLevel
+    } else {
+      // Neither is being updated, use existing
+      determinedAccessLevel = existingUser.accessLevel || undefined
+    }
+
     // Validate access level assignments
-    if (accessLevel === 'COMPANY' && !companyId) {
+    if (determinedAccessLevel === 'COMPANY' && !companyId) {
       return NextResponse.json(
         { error: 'Company ID required for COMPANY access level' },
         { status: 400 }
       )
     }
-    if (accessLevel === 'DEALER' && !dealerId) {
+    if (determinedAccessLevel === 'DEALER' && !dealerId) {
       return NextResponse.json(
         { error: 'Dealer ID required for DEALER access level' },
         { status: 400 }
       )
     }
-    if (accessLevel === 'LOCATION' && !locationId) {
+    if (determinedAccessLevel === 'LOCATION' && !locationId) {
       return NextResponse.json(
         { error: 'Location ID required for LOCATION access level' },
         { status: 400 }
@@ -222,7 +248,13 @@ export async function PUT(
     if (dealerId !== undefined) updateData.dealerId = dealerId ? BigInt(dealerId) : null
     if (locationId !== undefined) updateData.locationId = locationId ? BigInt(locationId) : null
     if (role) updateData.role = role
-    if (accessLevel) updateData.accessLevel = accessLevel
+    if (determinedAccessLevel) updateData.accessLevel = determinedAccessLevel
+    if (defaultStoreCode !== undefined) updateData.defaultStoreCode = defaultStoreCode
+    
+    // Ensure sync_id exists - database will handle UUID generation if missing
+    if (!existingUser.syncId) {
+      updateData.syncSource = 'server'
+    }
     if (isActive !== undefined) updateData.isActive = isActive
     updateData.updatedOn = new Date()
 
@@ -230,6 +262,269 @@ export async function PUT(
       where: { userId },
       data: updateData
     })
+
+    // Initialize storeAccesses array - will be populated either from update or existing data
+    let storeAccesses: Array<{ userId: bigint; locationId: bigint; storeCode: string; isDefault: boolean }> = []
+
+    // Update store access if storeCodes provided or access level/role changed
+    if (storeCodes !== undefined || determinedAccessLevel !== undefined || role !== undefined) {
+      // Delete existing store access
+      await masterPrisma.userStoreAccess.deleteMany({
+        where: { userId: user.userId }
+      })
+
+      // Create new store access entries
+      const newAccessLevel = determinedAccessLevel || existingUser.accessLevel
+
+      if (newAccessLevel === 'SUPER_ADMIN') {
+        // For SUPER_ADMIN, get ALL locations across all companies and dealers
+        const allLocations = await masterPrisma.location.findMany({
+          where: {
+            isActive: 1
+          },
+          select: {
+            locationId: true,
+            storeCode: true
+          }
+        })
+
+        for (const loc of allLocations) {
+          storeAccesses.push({
+            userId: user.userId,
+            locationId: loc.locationId,
+            storeCode: loc.storeCode,
+            isDefault: loc.storeCode === (defaultStoreCode || user.defaultStoreCode)
+          })
+        }
+      } else if (newAccessLevel === 'LOCATION') {
+        if (storeCodes && Array.isArray(storeCodes) && storeCodes.length > 0) {
+          const locations = await masterPrisma.location.findMany({
+            where: {
+              storeCode: { in: storeCodes },
+              isActive: 1
+            },
+            select: {
+              locationId: true,
+              storeCode: true
+            }
+          })
+
+          for (const loc of locations) {
+            storeAccesses.push({
+              userId: user.userId,
+              locationId: loc.locationId,
+              storeCode: loc.storeCode,
+              isDefault: loc.storeCode === (defaultStoreCode || user.defaultStoreCode)
+            })
+          }
+        } else if (user.locationId) {
+          const location = await masterPrisma.location.findUnique({
+            where: { locationId: user.locationId },
+            select: { locationId: true, storeCode: true }
+          })
+          if (location) {
+            storeAccesses.push({
+              userId: user.userId,
+              locationId: location.locationId,
+              storeCode: location.storeCode,
+              isDefault: true
+            })
+          }
+        }
+      } else if (newAccessLevel === 'COMPANY' && user.companyId) {
+        const locations = await masterPrisma.location.findMany({
+          where: {
+            companyId: user.companyId,
+            isActive: 1
+          },
+          select: {
+            locationId: true,
+            storeCode: true
+          }
+        })
+
+        for (const loc of locations) {
+          storeAccesses.push({
+            userId: user.userId,
+            locationId: loc.locationId,
+            storeCode: loc.storeCode,
+            isDefault: loc.storeCode === (defaultStoreCode || user.defaultStoreCode)
+          })
+        }
+      } else if (newAccessLevel === 'DEALER' && user.dealerId) {
+        const locations = await masterPrisma.location.findMany({
+          where: {
+            dealerId: user.dealerId,
+            isActive: 1
+          },
+          select: {
+            locationId: true,
+            storeCode: true
+          }
+        })
+
+        for (const loc of locations) {
+          storeAccesses.push({
+            userId: user.userId,
+            locationId: loc.locationId,
+            storeCode: loc.storeCode,
+            isDefault: loc.storeCode === (defaultStoreCode || user.defaultStoreCode)
+          })
+        }
+      }
+
+      // Create new store access entries
+      if (storeAccesses.length > 0) {
+        await masterPrisma.userStoreAccess.createMany({
+          data: storeAccesses,
+          skipDuplicates: true
+        })
+
+        // Create sync log entries for store access updates
+        for (const storeAccess of storeAccesses) {
+          try {
+            await masterPrisma.$executeRaw`
+              INSERT INTO sync_log (table_name, record_id, operation, source, data, change_time, sync_status, location_code)
+              VALUES (
+                'tbl_user_store_access',
+                gen_random_uuid(),
+                'INSERT',
+                'server',
+                ${JSON.stringify({
+                  user_id: user.userId.toString(),
+                  store_code: storeAccess.storeCode,
+                  is_default: storeAccess.isDefault
+                })}::jsonb,
+                NOW(),
+                0,
+                ${storeAccess.storeCode}
+              )
+            `
+          } catch (syncError) {
+            console.error('Error creating sync log for store access:', syncError)
+          }
+        }
+      }
+    } else {
+      // If store access wasn't updated, fetch existing store accesses for sync trigger
+      const existingStoreAccesses = await masterPrisma.userStoreAccess.findMany({
+        where: { userId: user.userId },
+        select: {
+          userId: true,
+          locationId: true,
+          storeCode: true,
+          isDefault: true
+        }
+      })
+      storeAccesses = existingStoreAccesses.map(sa => ({
+        userId: sa.userId,
+        locationId: sa.locationId,
+        storeCode: sa.storeCode,
+        isDefault: sa.isDefault
+      }))
+    }
+
+    // Create sync log entry for user update
+    // Use sync_id as record identifier
+    // Database will handle UUID generation if syncId is missing
+    try {
+      if (user.syncId) {
+        await masterPrisma.$executeRaw`
+          INSERT INTO sync_log (table_name, record_id, operation, source, data, change_time, sync_status, location_code)
+          VALUES (
+            'tbl_user',
+            ${user.syncId}::uuid,
+            'UPDATE',
+            'server',
+            ${JSON.stringify({
+              email: user.email,
+              username: user.username,
+              first_name: user.firstName,
+              last_name: user.lastName,
+              role: user.role,
+              access_level: user.accessLevel,
+              company_id: user.companyId?.toString(),
+              dealer_id: user.dealerId?.toString(),
+              location_id: user.locationId?.toString(),
+              default_store_code: user.defaultStoreCode,
+              is_active: user.isActive,
+              sync_id: user.syncId  // Include sync_id in data
+            })}::jsonb,
+            NOW(),
+            0,
+            NULL
+          )
+        `
+      } else {
+        // If syncId is missing, database will generate it via default UUID()
+        await masterPrisma.$executeRaw`
+          INSERT INTO sync_log (table_name, operation, source, data, change_time, sync_status, location_code)
+          VALUES (
+            'tbl_user',
+            'UPDATE',
+            'server',
+            ${JSON.stringify({
+              email: user.email,
+              username: user.username,
+              first_name: user.firstName,
+              last_name: user.lastName,
+              role: user.role,
+              access_level: user.accessLevel,
+              company_id: user.companyId?.toString(),
+              dealer_id: user.dealerId?.toString(),
+              location_id: user.locationId?.toString(),
+              default_store_code: user.defaultStoreCode,
+              is_active: user.isActive
+            })}::jsonb,
+            NOW(),
+            0,
+            NULL
+          )
+        `
+      }
+    } catch (syncError) {
+      console.error('Error creating sync log for user update:', syncError)
+    }
+
+    // Automatically trigger sync to all locations that this user has access to
+    if (storeAccesses.length > 0) {
+      try {
+        // Get unique store codes for this user
+        const storeCodes = [...new Set(storeAccesses.map(sa => sa.storeCode))]
+        
+        // Trigger sync for each store
+        for (const storeCode of storeCodes) {
+          try {
+            // Import sync service
+            const { syncService } = await import('@/lib/sync/syncService')
+            
+            // Sync user first
+            await syncService.syncToLocation({
+              locationCode: storeCode,
+              tableName: 'tbl_user',
+              fullSync: false,
+              forceSync: false
+            })
+            
+            // Then sync store access (will happen automatically due to dependency, but trigger explicitly)
+            await syncService.syncToLocation({
+              locationCode: storeCode,
+              tableName: 'tbl_user_store_access',
+              fullSync: false,
+              forceSync: false
+            })
+            
+            console.log(`Auto-synced updated user to location ${storeCode}`)
+          } catch (syncError) {
+            console.error(`Error auto-syncing to ${storeCode}:`, syncError)
+            // Continue with other stores even if one fails
+          }
+        }
+      } catch (autoSyncError) {
+        console.error('Error triggering automatic sync:', autoSyncError)
+        // Don't fail the user update if auto-sync fails
+      }
+    }
 
     // Fetch company, dealer, and location data separately
     const [company, dealer, location] = await Promise.all([

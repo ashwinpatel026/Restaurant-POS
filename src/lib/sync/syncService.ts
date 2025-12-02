@@ -4,6 +4,7 @@
  */
 
 import { masterPrisma, locationPrisma } from '@/lib/databaseManager';
+import { randomUUID } from 'crypto';
 import {
   SyncRequest,
   LocationToLocationSyncRequest,
@@ -223,18 +224,32 @@ export class SyncService {
 
       for (const batch of batches) {
         // Convert master records to sync log format
-        const syncEntries = batch.map((record) => ({
-          id: BigInt(0),
-          tableName,
-          recordId: record.sync_id,
-          operation: 'UPDATE' as SyncOperation, // Treat as UPDATE for full sync
-          source: record.sync_source || 'server',
-          data: record,
-          changeTime: new Date(),
-          syncStatus: 0 as const,
-          locationCode,
-          retryCount: 0,
-        }));
+        const syncEntries = batch.map((record) => {
+          // Generate sync_id if record doesn't have one (for tables like tbl_user)
+          let recordId = record.sync_id;
+          if (!recordId) {
+            // Use email for users table, or generate UUID for others
+            if (tableName === 'tbl_user' && record.email) {
+              // For users, we'll use email as identifier in sync log, but generate UUID for record_id
+              recordId = randomUUID();
+            } else {
+              recordId = randomUUID();
+            }
+          }
+          
+          return {
+            id: BigInt(0),
+            tableName,
+            recordId: recordId || randomUUID(),
+            operation: 'UPDATE' as SyncOperation, // Treat as UPDATE for full sync
+            source: record.sync_source || 'server',
+            data: record,
+            changeTime: new Date(),
+            syncStatus: 0 as const,
+            locationCode,
+            retryCount: 0,
+          };
+        });
 
         const batchResult = await syncProcessor.processBatch(
           locationCode,
@@ -599,11 +614,33 @@ export class SyncService {
       const orderByColumn = SYNC_ORDER_BY_COLUMN[masterTableName] || 'createdon';
       const escapedSourceCode = sourceLocationCode.replace(/'/g, "''");
 
-      // Fetch records from source location
+      // First, check total records in table for debugging
+      const totalCount = await locationPrisma.$queryRawUnsafe<[{ count: bigint }]>(`
+        SELECT COUNT(*) as count FROM ${locationTableName}
+      `);
+      console.log(`Total records in ${locationTableName}: ${totalCount[0]?.count || 0}`);
+
+      // Check records with any store_code for debugging
+      const anyStoreCodeCount = await locationPrisma.$queryRawUnsafe<[{ count: bigint }]>(`
+        SELECT COUNT(*) as count FROM ${locationTableName}
+        WHERE store_code IS NOT NULL
+      `);
+      console.log(`Records with store_code in ${locationTableName}: ${anyStoreCodeCount[0]?.count || 0}`);
+
+      // Check distinct store_codes for debugging
+      const distinctStores = await locationPrisma.$queryRawUnsafe<[{ store_code: string }]>(`
+        SELECT DISTINCT store_code FROM ${locationTableName}
+        WHERE store_code IS NOT NULL
+        LIMIT 10
+      `);
+      console.log(`Sample store_codes in ${locationTableName}:`, distinctStores.map(s => s.store_code));
+
+      // Fetch records from source location - handle case sensitivity
+      // Use double quotes for table/column names and proper escaping for values
       const sourceRecords = await locationPrisma.$queryRawUnsafe<any[]>(`
-        SELECT * FROM ${locationTableName}
-        WHERE store_code = '${escapedSourceCode}'::VARCHAR
-        ORDER BY ${orderByColumn} DESC
+        SELECT * FROM "${locationTableName}"
+        WHERE "store_code" = '${escapedSourceCode}'
+        ORDER BY "${orderByColumn}" DESC
       `);
 
       console.log(`Found ${sourceRecords.length} records in ${locationTableName} for source location ${sourceLocationCode}`);

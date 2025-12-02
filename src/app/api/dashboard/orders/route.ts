@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserAccessInfo, getSelectedStoreCode, buildStoreFilter } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 import { generateOrderNumber } from '@/lib/utils'
 
@@ -8,16 +9,34 @@ import { generateOrderNumber } from '@/lib/utils'
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
     const { searchParams } = new URL(request.url)
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+    
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
+    }
+    
+    // Filter by ONE store only
+    const storeFilter = buildStoreFilter(accessInfo, selectedStoreCode)
+    
     const status = searchParams.get('status')
     const type = searchParams.get('type')
 
     // Build where clause
-    const where: any = {}
+    const where: any = {
+      ...storeFilter,  // This will be { storeCode: "STORE001" }
+    }
     
     if (status && status !== 'ALL') {
       if (status.includes(',')) {
@@ -88,8 +107,22 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query or body
+    const { searchParams } = new URL(request.url)
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+    
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()
@@ -145,7 +178,7 @@ export async function POST(request: NextRequest) {
         total: total || 0,
         notes: notes || null,
         createdBy: parseInt(session.user.id),
-        storeCode: process.env.STORE_CODE || null,
+        storeCode: selectedStoreCode,
         orderItems: {
           create: orderItems.map((item: any) => ({
             menuItemId: item.menuItemId ? BigInt(item.menuItemId) : null,
@@ -155,7 +188,7 @@ export async function POST(request: NextRequest) {
             price: item.price || 0,
             subtotal: (item.price || 0) * (item.quantity || 1),
             notes: item.notes || null,
-            storeCode: process.env.STORE_CODE || null,
+            storeCode: selectedStoreCode,
           }))
         }
       },

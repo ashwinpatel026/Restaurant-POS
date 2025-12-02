@@ -15,6 +15,7 @@ import {
 import toast from "react-hot-toast";
 import CRUDModal from "@/components/modals/CRUDModal";
 import { PageSkeleton, CardSkeleton } from "@/components/ui/SkeletonLoader";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 interface MenuItem {
   menuItemId?: string;
@@ -56,6 +57,7 @@ interface MenuCategory {
 
 export default function MenuItemsPage() {
   const router = useRouter();
+  const { selectedStoreCode, buildApiUrl } = useApiWithStore();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,8 +78,10 @@ export default function MenuItemsPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (selectedStoreCode) {
+      fetchData();
+    }
+  }, [selectedStoreCode]);
 
   // Filter effect
   useEffect(() => {
@@ -144,7 +148,7 @@ export default function MenuItemsPage() {
     try {
       setLoading(true);
       const [itemsRes, categoriesRes] = await Promise.all([
-        fetch("/api/dashboard/menu/items", {
+        fetch(buildApiUrl("/api/dashboard/menu/items"), {
           cache: "no-store",
           headers: {
             "Cache-Control": "no-cache, no-store, must-revalidate",
@@ -152,7 +156,7 @@ export default function MenuItemsPage() {
             Expires: "0",
           },
         }),
-        fetch("/api/dashboard/menu/categories", { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/menu/categories"), { cache: "no-store" }),
       ]);
 
       let itemsData = [];
@@ -208,7 +212,7 @@ export default function MenuItemsPage() {
     if (!deletingId) return;
 
     try {
-      const response = await fetch(`/api/dashboard/menu/items/${deletingId}`, {
+      const response = await fetch(buildApiUrl(`/api/dashboard/menu/items/${deletingId}`), {
         method: "DELETE",
         cache: "no-store",
       });

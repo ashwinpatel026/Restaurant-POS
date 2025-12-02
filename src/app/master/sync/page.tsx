@@ -84,6 +84,8 @@ export default function SyncManagementPage() {
       value: "tbl_master_menu_item_modifier_group",
       label: "Menu Item Modifier Group",
     },
+    { value: "tbl_user", label: "Users" },
+    { value: "tbl_user_store_access", label: "User Store Access" },
   ];
 
   // Initial load - fetch locations only

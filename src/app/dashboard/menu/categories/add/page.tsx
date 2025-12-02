@@ -10,6 +10,7 @@ import SystemColorPicker, {
 } from "@/components/ui/SystemColorPicker";
 import { CheckIcon } from "@heroicons/react/24/solid";
 import StatusToggle from "@/components/forms/StatusToggle";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 interface MenuMaster {
   menuMasterId: string;
@@ -25,6 +26,7 @@ interface ModifierGroup {
 
 export default function AddCategoryPage() {
   const router = useRouter();
+  const { selectedStoreCode, buildApiUrl } = useApiWithStore();
   const [loading, setLoading] = useState(false);
   const [menuMasters, setMenuMasters] = useState<MenuMaster[]>([]);
   const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
@@ -41,14 +43,16 @@ export default function AddCategoryPage() {
   useEffect(() => {
     // Set default color to primary color on mount
     setFormData((prev) => ({ ...prev, colorCode: getPrimaryColor() }));
-    fetchData();
-  }, []);
+    if (selectedStoreCode) {
+      fetchData();
+    }
+  }, [selectedStoreCode]);
 
   const fetchData = async () => {
     try {
       const [mastersRes, modifierGroupsRes] = await Promise.all([
-        fetch("/api/dashboard/menu/masters", { cache: "no-store" }),
-        fetch("/api/dashboard/modifier-groups", { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/menu/masters"), { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/modifier-groups"), { cache: "no-store" }),
       ]);
 
       if (mastersRes.ok) {
@@ -98,7 +102,7 @@ export default function AddCategoryPage() {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/dashboard/menu/categories", {
+      const response = await fetch(buildApiUrl("/api/dashboard/menu/categories"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

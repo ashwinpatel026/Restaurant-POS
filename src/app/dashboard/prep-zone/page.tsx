@@ -20,6 +20,7 @@ import {
   StatsSkeleton,
   PageHeaderSkeleton,
 } from "@/components/ui/SkeletonLoader";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 interface PrepZone {
   prepZoneId: string; // Changed to string for BigInt serialization
@@ -55,6 +56,8 @@ interface Station {
 }
 
 export default function PrepZonePage() {
+  const { selectedStoreCode, buildApiUrl } = useApiWithStore();
+  
   const [prepZones, setPrepZones] = useState<PrepZone[]>([]);
   const [printers, setPrinters] = useState<Printer[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
@@ -69,7 +72,7 @@ export default function PrepZonePage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [selectedStoreCode]);
 
 
   const fetchData = async () => {
@@ -82,14 +85,17 @@ export default function PrepZonePage() {
     try {
       setLoading(true);
       const [zonesRes, printersRes, stationsRes] = await Promise.all([
-        fetch("/api/dashboard/menu/prep-zone", { cache: "no-store" }),
-        fetch("/api/dashboard/printer", { cache: "no-store" }),
-        fetch("/api/dashboard/station", { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/menu/prep-zone"), { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/printer"), { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/station"), { cache: "no-store" }),
       ]);
 
       if (zonesRes.ok) {
         const data = await zonesRes.json();
         setPrepZones(data);
+      } else {
+        const error = await zonesRes.json();
+        toast.error(error.error || "Error loading prep zones");
       }
 
       if (printersRes.ok) {
@@ -123,9 +129,10 @@ export default function PrepZonePage() {
 
   const handleSave = async (formData: any) => {
     try {
-      const url = editingZone
+      const baseUrl = editingZone
         ? `/api/dashboard/menu/prep-zone/${editingZone.prepZoneId}`
         : "/api/dashboard/menu/prep-zone";
+      const url = buildApiUrl(baseUrl);
 
       const method = editingZone ? "PUT" : "POST";
 
@@ -191,12 +198,10 @@ export default function PrepZonePage() {
     if (!zoneToDelete) return;
 
     try {
-      const response = await fetch(
-        `/api/dashboard/menu/prep-zone/${zoneToDelete.prepZoneId}`,
-        {
-          method: "DELETE",
-        }
-      );
+      const url = buildApiUrl(`/api/dashboard/menu/prep-zone/${zoneToDelete.prepZoneId}`);
+      const response = await fetch(url, {
+        method: "DELETE",
+      });
 
       if (response.ok) {
         setPrepZones(
@@ -208,10 +213,11 @@ export default function PrepZonePage() {
         setShowDeleteModal(false);
         setZoneToDelete(null);
       } else {
-        throw new Error("Failed to delete prep zone");
+        const error = await response.json();
+        throw new Error(error.error || "Failed to delete prep zone");
       }
-    } catch (error) {
-      toast.error("Error deleting prep zone");
+    } catch (error: any) {
+      toast.error(error.message || "Error deleting prep zone");
       console.error("Error:", error);
     }
   };

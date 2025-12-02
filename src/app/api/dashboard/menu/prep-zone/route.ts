@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserAccessInfo, getSelectedStoreCode, buildStoreFilter } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 
 // Helper function to generate unique prep zone code
-async function generatePrepZoneCode(): Promise<string> {
-  const storeCode = process.env.STORE_CODE || ''
+async function generatePrepZoneCode(storeCode: string): Promise<string> {
   const prefix = `WL${storeCode}PZ`
   
   // Get all prep zone codes that match the WL pattern for this store
@@ -13,7 +13,8 @@ async function generatePrepZoneCode(): Promise<string> {
     where: {
       prepZoneCode: {
         startsWith: prefix
-      }
+      },
+      storeCode: storeCode
     },
     select: { prepZoneCode: true },
     orderBy: { prepZoneId: 'desc' }
@@ -43,11 +44,31 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+    
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
+    }
+    
+    // Filter by ONE store only
+    const storeFilter = buildStoreFilter(accessInfo, selectedStoreCode)
+
     const prepZones = await prisma.prepZone.findMany({
+      where: {
+        ...storeFilter
+      },
       orderBy: { createdOn: 'desc' }
     })
 
@@ -76,8 +97,26 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || !['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+    
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()
@@ -91,8 +130,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate unique prep zone code
-    const prepZoneCode = await generatePrepZoneCode()
+    // Generate unique prep zone code for the selected store
+    const prepZoneCode = await generatePrepZoneCode(selectedStoreCode)
 
     const prepZone = await prisma.prepZone.create({
       data: {
@@ -107,7 +146,8 @@ export async function POST(request: NextRequest) {
         createdBy: parseInt(session.user.id),
         isSyncToWeb: 0,
         isSyncToLocal: 0,
-        storeCode: process.env.STORE_CODE || null
+        storeCode: selectedStoreCode,
+        syncSource: 'location' // Set sync_source to 'location' when created from dashboard
       }
     })
 

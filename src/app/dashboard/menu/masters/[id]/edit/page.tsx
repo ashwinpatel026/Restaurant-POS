@@ -9,6 +9,7 @@ import { PageSkeleton } from "@/components/ui/SkeletonLoader";
 import SystemColorPicker from "@/components/ui/SystemColorPicker";
 import { CheckIcon } from "@heroicons/react/24/solid";
 import StatusToggle from "@/components/forms/StatusToggle";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 interface PrepZone {
   prepZoneId: string;
@@ -51,6 +52,7 @@ export default function EditMenuMasterPage() {
   const router = useRouter();
   const params = useParams();
   const masterId = params?.id as string;
+  const { selectedStoreCode, buildApiUrl } = useApiWithStore();
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -76,18 +78,18 @@ export default function EditMenuMasterPage() {
   });
 
   useEffect(() => {
-    if (masterId) {
+    if (masterId && selectedStoreCode) {
       fetchData();
     }
-  }, [masterId]);
+  }, [masterId, selectedStoreCode]);
 
   const fetchData = async () => {
     try {
       const [prepZonesRes, stationsRes, eventsRes, masterRes] = await Promise.all([
-        fetch("/api/dashboard/menu/prep-zone", { cache: "no-store" }),
-        fetch("/api/dashboard/station", { cache: "no-store" }),
-        fetch("/api/dashboard/events", { cache: "no-store" }),
-        fetch(`/api/dashboard/menu/masters/${masterId}`, { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/menu/prep-zone"), { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/station"), { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/events"), { cache: "no-store" }),
+        fetch(buildApiUrl(`/api/dashboard/menu/masters/${masterId}`), { cache: "no-store" }),
       ]);
 
       if (prepZonesRes.ok) {
@@ -113,7 +115,7 @@ export default function EditMenuMasterPage() {
         let eventCode = "";
         if (masterData.isEventMenu === 1 && masterData.menuMasterCode) {
           const eventAssocRes = await fetch(
-            `/api/dashboard/menu/masters/${masterId}/events`,
+            buildApiUrl(`/api/dashboard/menu/masters/${masterId}/events`),
             { cache: "no-store" }
           );
           if (eventAssocRes.ok) {
@@ -224,7 +226,7 @@ export default function EditMenuMasterPage() {
     try {
       const prepZoneCodes = Array.from(selectedPrepZones);
       const stationCodes = Array.from(selectedStations);
-      const response = await fetch(`/api/dashboard/menu/masters/${masterId}`, {
+      const response = await fetch(buildApiUrl(`/api/dashboard/menu/masters/${masterId}`), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

@@ -382,7 +382,58 @@ function UserModal({
   });
   const [loading, setLoading] = useState(false);
 
-  // Removed filtered dealers/locations logic as we're simplifying the LOCATION access level
+  // Auto-determine accessLevel from role
+  const getAccessLevelFromRole = (
+    role: string,
+    currentAccessLevel?: string
+  ): string => {
+    if (role === "SUPER_ADMIN") return "SUPER_ADMIN";
+    if (role === "COMPANY_ADMIN") return "COMPANY";
+    if (role === "DEALER_ADMIN") return "DEALER";
+    return currentAccessLevel || "LOCATION";
+  };
+
+  // Initialize accessLevel based on role when component mounts or user changes
+  useEffect(() => {
+    if (user) {
+      const autoAccessLevel = getAccessLevelFromRole(
+        user.role,
+        user.accessLevel
+      );
+      setFormData((prev) => {
+        if (prev.accessLevel !== autoAccessLevel) {
+          return {
+            ...prev,
+            accessLevel: autoAccessLevel,
+          };
+        }
+        return prev;
+      });
+    }
+  }, [user?.role, user?.accessLevel]);
+
+  // Check if access level should be shown (only for non-admin roles)
+  const shouldShowAccessLevel = () => {
+    return !["SUPER_ADMIN", "COMPANY_ADMIN", "DEALER_ADMIN"].includes(
+      formData.role
+    );
+  };
+
+  // Check which fields should be shown based on role
+  const shouldShowCompanyField = () => {
+    return formData.role === "COMPANY_ADMIN";
+  };
+
+  const shouldShowDealerField = () => {
+    return formData.role === "DEALER_ADMIN";
+  };
+
+  const shouldShowLocationField = () => {
+    if (formData.role === "SUPER_ADMIN") return false;
+    if (formData.role === "COMPANY_ADMIN" || formData.role === "DEALER_ADMIN")
+      return false;
+    return formData.accessLevel === "LOCATION" || shouldShowAccessLevel();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -395,7 +446,30 @@ function UserModal({
         : "/api/master/users";
       const method = user ? "PUT" : "POST";
 
-      const submitData: any = { ...formData };
+      // Auto-determine accessLevel from role
+      const autoAccessLevel = getAccessLevelFromRole(
+        formData.role,
+        formData.accessLevel
+      );
+
+      const submitData: any = {
+        ...formData,
+        accessLevel: autoAccessLevel, // Override with auto-determined value
+      };
+
+      // Clear fields that shouldn't be sent based on role
+      if (formData.role === "SUPER_ADMIN") {
+        submitData.companyId = "";
+        submitData.dealerId = "";
+        submitData.locationId = "";
+      } else if (formData.role === "COMPANY_ADMIN") {
+        submitData.dealerId = "";
+        submitData.locationId = "";
+      } else if (formData.role === "DEALER_ADMIN") {
+        submitData.companyId = "";
+        submitData.locationId = "";
+      }
+
       if (user && !submitData.password) {
         delete submitData.password; // Don't send password if not changed
       }
@@ -501,9 +575,29 @@ function UserModal({
                 <select
                   required
                   value={formData.role}
-                  onChange={(e) =>
-                    setFormData({ ...formData, role: e.target.value })
-                  }
+                  onChange={(e) => {
+                    const newRole = e.target.value;
+                    const newAccessLevel = getAccessLevelFromRole(
+                      newRole,
+                      formData.accessLevel
+                    );
+                    setFormData({
+                      ...formData,
+                      role: newRole,
+                      accessLevel: newAccessLevel,
+                      // Clear fields based on new role
+                      companyId:
+                        newRole === "COMPANY_ADMIN" ? formData.companyId : "",
+                      dealerId:
+                        newRole === "DEALER_ADMIN" ? formData.dealerId : "",
+                      locationId:
+                        newRole === "SUPER_ADMIN" ||
+                        newRole === "COMPANY_ADMIN" ||
+                        newRole === "DEALER_ADMIN"
+                          ? ""
+                          : formData.locationId,
+                    });
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
                 >
                   <option value="OUTLET_MANAGER">Outlet Manager</option>
@@ -515,34 +609,67 @@ function UserModal({
                   <option value="KITCHEN_STAFF">Kitchen Staff</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Access Level *
-                </label>
-                <select
-                  required
-                  value={formData.accessLevel}
-                  onChange={(e) => {
-                    const newLevel = e.target.value;
-                    setFormData({
-                      ...formData,
-                      accessLevel: newLevel,
-                      companyId:
-                        newLevel !== "COMPANY" ? "" : formData.companyId,
-                      dealerId: newLevel !== "DEALER" ? "" : formData.dealerId,
-                      locationId:
-                        newLevel !== "LOCATION" ? "" : formData.locationId,
-                    });
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                >
-                  <option value="COMPANY">Company</option>
-                  <option value="DEALER">Dealer</option>
-                  <option value="LOCATION">Location</option>
-                </select>
-              </div>
+              {shouldShowAccessLevel() && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Access Level *
+                  </label>
+                  <select
+                    required
+                    value={formData.accessLevel}
+                    onChange={(e) => {
+                      const newLevel = e.target.value;
+                      setFormData({
+                        ...formData,
+                        accessLevel: newLevel,
+                        companyId:
+                          newLevel !== "COMPANY" ? "" : formData.companyId,
+                        dealerId:
+                          newLevel !== "DEALER" ? "" : formData.dealerId,
+                        locationId:
+                          newLevel !== "LOCATION" ? "" : formData.locationId,
+                      });
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="COMPANY">Company</option>
+                    <option value="DEALER">Dealer</option>
+                    <option value="LOCATION">Location</option>
+                  </select>
+                </div>
+              )}
+              {!shouldShowAccessLevel() && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Access Level
+                  </label>
+                  <div className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                    {formData.role === "SUPER_ADMIN" &&
+                      "All Companies, Dealers & Locations"}
+                    {formData.role === "COMPANY_ADMIN" &&
+                      "All Locations in Company"}
+                    {formData.role === "DEALER_ADMIN" &&
+                      "All Locations in Dealer"}
+                  </div>
+                  {formData.role === "SUPER_ADMIN" && (
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Super Admin has access to all locations across all
+                      companies and dealers
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
-            {formData.accessLevel === "COMPANY" && (
+            {formData.role === "SUPER_ADMIN" && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>Super Admin:</strong> This user will have access to
+                  all companies, dealers, and locations. No specific assignment
+                  is required.
+                </p>
+              </div>
+            )}
+            {shouldShowCompanyField() && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Company *
@@ -569,7 +696,7 @@ function UserModal({
                 </select>
               </div>
             )}
-            {formData.accessLevel === "DEALER" && (
+            {shouldShowDealerField() && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Dealer *
@@ -595,7 +722,7 @@ function UserModal({
                 </select>
               </div>
             )}
-            {formData.accessLevel === "LOCATION" && (
+            {shouldShowLocationField() && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Location *

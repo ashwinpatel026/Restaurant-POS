@@ -12,6 +12,7 @@ import {
 import toast from "react-hot-toast";
 import CRUDModal from "@/components/modals/CRUDModal";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 interface TimeEvent {
   id: string;
@@ -52,6 +53,8 @@ interface TimeEvent {
 
 export default function EventsPage() {
   const router = useRouter();
+  const { selectedStoreCode, buildApiUrl } = useApiWithStore();
+  
   const [events, setEvents] = useState<TimeEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -65,7 +68,7 @@ export default function EventsPage() {
 
   useEffect(() => {
     fetchEvents();
-  }, []);
+  }, [selectedStoreCode]);
 
   // Filter effect
   useEffect(() => {
@@ -89,10 +92,15 @@ export default function EventsPage() {
 
   const fetchEvents = async () => {
     try {
-      const response = await fetch("/api/dashboard/events");
+      const url = buildApiUrl("/api/dashboard/events");
+      const response = await fetch(url);
+      
       if (response.ok) {
         const data = await response.json();
         setEvents(data);
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Error loading events");
       }
     } catch (error) {
       toast.error("Error loading events");
@@ -120,7 +128,8 @@ export default function EventsPage() {
     if (!deletingId) return;
 
     try {
-      const response = await fetch(`/api/dashboard/events/${deletingId}`, {
+      const url = buildApiUrl(`/api/dashboard/events/${deletingId}`);
+      const response = await fetch(url, {
         method: "DELETE",
       });
 
@@ -128,10 +137,11 @@ export default function EventsPage() {
         setEvents(events.filter((event) => event.id !== deletingId));
         toast.success("Event deleted successfully");
       } else {
-        throw new Error("Failed to delete event");
+        const error = await response.json();
+        throw new Error(error.error || "Failed to delete event");
       }
-    } catch (error) {
-      toast.error("Error deleting event");
+    } catch (error: any) {
+      toast.error(error.message || "Error deleting event");
       console.error("Error:", error);
     } finally {
       setShowConfirmModal(false);

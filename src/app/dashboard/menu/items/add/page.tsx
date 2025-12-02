@@ -7,6 +7,7 @@ import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import MenuItemTabbedForm from "@/components/forms/MenuItemTabbedForm";
 import { FormSkeleton, Spinner } from "@/components/ui/SkeletonLoader";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 interface MenuCategory {
   tblMenuCategoryId?: number;
@@ -26,19 +27,22 @@ interface MenuMaster {
 
 export default function AddMenuItemPage() {
   const router = useRouter();
+  const { selectedStoreCode, buildApiUrl } = useApiWithStore();
   const [menuMasters, setMenuMasters] = useState<MenuMaster[]>([]);
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (selectedStoreCode) {
+      fetchData();
+    }
+  }, [selectedStoreCode]);
 
   const fetchData = async () => {
     try {
       const [mastersRes, categoriesRes] = await Promise.all([
-        fetch("/api/dashboard/menu/masters"),
-        fetch("/api/dashboard/menu/categories"),
+        fetch(buildApiUrl("/api/dashboard/menu/masters")),
+        fetch(buildApiUrl("/api/dashboard/menu/categories")),
       ]);
 
       if (mastersRes.ok) {
@@ -60,7 +64,7 @@ export default function AddMenuItemPage() {
 
   const handleSave = async (formData: any) => {
     try {
-      const response = await fetch("/api/dashboard/menu/items", {
+      const response = await fetch(buildApiUrl("/api/dashboard/menu/items"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

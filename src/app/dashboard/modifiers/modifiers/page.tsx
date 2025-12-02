@@ -14,6 +14,7 @@ import {
 import toast from "react-hot-toast";
 import CRUDModal from "@/components/modals/CRUDModal";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 interface ModifierGroup {
   id: string;
@@ -33,6 +34,8 @@ interface ModifierGroup {
 
 export default function ModifiersPage() {
   const router = useRouter();
+  const { selectedStoreCode, buildApiUrl } = useApiWithStore();
+  
   const [modifiers, setModifiers] = useState<ModifierGroup[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -45,12 +48,13 @@ export default function ModifiersPage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [selectedStoreCode]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const modifiersRes = await fetch("/api/dashboard/modifier-groups", {
+      const url = buildApiUrl("/api/dashboard/modifier-groups");
+      const modifiersRes = await fetch(url, {
         cache: "no-store",
       });
 
@@ -58,10 +62,11 @@ export default function ModifiersPage() {
         const modifiersData = await modifiersRes.json();
         setModifiers(modifiersData);
       } else {
-        throw new Error("Failed to fetch modifiers");
+        const error = await modifiersRes.json();
+        throw new Error(error.error || "Failed to fetch modifiers");
       }
     } catch (error: any) {
-      toast.error("Error loading data");
+      toast.error(error.message || "Error loading data");
       console.error("Error:", error);
     } finally {
       setLoading(false);
@@ -88,7 +93,8 @@ export default function ModifiersPage() {
     if (!deletingId) return;
 
     try {
-      const response = await fetch(`/api/dashboard/modifier-groups/${deletingId}`, {
+      const url = buildApiUrl(`/api/dashboard/modifier-groups/${deletingId}`);
+      const response = await fetch(url, {
         method: "DELETE",
       });
 
@@ -96,10 +102,11 @@ export default function ModifiersPage() {
         setModifiers(modifiers.filter((mod) => mod.id !== String(deletingId)));
         toast.success("Modifier deleted successfully");
       } else {
-        throw new Error("Failed to delete modifier");
+        const error = await response.json();
+        throw new Error(error.error || "Failed to delete modifier");
       }
-    } catch (error) {
-      toast.error("Error deleting modifier");
+    } catch (error: any) {
+      toast.error(error.message || "Error deleting modifier");
       console.error("Error:", error);
     } finally {
       setShowConfirmModal(false);

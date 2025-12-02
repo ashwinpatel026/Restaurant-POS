@@ -14,6 +14,7 @@ import {
 import toast from "react-hot-toast";
 import CRUDModal from "@/components/modals/CRUDModal";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 interface MenuCategory {
   tblMenuCategoryId: number;
@@ -35,6 +36,7 @@ interface MenuMaster {
 
 export default function MenuCategoriesPage() {
   const router = useRouter();
+  const { selectedStoreCode, buildApiUrl } = useApiWithStore();
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [menuMasters, setMenuMasters] = useState<MenuMaster[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,8 +56,10 @@ export default function MenuCategoriesPage() {
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (selectedStoreCode) {
+      fetchData();
+    }
+  }, [selectedStoreCode]);
 
   // Filter effect
   useEffect(() => {
@@ -94,8 +98,8 @@ export default function MenuCategoriesPage() {
     try {
       setLoading(true);
       const [categoriesRes, mastersRes] = await Promise.all([
-        fetch("/api/dashboard/menu/categories", { cache: "no-store" }),
-        fetch("/api/dashboard/menu/masters", { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/menu/categories"), { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/menu/masters"), { cache: "no-store" }),
       ]);
 
       if (categoriesRes.ok) {
@@ -133,7 +137,7 @@ export default function MenuCategoriesPage() {
     if (!deletingId) return;
 
     try {
-      const response = await fetch(`/api/dashboard/menu/categories/${deletingId}`, {
+      const response = await fetch(buildApiUrl(`/api/dashboard/menu/categories/${deletingId}`), {
         method: "DELETE",
       });
 

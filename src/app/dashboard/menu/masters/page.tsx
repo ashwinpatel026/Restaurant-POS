@@ -14,6 +14,7 @@ import {
 import toast from "react-hot-toast";
 import CRUDModal from "@/components/modals/CRUDModal";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 interface MenuMaster {
   menuMasterId: string;
@@ -43,6 +44,7 @@ interface Station {
 
 export default function MenuMastersPage() {
   const router = useRouter();
+  const { selectedStoreCode, buildApiUrl } = useApiWithStore();
   const [menuMasters, setMenuMasters] = useState<MenuMaster[]>([]);
   const [prepZones, setPrepZones] = useState<PrepZone[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
@@ -63,8 +65,10 @@ export default function MenuMastersPage() {
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (selectedStoreCode) {
+      fetchData();
+    }
+  }, [selectedStoreCode]);
 
   // Filter effect
   useEffect(() => {
@@ -198,9 +202,9 @@ export default function MenuMastersPage() {
     try {
       setLoading(true);
       const [mastersRes, prepZonesRes, stationsRes] = await Promise.all([
-        fetch("/api/dashboard/menu/masters", { cache: "no-store" }),
-        fetch("/api/dashboard/menu/prep-zone", { cache: "no-store" }),
-        fetch("/api/dashboard/station", { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/menu/masters"), { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/menu/prep-zone"), { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/station"), { cache: "no-store" }),
       ]);
 
       if (mastersRes.ok) {
@@ -244,7 +248,7 @@ export default function MenuMastersPage() {
     if (!deletingId) return;
 
     try {
-      const response = await fetch(`/api/dashboard/menu/masters/${deletingId}`, {
+      const response = await fetch(buildApiUrl(`/api/dashboard/menu/masters/${deletingId}`), {
         method: "DELETE",
       });
 

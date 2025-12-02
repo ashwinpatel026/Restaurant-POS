@@ -11,21 +11,55 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  username  String   @unique
-  password  String
-  firstName String
-  lastName  String
-  phone     String?
-  role      UserRole
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              Int         @id @default(autoincrement())
+  email           String      @unique
+  username        String      @unique
+  password        String
+  firstName       String
+  lastName        String
+  phone           String?
+  role            UserRole
+  accessLevel     AccessLevel? @map("access_level")
+  companyId       BigInt?     @map("company_id")
+  dealerId       BigInt?     @map("dealer_id")
+  locationId      BigInt?     @map("location_id")
+  defaultStoreCode String?    @map("default_store_code") @db.VarChar(100)
+  isActive        Boolean     @default(true)
+  createdAt       DateTime    @default(now())
+  // Use default(now()) so inserts from sync that don't set updatedAt
+  // still satisfy NOT NULL constraint in the database
+  updatedAt       DateTime    @default(now()) @updatedAt
+  syncId          String?     @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource      String?     @default("server") @map("sync_source") @db.VarChar(20)
 
   loginActivities UserLoginActivity[]
+  storeAccesses   UserStoreAccess[]
 
+  @@index([email])
+  @@index([username])
+  @@index([companyId])
+  @@index([dealerId])
+  @@index([locationId])
+  @@index([syncId])
   @@map("users")
+}
+
+model UserStoreAccess {
+  id          BigInt    @id @default(autoincrement()) @map("id")
+  userId      Int       @map("user_id")
+  storeCode   String    @map("store_code") @db.VarChar(100)
+  isDefault   Boolean   @default(false) @map("is_default")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  syncId      String?   @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource  String?   @default("server") @map("sync_source") @db.VarChar(20)
+  
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, storeCode])
+  @@index([userId])
+  @@index([storeCode])
+  @@index([syncId])
+  @@map("tbl_user_store_access")
 }
 
 model TimeEvent {
@@ -536,9 +570,18 @@ model OrderItem {
 // Enums
 enum UserRole {
   SUPER_ADMIN
+  COMPANY_ADMIN
+  DEALER_ADMIN
   OUTLET_MANAGER
   CAPTAIN
   CASHIER
   KITCHEN_STAFF
+}
+
+enum AccessLevel {
+  SUPER_ADMIN  // Full access to all companies, dealers, and locations
+  COMPANY      // Access all locations in company
+  DEALER       // Access all locations in dealer
+  LOCATION     // Access only specific location
 }
 

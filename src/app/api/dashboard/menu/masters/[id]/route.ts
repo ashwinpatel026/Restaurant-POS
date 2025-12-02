@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserAccessInfo, getSelectedStoreCode, canAccessStore } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 
 export async function GET(
@@ -10,9 +11,16 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
 
     const resolvedParams = await params
     const masterId = BigInt(resolvedParams.id)
@@ -23,6 +31,16 @@ export async function GET(
 
     if (!menuMaster) {
       return NextResponse.json({ error: 'Menu master not found' }, { status: 404 })
+    }
+
+    // Validate store access
+    if (selectedStoreCode && menuMaster.storeCode) {
+      if (!canAccessStore(accessInfo, menuMaster.storeCode)) {
+        return NextResponse.json(
+          { error: 'Access denied to this store' },
+          { status: 403 }
+        )
+      }
     }
 
     // Convert BigInt to string for JSON serialization
@@ -48,9 +66,20 @@ export async function PUT(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || !['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    if (!['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
 
     const resolvedParams = await params
     const masterId = BigInt(resolvedParams.id)
@@ -77,6 +106,16 @@ export async function PUT(
       return NextResponse.json({ error: 'Menu master not found' }, { status: 404 })
     }
 
+    // Validate store access
+    if (existingMaster.storeCode) {
+      if (!canAccessStore(accessInfo, existingMaster.storeCode)) {
+        return NextResponse.json(
+          { error: 'Access denied to this store' },
+          { status: 403 }
+        )
+      }
+    }
+
     // Update menu master
     const updateData = {
       name,
@@ -87,7 +126,8 @@ export async function PUT(
       isEventMenu: isEventMenu || 0,
       isActive: isActive ?? 1,
       updatedBy: parseInt(session.user.id),
-      updatedOn: new Date()
+      updatedOn: new Date(),
+      syncSource: 'location' // Set sync_source to 'location' when updated from dashboard
     }
 
     const menuMaster = await prisma.menuMaster.update({
@@ -122,7 +162,8 @@ export async function PUT(
             menuMasterCode: existingMaster.menuMasterCode,
             eventCode: eventCode,
             createdBy: parseInt(session.user.id),
-            storeCode: process.env.STORE_CODE || null
+            storeCode: existingMaster.storeCode || selectedStoreCode || null,
+            syncSource: 'location' // Set sync_source to 'location' when created from dashboard
           }
         })
       }
@@ -158,9 +199,20 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || !['SUPER_ADMIN'].includes(session.user.role)) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    if (!['SUPER_ADMIN'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
 
     const resolvedParams = await params
     const masterId = BigInt(resolvedParams.id)
@@ -172,6 +224,16 @@ export async function DELETE(
 
     if (!menuMaster) {
       return NextResponse.json({ error: 'Menu master not found' }, { status: 404 })
+    }
+
+    // Validate store access
+    if (menuMaster.storeCode) {
+      if (!canAccessStore(accessInfo, menuMaster.storeCode)) {
+        return NextResponse.json(
+          { error: 'Access denied to this store' },
+          { status: 403 }
+        )
+      }
     }
 
     // Check if menu master has any categories

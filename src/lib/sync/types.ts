@@ -106,6 +106,7 @@ export const SYNC_TABLE_MAP: Record<string, string> = {
   'tbl_master_station': 'tbl_station',
   'tbl_master_tax': 'tbl_tax',
   'tbl_master_time_events': 'tbl_time_events',
+  // User management tables - REMOVED: synced separately
   // Relationship/junction tables
   'tbl_master_menu_master_event': 'tbl_menu_master_event',
   'tbl_master_menu_category_modifier': 'tbl_menu_category_modifier',
@@ -260,6 +261,7 @@ export const SYNC_FIELD_MAP: Record<string, Record<string, string>> = {
     'Event_End_Date': 'Event_End_Date',
     'is_active': 'is_active',
   },
+  // User management tables - REMOVED: synced separately
   // Relationship/junction tables
   'tbl_master_menu_master_event': {
     'menu_master_code': 'menu_master_code',
@@ -294,6 +296,7 @@ export const SYNC_ORDER_BY_COLUMN: Record<string, string> = {
   'tbl_master_station': 'station_code', // Station table doesn't have createdon/created_date
   'tbl_master_tax': 'created_date',
   'tbl_master_time_events': 'created_date',
+  // User management tables - REMOVED: synced separately
   // Relationship/junction tables
   'tbl_master_menu_master_event': 'createdon',
   'tbl_master_menu_category_modifier': 'createdon',
@@ -313,6 +316,8 @@ export const SYNC_TABLE_ORDER: string[] = [
   'tbl_master_time_events',
   'tbl_master_prep_zone',
   
+  // User management - REMOVED: synced separately
+  
   // Menu hierarchy (parent -> child)
   'tbl_master_menu_master',      // Must sync before menu_category and menu_master_event
   'tbl_master_menu_category',    // Depends on menu_master
@@ -330,6 +335,8 @@ export const SYNC_TABLE_ORDER: string[] = [
 
 // Table dependencies: child table -> parent table(s)
 export const SYNC_TABLE_DEPENDENCIES: Record<string, string[]> = {
+  // User management dependencies - REMOVED: synced separately
+  // Menu dependencies
   'tbl_master_menu_category': ['tbl_master_menu_master'],
   'tbl_master_menu_item': ['tbl_master_menu_master', 'tbl_master_menu_category'],
   'tbl_master_modifier_item': ['tbl_master_modifier_group'],

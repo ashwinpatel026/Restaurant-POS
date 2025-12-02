@@ -1,20 +1,60 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { getUserAccessInfo, getSelectedStoreCode, buildStoreFilter } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
+
+// Helper function to convert BigInt and Decimal fields for JSON serialization
+function convertEventForJson(event: any): any {
+  return {
+    ...event,
+    id: event.id.toString(),
+    createdBy: event.createdBy ? event.createdBy.toString() : null,
+    updatedBy: event.updatedBy ? event.updatedBy.toString() : null,
+    globalPriceAmountAdd: event.globalPriceAmountAdd ? Number(event.globalPriceAmountAdd) : null,
+    globalPriceAmountDisc: event.globalPriceAmountDisc ? Number(event.globalPriceAmountDisc) : null,
+    globalPricePerAdd: event.globalPricePerAdd ? Number(event.globalPricePerAdd) : null,
+    globalPricePerDisc: event.globalPricePerDisc ? Number(event.globalPricePerDisc) : null,
+  }
+}
 
 // GET all time events
 export async function GET(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+    
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
+    }
+    
+    // Filter by ONE store only
+    const storeFilter = buildStoreFilter(accessInfo, selectedStoreCode)
+
     const events = await prisma.timeEvent.findMany({
+      where: {
+        ...storeFilter
+      },
       orderBy: {
         createdDate: 'desc'
       }
     })
     
-    // Convert BigInt to string for JSON serialization
-    const eventsWithStringId = events.map((event: any) => ({
-      ...event,
-      id: event.id.toString()
-    }))
+    // Convert BigInt and Decimal to string/number for JSON serialization
+    const eventsWithStringId = events.map((event: any) => convertEventForJson(event))
     
     return NextResponse.json(eventsWithStringId, { status: 200 })
   } catch (error) {
@@ -27,8 +67,7 @@ export async function GET(request: NextRequest) {
 }
 
 // Helper function to generate next event code
-async function generateEventCode(): Promise<string> {
-  const storeCode = process.env.STORE_CODE || ''
+async function generateEventCode(storeCode: string): Promise<string> {
   const prefix = `WL${storeCode}TE`
   
   // Get all event codes that match the WL pattern for this store
@@ -36,7 +75,8 @@ async function generateEventCode(): Promise<string> {
     where: {
       eventCode: {
         startsWith: prefix
-      }
+      },
+      storeCode: storeCode
     },
     select: { eventCode: true },
     orderBy: { id: 'desc' }
@@ -78,10 +118,34 @@ function validateTimeString(time: string | null): string | null {
 // POST create new time event
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+    
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+    
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
+    }
+
     const body = await request.json()
     
-    // Auto-generate event code
-    const eventCode = await generateEventCode()
+    // Auto-generate event code for the selected store
+    const eventCode = await generateEventCode(selectedStoreCode)
     
     const event = await prisma.timeEvent.create({
       data: {
@@ -115,18 +179,16 @@ export async function POST(request: NextRequest) {
         eventStartDate: body.eventStartDate && body.eventStartDate.trim() !== "" ? new Date(body.eventStartDate) : null,
         eventEndDate: body.eventEndDate && body.eventEndDate.trim() !== "" ? new Date(body.eventEndDate) : null,
         isActive: body.isActive ?? 1,
-        createdBy: body.createdBy || null,
-        storeCode: body.storeCode || null,
+        createdBy: parseInt(session.user.id),
+        storeCode: selectedStoreCode,
         isSyncToWeb: body.isSyncToWeb || 0,
-        isSyncToLocal: body.isSyncToLocal || 0
+        isSyncToLocal: body.isSyncToLocal || 0,
+        syncSource: 'location' // Set sync_source to 'location' when created from dashboard
       }
     })
     
-    // Convert BigInt to string for JSON serialization
-    const eventWithStringId = {
-      ...event,
-      id: event.id.toString()
-    }
+    // Convert BigInt and Decimal to string/number for JSON serialization
+    const eventWithStringId = convertEventForJson(event)
     
     return NextResponse.json(eventWithStringId, { status: 201 })
   } catch (error: any) {

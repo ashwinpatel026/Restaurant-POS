@@ -7,6 +7,7 @@ import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import ModifierForm from "@/components/forms/ModifierForm";
 import { FormSkeleton, Spinner } from "@/components/ui/SkeletonLoader";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 interface ModifierGroup {
   id: string;
@@ -30,15 +31,16 @@ export default function EditModifierPage() {
   const router = useRouter();
   const params = useParams();
   const { id } = params;
+  const { buildApiUrl, selectedStoreCode } = useApiWithStore();
   const [modifier, setModifier] = useState<ModifierGroup | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchModifier = async () => {
-      if (!id) return;
+      if (!id || !selectedStoreCode) return;
       setLoading(true);
       try {
-        const response = await fetch(`/api/dashboard/menu/modifiers/${id}`);
+        const response = await fetch(buildApiUrl(`/api/dashboard/modifier-groups/${id}`));
         if (response.ok) {
           const modifierData = await response.json();
           setModifier(modifierData);
@@ -55,7 +57,8 @@ export default function EditModifierPage() {
     };
 
     fetchModifier();
-  }, [id, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, selectedStoreCode]);
 
   const handleSave = async (formData: any) => {
     if (!id) return;
@@ -67,7 +70,7 @@ export default function EditModifierPage() {
       } = formData || {};
 
       // 1) Update modifier group
-      const groupResponse = await fetch(`/api/dashboard/menu/modifiers/${id}`, {
+      const groupResponse = await fetch(buildApiUrl(`/api/dashboard/modifier-groups/${id}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -93,7 +96,7 @@ export default function EditModifierPage() {
       if (Array.isArray(removedItemIds)) {
         for (const itemId of removedItemIds) {
           if (!itemId) continue;
-          const deleteRes = await fetch(`/api/dashboard/modifier-items/${itemId}`, {
+          const deleteRes = await fetch(buildApiUrl(`/api/dashboard/modifier-items/${itemId}`), {
             method: "DELETE",
           });
           if (!deleteRes.ok) {
@@ -121,7 +124,7 @@ export default function EditModifierPage() {
           };
 
           if (item.id) {
-            const updateRes = await fetch(`/api/dashboard/modifier-items/${item.id}`, {
+            const updateRes = await fetch(buildApiUrl(`/api/dashboard/modifier-items/${item.id}`), {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payload),
@@ -131,7 +134,7 @@ export default function EditModifierPage() {
               throw new Error(err.error || "Failed to update modifier item");
             }
           } else {
-            const createRes = await fetch("/api/dashboard/modifier-items", {
+            const createRes = await fetch(buildApiUrl("/api/dashboard/modifier-items"), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payload),

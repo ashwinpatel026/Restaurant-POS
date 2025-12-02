@@ -6,9 +6,11 @@ import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import ModifierForm from "@/components/forms/ModifierForm";
 import { FormSkeleton } from "@/components/ui/SkeletonLoader";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 export default function AddModifierPage() {
   const router = useRouter();
+  const { buildApiUrl } = useApiWithStore();
 
   const handleSave = async (formData: any) => {
     try {
@@ -19,14 +21,17 @@ export default function AddModifierPage() {
       } = formData || {};
 
       // 1) Create modifier group
-      const groupRes = await fetch("/api/dashboard/modifier-groups", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...groupData,
-          price: groupData.priceStrategy === 3 ? groupData.price ?? 0 : null,
-        }),
-      });
+      const groupRes = await fetch(
+        buildApiUrl("/api/dashboard/modifier-groups"),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...groupData,
+            price: groupData.priceStrategy === 3 ? groupData.price ?? 0 : null,
+          }),
+        }
+      );
 
       if (!groupRes.ok) {
         const errorData = await groupRes.json();
@@ -39,25 +44,28 @@ export default function AddModifierPage() {
       if (Array.isArray(formItems)) {
         for (const item of formItems) {
           if (!item.name?.trim()) continue;
-          const itemRes = await fetch("/api/dashboard/modifier-items", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              modifierGroupCode:
-                createdGroup.modifierGroupCode ||
-                createdGroup.modifier_group_code,
-              name: item.name,
-              labelName: item.labelName || null,
-              colorCode: item.colorCode || null,
-              price: typeof item.price === "number" ? item.price : null,
-              isDefault: item.isDefault ? 1 : 0,
-              displayOrder:
-                typeof item.displayOrder === "number"
-                  ? item.displayOrder
-                  : null,
-              isActive: 1,
-            }),
-          });
+          const itemRes = await fetch(
+            buildApiUrl("/api/dashboard/modifier-items"),
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                modifierGroupCode:
+                  createdGroup.modifierGroupCode ||
+                  createdGroup.modifier_group_code,
+                name: item.name,
+                labelName: item.labelName || null,
+                colorCode: item.colorCode || null,
+                price: typeof item.price === "number" ? item.price : null,
+                isDefault: item.isDefault ? 1 : 0,
+                displayOrder:
+                  typeof item.displayOrder === "number"
+                    ? item.displayOrder
+                    : null,
+                isActive: 1,
+              }),
+            }
+          );
           if (!itemRes.ok) {
             const err = await itemRes.json();
             throw new Error(err.error || "Failed to create modifier item");

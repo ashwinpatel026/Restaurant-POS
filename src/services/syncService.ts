@@ -147,7 +147,7 @@ export async function syncMasterDataToLocation(
     return {
       success: false,
       recordsSynced: totalRecordsSynced,
-      error: errorMessage,
+      error: errorMessage || 'Unknown error',
       progress
     }
   }
@@ -158,39 +158,62 @@ export async function syncMasterDataToLocation(
  */
 async function syncMenuMasters(storeCode: string): Promise<{ recordsSynced: number }> {
   const masters = await masterPrisma.masterMenuMaster.findMany({
-    where: { isActive: 1 },
-    include: {
-      menuMasterEvents: {
-        include: {
-          timeEvent: true
-        }
-      }
-    }
+    where: { isActive: 1 }
   })
 
   let synced = 0
   for (const master of masters) {
-    const { menuMasterEvents, ...masterData } = master
-    
+    // Sync menu master first
     await (locationPrisma as any).menuMaster.upsert({
       where: {
         menuMasterCode: master.menuMasterCode
       },
       update: {
-        ...masterData,
+        name: master.name,
+        labelName: master.labelName,
+        colorCode: master.colorCode,
+        prepZoneCode: master.prepZoneCode,
+        stationCode: master.stationCode,
+        isEventMenu: master.isEventMenu,
+        isActive: master.isActive,
+        createdBy: master.createdBy,
+        createdOn: master.createdOn,
+        updatedBy: master.updatedBy,
+        updatedOn: master.updatedOn,
         storeCode: storeCode,
         isSyncToWeb: 0,
-        isSyncToLocal: 0
+        isSyncToLocal: 0,
+        syncId: master.syncId,
+        syncSource: master.syncSource || 'server'
       },
       create: {
-        ...masterData,
+        menuMasterCode: master.menuMasterCode,
+        name: master.name,
+        labelName: master.labelName,
+        colorCode: master.colorCode,
+        prepZoneCode: master.prepZoneCode,
+        stationCode: master.stationCode,
+        isEventMenu: master.isEventMenu,
+        isActive: master.isActive,
+        createdBy: master.createdBy,
+        createdOn: master.createdOn,
+        updatedBy: master.updatedBy,
+        updatedOn: master.updatedOn,
         storeCode: storeCode,
         isSyncToWeb: 0,
-        isSyncToLocal: 0
+        isSyncToLocal: 0,
+        syncId: master.syncId,
+        syncSource: master.syncSource || 'server'
       }
     })
 
-    // Sync menu master events
+    // Fetch and sync menu master events separately (no relation defined in master schema)
+    const menuMasterEvents = await masterPrisma.masterMenuMasterEvent.findMany({
+      where: {
+        menuMasterCode: master.menuMasterCode
+      }
+    })
+
     for (const event of menuMasterEvents) {
       await (locationPrisma as any).menuMasterEvent.upsert({
         where: {
@@ -200,12 +223,26 @@ async function syncMenuMasters(storeCode: string): Promise<{ recordsSynced: numb
           }
         },
         update: {
-          ...event,
-          storeCode: storeCode
+          menuMasterCode: event.menuMasterCode,
+          eventCode: event.eventCode,
+          createdBy: event.createdBy,
+          createdOn: event.createdOn,
+          storeCode: storeCode,
+          syncId: event.syncId,
+          syncSource: event.syncSource || 'server',
+          isSyncToWeb: 0,
+          isSyncToLocal: 0
         },
         create: {
-          ...event,
-          storeCode: storeCode
+          menuMasterCode: event.menuMasterCode,
+          eventCode: event.eventCode,
+          createdBy: event.createdBy,
+          createdOn: event.createdOn,
+          storeCode: storeCode,
+          syncId: event.syncId,
+          syncSource: event.syncSource || 'server',
+          isSyncToWeb: 0,
+          isSyncToLocal: 0
         }
       })
     }
@@ -221,31 +258,55 @@ async function syncMenuMasters(storeCode: string): Promise<{ recordsSynced: numb
  */
 async function syncMenuCategories(storeCode: string): Promise<{ recordsSynced: number }> {
   const categories = await masterPrisma.masterMenuCategory.findMany({
-    where: { isActive: 1 },
-    include: {
-      menuCategoryModifiers: true
-    }
+    where: { isActive: 1 }
   })
 
   let synced = 0
   for (const category of categories) {
-    const { menuCategoryModifiers, ...categoryData } = category
-    
     await (locationPrisma as any).menuCategory.upsert({
       where: {
         menuCategoryCode: category.menuCategoryCode
       },
       update: {
-        ...categoryData,
-        storeCode: storeCode
+        menuMasterCode: category.menuMasterCode,
+        name: category.name,
+        colorCode: category.colorCode,
+        isActive: category.isActive,
+        createdBy: category.createdBy,
+        createdOn: category.createdOn,
+        updatedBy: category.updatedBy,
+        updatedOn: category.updatedOn,
+        storeCode: storeCode,
+        syncId: category.syncId,
+        syncSource: category.syncSource || 'server',
+        isSyncToWeb: 0,
+        isSyncToLocal: 0
       },
       create: {
-        ...categoryData,
-        storeCode: storeCode
+        menuCategoryCode: category.menuCategoryCode,
+        menuMasterCode: category.menuMasterCode,
+        name: category.name,
+        colorCode: category.colorCode,
+        isActive: category.isActive,
+        createdBy: category.createdBy,
+        createdOn: category.createdOn,
+        updatedBy: category.updatedBy,
+        updatedOn: category.updatedOn,
+        storeCode: storeCode,
+        syncId: category.syncId,
+        syncSource: category.syncSource || 'server',
+        isSyncToWeb: 0,
+        isSyncToLocal: 0
       }
     })
 
-    // Sync category modifiers
+    // Fetch and sync category modifiers separately (no relation defined in master schema)
+    const menuCategoryModifiers = await masterPrisma.masterMenuCategoryModifier.findMany({
+      where: {
+        menuCategoryCode: category.menuCategoryCode
+      }
+    })
+
     for (const modifier of menuCategoryModifiers) {
       await (locationPrisma as any).menuCategoryModifier.upsert({
         where: {
@@ -255,12 +316,26 @@ async function syncMenuCategories(storeCode: string): Promise<{ recordsSynced: n
           }
         },
         update: {
-          ...modifier,
-          storeCode: storeCode
+          menuCategoryCode: modifier.menuCategoryCode,
+          modifierGroupCode: modifier.modifierGroupCode,
+          createdBy: modifier.createdBy,
+          createdOn: modifier.createdOn,
+          storeCode: storeCode,
+          syncId: modifier.syncId,
+          syncSource: modifier.syncSource || 'server',
+          isSyncToWeb: 0,
+          isSyncToLocal: 0
         },
         create: {
-          ...modifier,
-          storeCode: storeCode
+          menuCategoryCode: modifier.menuCategoryCode,
+          modifierGroupCode: modifier.modifierGroupCode,
+          createdBy: modifier.createdBy,
+          createdOn: modifier.createdOn,
+          storeCode: storeCode,
+          syncId: modifier.syncId,
+          syncSource: modifier.syncSource || 'server',
+          isSyncToWeb: 0,
+          isSyncToLocal: 0
         }
       })
     }
@@ -276,31 +351,80 @@ async function syncMenuCategories(storeCode: string): Promise<{ recordsSynced: n
  */
 async function syncMenuItems(storeCode: string): Promise<{ recordsSynced: number }> {
   const items = await masterPrisma.masterMenuItem.findMany({
-    where: { isActive: 1 },
-    include: {
-      menuItemModifierGroups: true
-    }
+    where: { isActive: 1 }
   })
 
   let synced = 0
   for (const item of items) {
-    const { menuItemModifierGroups, ...itemData } = item
-    
+    // Sync menu item (exclude nested relations that need separate sync)
     await (locationPrisma as any).menuItem.upsert({
       where: {
         menuItemCode: item.menuItemCode
       },
       update: {
-        ...itemData,
-        storeCode: storeCode
+        menuMasterCode: item.menuMasterCode,
+        menuCategoryCode: item.menuCategoryCode,
+        name: item.name,
+        kitchenName: item.kitchenName,
+        labelName: item.labelName,
+        colorCode: item.colorCode,
+        calories: item.calories,
+        description: item.description,
+        itemSize: item.itemSize,
+        skuPlu: item.skuPlu,
+        isAlcohol: item.isAlcohol,
+        menuImg: item.menuImg,
+        priceStrategy: item.priceStrategy,
+        cardPrice: item.cardPrice,
+        cashPrice: item.cashPrice,
+        isPrice: item.isPrice,
+        isActive: item.isActive,
+        stockinhand: item.stockinhand,
+        storeCode: storeCode,
+        syncId: item.syncId,
+        syncSource: item.syncSource || 'server',
+        isSyncToWeb: 0,
+        isSyncToLocal: 0,
+        createdBy: item.createdBy,
+        createdOn: item.createdOn
       },
       create: {
-        ...itemData,
-        storeCode: storeCode
+        menuItemCode: item.menuItemCode,
+        menuMasterCode: item.menuMasterCode,
+        menuCategoryCode: item.menuCategoryCode,
+        name: item.name,
+        kitchenName: item.kitchenName,
+        labelName: item.labelName,
+        colorCode: item.colorCode,
+        calories: item.calories,
+        description: item.description,
+        itemSize: item.itemSize,
+        skuPlu: item.skuPlu,
+        isAlcohol: item.isAlcohol,
+        menuImg: item.menuImg,
+        priceStrategy: item.priceStrategy,
+        cardPrice: item.cardPrice,
+        cashPrice: item.cashPrice,
+        isPrice: item.isPrice,
+        isActive: item.isActive,
+        stockinhand: item.stockinhand,
+        storeCode: storeCode,
+        syncId: item.syncId,
+        syncSource: item.syncSource || 'server',
+        isSyncToWeb: 0,
+        isSyncToLocal: 0,
+        createdBy: item.createdBy,
+        createdOn: item.createdOn
       }
     })
 
-    // Sync item modifier groups
+    // Fetch and sync item modifier groups separately (no relation defined in master schema)
+    const menuItemModifierGroups = await masterPrisma.masterMenuItemModifierGroup.findMany({
+      where: {
+        menuItemCode: item.menuItemCode
+      }
+    })
+
     for (const modifierGroup of menuItemModifierGroups) {
       await (locationPrisma as any).menuItemModifierGroup.upsert({
         where: {
@@ -310,12 +434,38 @@ async function syncMenuItems(storeCode: string): Promise<{ recordsSynced: number
           }
         },
         update: {
-          ...modifierGroup,
-          storeCode: storeCode
+          menuItemCode: modifierGroup.menuItemCode,
+          modifierGroupCode: modifierGroup.modifierGroupCode,
+          inheritFromMenuGroup: modifierGroup.inheritFromMenuGroup,
+          isInheritFromMenuCategory: modifierGroup.isInheritFromMenuCategory,
+          isRequired: modifierGroup.isRequired,
+          isMultiselect: modifierGroup.isMultiselect,
+          minSelection: modifierGroup.minSelection,
+          maxSelection: modifierGroup.maxSelection,
+          createdBy: modifierGroup.createdBy,
+          createdOn: modifierGroup.createdOn,
+          storeCode: storeCode,
+          syncId: modifierGroup.syncId,
+          syncSource: modifierGroup.syncSource || 'server',
+          isSyncToWeb: 0,
+          isSyncToLocal: 0
         },
         create: {
-          ...modifierGroup,
-          storeCode: storeCode
+          menuItemCode: modifierGroup.menuItemCode,
+          modifierGroupCode: modifierGroup.modifierGroupCode,
+          inheritFromMenuGroup: modifierGroup.inheritFromMenuGroup,
+          isInheritFromMenuCategory: modifierGroup.isInheritFromMenuCategory,
+          isRequired: modifierGroup.isRequired,
+          isMultiselect: modifierGroup.isMultiselect,
+          minSelection: modifierGroup.minSelection,
+          maxSelection: modifierGroup.maxSelection,
+          createdBy: modifierGroup.createdBy,
+          createdOn: modifierGroup.createdOn,
+          storeCode: storeCode,
+          syncId: modifierGroup.syncId,
+          syncSource: modifierGroup.syncSource || 'server',
+          isSyncToWeb: 0,
+          isSyncToLocal: 0
         }
       })
     }

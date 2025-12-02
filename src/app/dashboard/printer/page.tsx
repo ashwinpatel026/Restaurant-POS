@@ -15,6 +15,7 @@ import CRUDModal from "@/components/modals/CRUDModal";
 import DeleteConfirmationModal from "@/components/modals/DeleteConfirmationModal";
 import DataTable from "@/components/tables/DataTable";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 interface Printer {
   printerId: number;
@@ -28,6 +29,8 @@ interface Printer {
 }
 
 export default function PrinterManagementPage() {
+  const { selectedStoreCode, buildApiUrl } = useApiWithStore();
+
   const [printers, setPrinters] = useState<Printer[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -39,11 +42,13 @@ export default function PrinterManagementPage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [selectedStoreCode]);
 
   const fetchData = async () => {
     try {
-      const response = await fetch("/api/dashboard/printer");
+      const url = buildApiUrl("/api/dashboard/printer");
+
+      const response = await fetch(url);
 
       if (response.ok) {
         const data = await response.json();
@@ -70,9 +75,10 @@ export default function PrinterManagementPage() {
 
   const handleSave = async (formData: any) => {
     try {
-      const url = editingPrinter
+      const baseUrl = editingPrinter
         ? `/api/dashboard/printer/${editingPrinter.printerId}`
         : "/api/dashboard/printer";
+      const url = buildApiUrl(baseUrl);
 
       const method = editingPrinter ? "PUT" : "POST";
 
@@ -113,12 +119,11 @@ export default function PrinterManagementPage() {
     if (!printerToDelete) return;
 
     try {
-      const response = await fetch(
-        `/api/dashboard/printer/${printerToDelete.printerId}`,
-        {
-          method: "DELETE",
-        }
-      );
+      const url = buildApiUrl(`/api/dashboard/printer/${printerToDelete.printerId}`);
+
+      const response = await fetch(url, {
+        method: "DELETE",
+      });
 
       if (response.ok) {
         setPrinters(

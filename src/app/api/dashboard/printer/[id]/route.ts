@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import {
+  getUserAccessInfo,
+  getSelectedStoreCode,
+  canAccessStore,
+} from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 
 export async function GET(
@@ -10,25 +15,39 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
 
     const resolvedParams = await params
     const printerId = BigInt(resolvedParams.id)
 
     const printer = await prisma.printer.findUnique({
-      where: { printerId }
+      where: { printerId },
     })
 
     if (!printer) {
       return NextResponse.json({ error: 'Printer not found' }, { status: 404 })
     }
 
+    // If storeCode is provided, verify the printer belongs to that store or user has access
+    if (selectedStoreCode && printer.storeCode !== selectedStoreCode) {
+      if (!canAccessStore(accessInfo, printer.storeCode || '')) {
+        return NextResponse.json({ error: 'Printer not found' }, { status: 404 })
+      }
+    }
+
     // Serialize BigInt to string
     const serializedPrinter = {
       ...printer,
-      printerId: printer.printerId.toString()
+      printerId: printer.printerId.toString(),
     }
 
     return NextResponse.json(serializedPrinter)
@@ -48,8 +67,26 @@ export async function PUT(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || !['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (!['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
+
+    // Get selected store from query
+    const searchParams = request.nextUrl.searchParams
+    const queryStoreCode = searchParams.get('storeCode')
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
+
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: 'No accessible store selected' },
+        { status: 403 }
+      )
     }
 
     const resolvedParams = await params
@@ -66,20 +103,39 @@ export async function PUT(
       )
     }
 
+    // First check if printer exists and belongs to a store the user can access
+    const existingPrinter = await prisma.printer.findUnique({
+      where: { printerId },
+    })
+
+    if (!existingPrinter) {
+      return NextResponse.json({ error: 'Printer not found' }, { status: 404 })
+    }
+
+    if (
+      existingPrinter.storeCode &&
+      !canAccessStore(accessInfo, existingPrinter.storeCode)
+    ) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
     // Update printer (printer code cannot be changed)
     const printer = await prisma.printer.update({
       where: { printerId },
       data: {
         printerName,
         isActive: isActive ? 1 : 0,
-        storeCode: process.env.STORE_CODE || null
-      }
+        // Keep the original storeCode, don't change it; if empty, set to selected store
+        storeCode: existingPrinter.storeCode || selectedStoreCode,
+        // Mark updates from dashboard/location
+        syncSource: 'location',
+      },
     })
 
     // Serialize BigInt to string
     const serializedPrinter = {
       ...printer,
-      printerId: printer.printerId.toString()
+      printerId: printer.printerId.toString(),
     }
 
     return NextResponse.json(serializedPrinter)
@@ -100,15 +156,37 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || !['SUPER_ADMIN'].includes(session.user.role)) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    if (!['SUPER_ADMIN'].includes(session.user.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
 
     const resolvedParams = await params
     const printerId = BigInt(resolvedParams.id)
 
+    // First check if printer exists and user has access
+    const existingPrinter = await prisma.printer.findUnique({
+      where: { printerId },
+    })
+
+    if (!existingPrinter) {
+      return NextResponse.json({ error: 'Printer not found' }, { status: 404 })
+    }
+
+    if (
+      existingPrinter.storeCode &&
+      !canAccessStore(accessInfo, existingPrinter.storeCode)
+    ) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
     await prisma.printer.delete({
-      where: { printerId }
+      where: { printerId },
     })
 
     return NextResponse.json({ message: 'Printer deleted successfully' })
