@@ -106,7 +106,9 @@ export const SYNC_TABLE_MAP: Record<string, string> = {
   'tbl_master_station': 'tbl_station',
   'tbl_master_tax': 'tbl_tax',
   'tbl_master_time_events': 'tbl_time_events',
-  // User management tables - REMOVED: synced separately
+  // User management tables - Individual sync only (not in full sync)
+  'tbl_user': 'users',
+  'tbl_user_store_access': 'tbl_user_store_access',
   // Relationship/junction tables
   'tbl_master_menu_master_event': 'tbl_menu_master_event',
   'tbl_master_menu_category_modifier': 'tbl_menu_category_modifier',
@@ -196,6 +198,7 @@ export const SYNC_FIELD_MAP: Record<string, Record<string, string>> = {
     'inherit_from_menu_group': 'inherit_from_menu_group',
     'price_strategy': 'price_strategy',
     'price': 'price',
+    'prefix': 'prefix',
     'is_active': 'is_active',
   },
   'tbl_master_modifier_item': {
@@ -261,7 +264,28 @@ export const SYNC_FIELD_MAP: Record<string, Record<string, string>> = {
     'Event_End_Date': 'Event_End_Date',
     'is_active': 'is_active',
   },
-  // User management tables - REMOVED: synced separately
+  // User management tables - Individual sync only (synced on create/update, not in full sync)
+  'tbl_user': {
+    'email': 'email',
+    'username': 'username',
+    'password': 'password', // Note: Password should be synced as hashed
+    'first_name': 'firstName',  // Database column name (snake_case)
+    'last_name': 'lastName',  // Map from master table's last_name (snake_case) to location table's lastName (camelCase)
+    'phone': 'phone',
+    'role': 'role',
+    'access_level': 'access_level',  // Database column name (snake_case)
+    'company_id': 'company_id',  // Database column name (snake_case)
+    'dealer_id': 'dealer_id',  // Database column name (snake_case)
+    'location_id': 'location_id',  // Database column name (snake_case)
+    'default_store_code': 'default_store_code',  // Database column name (snake_case)
+    'is_active': 'isActive',  // Map from master table's is_active (snake_case) to location table's isActive (camelCase)
+    'sync_id': 'sync_id',  // Database column name (snake_case) - for sync tracking
+  },
+  'tbl_user_store_access': {
+    'user_id': 'user_id',  // Database column name (snake_case)
+    'store_code': 'store_code',  // Database column name (snake_case)
+    'is_default': 'is_default',  // Database column name (snake_case)
+  },
   // Relationship/junction tables
   'tbl_master_menu_master_event': {
     'menu_master_code': 'menu_master_code',
@@ -296,7 +320,9 @@ export const SYNC_ORDER_BY_COLUMN: Record<string, string> = {
   'tbl_master_station': 'station_code', // Station table doesn't have createdon/created_date
   'tbl_master_tax': 'created_date',
   'tbl_master_time_events': 'created_date',
-  // User management tables - REMOVED: synced separately
+  // User management tables - Individual sync only (not in full sync)
+  'tbl_user': 'created_on',
+  'tbl_user_store_access': 'created_on',
   // Relationship/junction tables
   'tbl_master_menu_master_event': 'createdon',
   'tbl_master_menu_category_modifier': 'createdon',

@@ -3,6 +3,46 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getUserAccessInfo, getSelectedStoreCode, canAccessStore } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
+import { Prisma } from '@prisma/client'
+
+// Helper function to sanitize prefix array
+function sanitizePrefix(input: unknown): string[] {
+  if (!input) {
+    return []
+  }
+
+  const values = Array.isArray(input)
+    ? input
+    : typeof input === 'string'
+      ? input.split(',')
+      : []
+
+  const unique = new Set<string>()
+
+  for (const value of values) {
+    if (typeof value === 'string') {
+      const trimmed = value.trim()
+      if (trimmed) {
+        unique.add(trimmed)
+      }
+    }
+  }
+
+  return Array.from(unique)
+}
+
+// Helper function to normalize prefix from JSON
+function normalizePrefix(value: unknown): string[] {
+  if (!value) return []
+  const values = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(',')
+      : []
+  return values
+    .map((v) => (typeof v === 'string' ? v.trim() : String(v).trim()))
+    .filter((v) => v)
+}
 
 export async function GET(
   request: NextRequest,
@@ -57,6 +97,7 @@ export async function GET(
     const data: any = { 
       ...group, 
       id: group.id.toString(),
+      prefix: normalizePrefix(group.prefix),
       assignedCategories: assigned?.map(a => ({ code: a.menu_category_code, name: a.category_name })) || [],
       items: items.map((item: any) => ({
         ...item,
@@ -127,26 +168,37 @@ export async function PUT(
       maxSelection,
       showDefaultTop,
       inheritFromMenuGroup,
+      prefix,
       isActive,
     } = body
 
+    const prefixes = sanitizePrefix(prefix)
+
+    const updateData: Record<string, unknown> = {
+      groupName: groupName ?? null,
+      labelName: labelName ?? null,
+      isRequired: typeof isRequired === 'number' ? isRequired : undefined,
+      isMultiselect: typeof isMultiselect === 'number' ? isMultiselect : undefined,
+      minSelection: typeof minSelection === 'number' ? minSelection : null,
+      maxSelection: typeof maxSelection === 'number' ? maxSelection : null,
+      showDefaultTop: typeof showDefaultTop === 'number' ? showDefaultTop : undefined,
+      inheritFromMenuGroup: typeof inheritFromMenuGroup === 'number' ? inheritFromMenuGroup : undefined,
+      isActive: typeof isActive === 'number' ? isActive : undefined,
+      // Keep the original storeCode, don't change it
+      storeCode: existingGroup.storeCode || selectedStoreCode,
+      // Set sync_source to 'location' when updated from dashboard
+      syncSource: 'location',
+    }
+
+    if (prefixes.length > 0) {
+      updateData.prefix = prefixes
+    } else {
+      updateData.prefix = Prisma.JsonNull
+    }
+
     const updated = await (prisma as any).modifierGroup.update({
       where: { id: groupId },
-      data: {
-        groupName: groupName ?? null,
-        labelName: labelName ?? null,
-        isRequired: typeof isRequired === 'number' ? isRequired : undefined,
-        isMultiselect: typeof isMultiselect === 'number' ? isMultiselect : undefined,
-        minSelection: typeof minSelection === 'number' ? minSelection : null,
-        maxSelection: typeof maxSelection === 'number' ? maxSelection : null,
-        showDefaultTop: typeof showDefaultTop === 'number' ? showDefaultTop : undefined,
-        inheritFromMenuGroup: typeof inheritFromMenuGroup === 'number' ? inheritFromMenuGroup : undefined,
-        isActive: typeof isActive === 'number' ? isActive : undefined,
-        // Keep the original storeCode, don't change it
-        storeCode: existingGroup.storeCode || selectedStoreCode,
-        // Set sync_source to 'location' when updated from dashboard
-        syncSource: 'location'
-      }
+      data: updateData,
     })
 
     const data: any = { ...updated, id: updated.id.toString() }

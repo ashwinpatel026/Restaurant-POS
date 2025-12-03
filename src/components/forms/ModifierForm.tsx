@@ -4,6 +4,19 @@ import { useState, useEffect } from "react";
 import { TrashIcon } from "@heroicons/react/24/outline";
 import { LoadingOverlay } from "@/components/ui/SkeletonLoader";
 
+// Helper function to normalize prefix array
+const normalizePrefix = (value: unknown): string[] => {
+  if (!value) return [];
+  const values = Array.isArray(value)
+    ? value
+    : typeof value === "string"
+    ? value.split(",")
+    : [];
+  return values
+    .map((v) => (typeof v === "string" ? v.trim() : String(v).trim()))
+    .filter((v) => v);
+};
+
 interface ModifierGroupData {
   id?: string;
   modifierGroupCode?: string | null;
@@ -58,6 +71,7 @@ export default function ModifierForm({
     priceStrategy: 1,
     price: 0,
     isActive: 1,
+    prefix: [] as string[],
   });
 
   const [modifierItems, setModifierItems] = useState<ModifierItemState[]>([
@@ -88,6 +102,12 @@ export default function ModifierForm({
   const [loading, setLoading] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
+  const [prefixInput, setPrefixInput] = useState("");
+  const [allPrefixes, setAllPrefixes] = useState<string[]>([]);
+  const [showPrefixSuggestions, setShowPrefixSuggestions] = useState(false);
+  const [filteredPrefixSuggestions, setFilteredPrefixSuggestions] = useState<
+    string[]
+  >([]);
 
   useEffect(() => {
     if (modifier) {
@@ -105,7 +125,9 @@ export default function ModifierForm({
         priceStrategy: (modifier as any).priceStrategy ?? 1,
         price: (modifier as any).price ?? 0,
         isActive: modifier.isActive ?? 1,
+        prefix: normalizePrefix((modifier as any).prefix),
       });
+      setPrefixInput("");
       setRemovedItemIds([]);
       // Load items if provided in modifier data
       if ((modifier as any).items && Array.isArray((modifier as any).items)) {
@@ -168,6 +190,68 @@ export default function ModifierForm({
     }
   }, [modifier]);
 
+  // Fetch all prefixes for suggestions
+  useEffect(() => {
+    const fetchAllPrefixes = async () => {
+      try {
+        const token = localStorage.getItem("master_admin_token");
+        const isMaster = !!token;
+        const url = isMaster
+          ? "/api/master/modifier-groups"
+          : "/api/dashboard/modifier-groups";
+        const headers: HeadersInit = {
+          "Content-Type": "application/json",
+        };
+        if (isMaster) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+
+        const response = await fetch(url, {
+          cache: "no-store",
+          headers,
+        });
+        if (response.ok) {
+          const groups = await response.json();
+          const allPrefixValues: string[] = [];
+
+          groups.forEach((g: any) => {
+            if (g.prefix) {
+              const prefixes = normalizePrefix(g.prefix);
+              allPrefixValues.push(...prefixes);
+            }
+          });
+
+          // Remove duplicates and sort
+          const uniquePrefixes = Array.from(new Set(allPrefixValues))
+            .filter((p) => p && p.trim())
+            .sort();
+
+          setAllPrefixes(uniquePrefixes);
+        }
+      } catch (error) {
+        console.error("Error fetching prefixes:", error);
+      }
+    };
+
+    fetchAllPrefixes();
+  }, []);
+
+  // Filter prefix suggestions based on input
+  useEffect(() => {
+    if (prefixInput.trim()) {
+      const filtered = allPrefixes.filter(
+        (prefix) =>
+          prefix.toLowerCase().includes(prefixInput.toLowerCase()) &&
+          !formData.prefix.includes(prefix)
+      );
+      setFilteredPrefixSuggestions(filtered);
+      setShowPrefixSuggestions(filtered.length > 0);
+    } else {
+      setShowPrefixSuggestions(false);
+      setFilteredPrefixSuggestions([]);
+    }
+  }, [prefixInput, allPrefixes, formData.prefix]);
+
   // No longer fetching categories; assignments shown read-only from modifier.assignedCategories
 
   // Removed legacy fetchModifierItems; items are created alongside group on save for add flow
@@ -216,6 +300,76 @@ export default function ModifierForm({
     setDeletingIndex(null);
   };
 
+  // Prefix handlers
+  const handlePrefixAdd = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    setFormData((prev) => {
+      if (prev.prefix.includes(trimmed)) {
+        return prev;
+      }
+      return {
+        ...prev,
+        prefix: [...prev.prefix, trimmed],
+      };
+    });
+  };
+
+  const handlePrefixRemove = (prefix: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      prefix: prev.prefix.filter((item) => item !== prefix),
+    }));
+  };
+
+  const handlePrefixKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      if (prefixInput.trim()) {
+        handlePrefixAdd(prefixInput);
+        setPrefixInput("");
+        setShowPrefixSuggestions(false);
+      }
+    } else if (e.key === "Backspace" && prefixInput === "") {
+      setFormData((prev) => ({
+        ...prev,
+        prefix: prev.prefix.slice(0, Math.max(prev.prefix.length - 1, 0)),
+      }));
+    } else if (e.key === "Escape") {
+      setShowPrefixSuggestions(false);
+    }
+  };
+
+  const handlePrefixSuggestionClick = (suggestion: string) => {
+    handlePrefixAdd(suggestion);
+    setPrefixInput("");
+    setShowPrefixSuggestions(false);
+  };
+
+  const handlePrefixInputFocus = () => {
+    if (prefixInput.trim()) {
+      const filtered = allPrefixes.filter(
+        (prefix) =>
+          prefix.toLowerCase().includes(prefixInput.toLowerCase()) &&
+          !formData.prefix.includes(prefix)
+      );
+      setFilteredPrefixSuggestions(filtered);
+      setShowPrefixSuggestions(filtered.length > 0);
+    } else {
+      const available = allPrefixes.filter(
+        (prefix) => !formData.prefix.includes(prefix)
+      );
+      setFilteredPrefixSuggestions(available);
+      setShowPrefixSuggestions(available.length > 0);
+    }
+  };
+
+  const handlePrefixInputBlur = () => {
+    setTimeout(() => {
+      setShowPrefixSuggestions(false);
+    }, 200);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -232,6 +386,7 @@ export default function ModifierForm({
             ? parseFloat(String(formData.price))
             : null,
         isActive: parseInt(String(formData.isActive)),
+        prefix: normalizePrefix(formData.prefix),
         modifierItems: modifierItems
           .filter((item) => item.name.trim() !== "")
           .map((item, idx) => ({
@@ -397,6 +552,68 @@ export default function ModifierForm({
                     </span>
                   </label>
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Prefix
+                </label>
+                <div className="relative">
+                  <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-white dark:bg-gray-700">
+                    {formData.prefix.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {formData.prefix.map((prefix) => (
+                          <span
+                            key={prefix}
+                            className="inline-flex items-center bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-medium px-2 py-1 rounded-full"
+                          >
+                            {prefix}
+                            <button
+                              type="button"
+                              onClick={() => handlePrefixRemove(prefix)}
+                              className="ml-1 text-blue-500 hover:text-blue-700 dark:text-blue-300 dark:hover:text-blue-200"
+                              aria-label={`Remove ${prefix}`}
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <input
+                      type="text"
+                      value={prefixInput}
+                      onChange={(e) => setPrefixInput(e.target.value)}
+                      onKeyDown={handlePrefixKeyDown}
+                      onFocus={handlePrefixInputFocus}
+                      onBlur={handlePrefixInputBlur}
+                      placeholder="Type a prefix and press Enter or select from suggestions"
+                      className="w-full px-3 py-2 border border-gray-200 dark:border-gray-500 rounded-lg bg-white dark:bg-gray-600 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  {/* Suggestions Dropdown */}
+                  {showPrefixSuggestions &&
+                    filteredPrefixSuggestions.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {filteredPrefixSuggestions.map((suggestion) => (
+                          <button
+                            key={suggestion}
+                            type="button"
+                            onClick={() =>
+                              handlePrefixSuggestionClick(suggestion)
+                            }
+                            className="w-full text-left px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                </div>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Press Enter or comma to add a prefix. Click suggestions to
+                  select. Use the × icon to remove a prefix.
+                </p>
               </div>
             </div>
           </div>

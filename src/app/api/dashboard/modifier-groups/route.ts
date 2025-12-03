@@ -3,6 +3,46 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getUserAccessInfo, getSelectedStoreCode, buildStoreFilter } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
+import { Prisma } from '@prisma/client'
+
+// Helper function to sanitize prefix array
+function sanitizePrefix(input: unknown): string[] {
+  if (!input) {
+    return []
+  }
+
+  const values = Array.isArray(input)
+    ? input
+    : typeof input === 'string'
+      ? input.split(',')
+      : []
+
+  const unique = new Set<string>()
+
+  for (const value of values) {
+    if (typeof value === 'string') {
+      const trimmed = value.trim()
+      if (trimmed) {
+        unique.add(trimmed)
+      }
+    }
+  }
+
+  return Array.from(unique)
+}
+
+// Helper function to normalize prefix from JSON
+function normalizePrefix(value: unknown): string[] {
+  if (!value) return []
+  const values = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(',')
+      : []
+  return values
+    .map((v) => (typeof v === 'string' ? v.trim() : String(v).trim()))
+    .filter((v) => v)
+}
 
 // Helper function to generate unique modifier group code
 async function generateModifierGroupCode(storeCode: string): Promise<string> {
@@ -138,6 +178,7 @@ export async function GET(request: NextRequest) {
     const data = groups.map((g: any) => ({
       ...g,
       id: g.id.toString(),
+      prefix: normalizePrefix(g.prefix),
       assignedCategories: codeToCategories.get(g.modifierGroupCode || '') || []
     }))
 
@@ -191,30 +232,40 @@ export async function POST(request: NextRequest) {
       inheritFromMenuGroup = 0,
       priceStrategy = 1,
       price,
+      prefix,
       isActive = 1,
     } = body
 
     // Generate unique modifier group code for the selected store
     const modifierGroupCode = await generateModifierGroupCode(selectedStoreCode)
+    const prefixes = sanitizePrefix(prefix)
+
+    const groupData: Record<string, unknown> = {
+      modifierGroupCode,
+      groupName: groupName || null,
+      labelName: labelName || null,
+      isRequired,
+      isMultiselect,
+      minSelection: typeof minSelection === 'number' ? minSelection : null,
+      maxSelection: typeof maxSelection === 'number' ? maxSelection : null,
+      showDefaultTop,
+      inheritFromMenuGroup,
+      priceStrategy,
+      price: typeof price === 'number' && price > 0 ? price : null,
+      isActive,
+      createdBy: parseInt(session.user.id),
+      storeCode: selectedStoreCode,
+      syncSource: 'location', // Set sync_source to 'location' when created from dashboard
+    }
+
+    if (prefixes.length > 0) {
+      groupData.prefix = prefixes
+    } else {
+      groupData.prefix = Prisma.JsonNull
+    }
 
     const created = await (prisma as any).modifierGroup.create({
-      data: {
-        modifierGroupCode,
-        groupName: groupName || null,
-        labelName: labelName || null,
-        isRequired,
-        isMultiselect,
-        minSelection: typeof minSelection === 'number' ? minSelection : null,
-        maxSelection: typeof maxSelection === 'number' ? maxSelection : null,
-        showDefaultTop,
-        inheritFromMenuGroup,
-        priceStrategy,
-        price: typeof price === 'number' && price > 0 ? price : null,
-        isActive,
-        createdBy: parseInt(session.user.id),
-        storeCode: selectedStoreCode,
-        syncSource: 'location' // Set sync_source to 'location' when created from dashboard
-      },
+      data: groupData,
     })
 
     const data = { ...created, id: created.id.toString() }

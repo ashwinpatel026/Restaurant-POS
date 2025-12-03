@@ -1,6 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { masterPrisma } from '@/lib/databaseManager'
+import { Prisma } from '@prisma/master-client'
+
+// Helper function to sanitize prefix array
+function sanitizePrefix(input: unknown): string[] {
+  if (!input) {
+    return []
+  }
+
+  const values = Array.isArray(input)
+    ? input
+    : typeof input === 'string'
+      ? input.split(',')
+      : []
+
+  const unique = new Set<string>()
+
+  for (const value of values) {
+    if (typeof value === 'string') {
+      const trimmed = value.trim()
+      if (trimmed) {
+        unique.add(trimmed)
+      }
+    }
+  }
+
+  return Array.from(unique)
+}
+
+// Helper function to normalize prefix from JSON
+function normalizePrefix(value: unknown): string[] {
+  if (!value) return []
+  const values = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(',')
+      : []
+  return values
+    .map((v) => (typeof v === 'string' ? v.trim() : String(v).trim()))
+    .filter((v) => v)
+}
 
 // Helper function to map modifier group response
 function mapModifierGroupResponse(group: any) {
@@ -8,6 +48,7 @@ function mapModifierGroupResponse(group: any) {
     ...group,
     id: group.id.toString(),
     price: group.price ? group.price.toString() : null,
+    prefix: normalizePrefix(group.prefix),
     createdBy: group.createdBy ? group.createdBy.toString() : null,
     createdOn: group.createdOn ? group.createdOn.toISOString() : null,
     updatedBy: group.updatedBy ? group.updatedBy.toString() : null,
@@ -71,24 +112,35 @@ export async function PUT(
       maxSelection,
       showDefaultTop,
       inheritFromMenuGroup,
+      prefix,
       isActive,
     } = body
 
+    const prefixes = sanitizePrefix(prefix)
+
+    const updateData: Record<string, unknown> = {
+      groupName: groupName ?? null,
+      labelName: labelName ?? null,
+      isRequired: typeof isRequired === 'number' ? isRequired : undefined,
+      isMultiselect: typeof isMultiselect === 'number' ? isMultiselect : undefined,
+      minSelection: typeof minSelection === 'number' ? minSelection : null,
+      maxSelection: typeof maxSelection === 'number' ? maxSelection : null,
+      showDefaultTop: typeof showDefaultTop === 'number' ? showDefaultTop : undefined,
+      inheritFromMenuGroup: typeof inheritFromMenuGroup === 'number' ? inheritFromMenuGroup : undefined,
+      isActive: typeof isActive === 'number' ? isActive : undefined,
+      updatedBy: admin.adminId,
+      updatedOn: new Date(),
+    }
+
+    if (prefixes.length > 0) {
+      updateData.prefix = prefixes
+    } else {
+      updateData.prefix = Prisma.JsonNull
+    }
+
     const updated = await masterPrisma.masterModifierGroup.update({
       where: { id: groupId },
-      data: {
-        groupName: groupName ?? null,
-        labelName: labelName ?? null,
-        isRequired: typeof isRequired === 'number' ? isRequired : undefined,
-        isMultiselect: typeof isMultiselect === 'number' ? isMultiselect : undefined,
-        minSelection: typeof minSelection === 'number' ? minSelection : null,
-        maxSelection: typeof maxSelection === 'number' ? maxSelection : null,
-        showDefaultTop: typeof showDefaultTop === 'number' ? showDefaultTop : undefined,
-        inheritFromMenuGroup: typeof inheritFromMenuGroup === 'number' ? inheritFromMenuGroup : undefined,
-        isActive: typeof isActive === 'number' ? isActive : undefined,
-        updatedBy: admin.adminId,
-        updatedOn: new Date(),
-      }
+      data: updateData as Prisma.MasterModifierGroupUpdateInput,
     })
 
     return NextResponse.json(mapModifierGroupResponse(updated))

@@ -30,12 +30,22 @@ export class SyncProcessor {
     'is_bill',
     'is_report',
     'isActive',   // Location database users table column (camelCase)
+    'is_default', // For tbl_user_store_access (boolean) - handled table-specifically
   ]);
+
+  // Table-specific boolean columns (columns that are boolean in some tables, integer in others)
+  private readonly TABLE_BOOLEAN_COLUMNS: Record<string, Set<string>> = {
+    'tbl_user_store_access': new Set(['is_default']), // is_default is boolean in user_store_access
+  };
+
+  // Table-specific integer columns (columns that are integer in some tables)
+  private readonly TABLE_INTEGER_COLUMNS: Record<string, Set<string>> = {
+    'tbl_modifier_item': new Set(['is_default']), // is_default is integer in modifier_item
+  };
 
   // List of integer columns that might come as boolean but should be converted to integer
   // These columns are integers in the database but might be stored/read as boolean
   private readonly INTEGER_COLUMNS = new Set([
-    'is_default',  // ModifierItem.is_default is Int, not Boolean
     'is_active',
     'is_required',
     'is_multiselect',
@@ -372,26 +382,45 @@ export class SyncProcessor {
     // Validate foreign key references before syncing
     await this.validateForeignKeyReferences(tableName, locationTableName, mappedData, locationCode);
 
-    // Get the primary code field for this table to check for existing records by code + store_code
-    const primaryCodeField = this.getPrimaryCodeField(tableName);
+    // Special handling for user tables: sync by sync_id only (no code + store_code check)
+    // This allows multiple users to be assigned to the same store_code (location)
+    const isUserTable = tableName === 'tbl_user' || tableName === 'tbl_user_store_access';
     let existingRecordSyncId: string | null = null;
 
-    if (primaryCodeField && mappedData[primaryCodeField]) {
-      // Check if record with same code already exists for this store_code
-      const primaryCodeValue = mappedData[primaryCodeField];
-      const escapedCode = String(primaryCodeValue).replace(/'/g, "''");
-      const escapedStoreCode = locationCode.replace(/'/g, "''");
-
+    if (isUserTable) {
+      // For user tables, check by sync_id only (not by code + store_code)
+      // This allows multiple users per location, each with unique sync_id
       const existing = await locationPrisma.$queryRawUnsafe<any[]>(`
         SELECT sync_id FROM ${locationTableName}
-        WHERE "${primaryCodeField}" = '${escapedCode}'::VARCHAR
-          AND store_code = '${escapedStoreCode}'::VARCHAR
+        WHERE sync_id = '${recordId}'::UUID
         LIMIT 1
       `);
 
       if (existing && existing.length > 0) {
         existingRecordSyncId = existing[0].sync_id;
-        console.log(`Found existing record with ${primaryCodeField} = ${primaryCodeValue} for store_code = ${locationCode}, sync_id = ${existingRecordSyncId}`);
+        console.log(`Found existing record by sync_id = ${recordId} for ${locationTableName}`);
+      }
+    } else {
+      // For other tables, check by primary code + store_code
+      const primaryCodeField = this.getPrimaryCodeField(tableName);
+      
+      if (primaryCodeField && mappedData[primaryCodeField]) {
+        // Check if record with same code already exists for this store_code
+        const primaryCodeValue = mappedData[primaryCodeField];
+        const escapedCode = String(primaryCodeValue).replace(/'/g, "''");
+        const escapedStoreCode = locationCode.replace(/'/g, "''");
+
+        const existing = await locationPrisma.$queryRawUnsafe<any[]>(`
+          SELECT sync_id FROM ${locationTableName}
+          WHERE "${primaryCodeField}" = '${escapedCode}'::VARCHAR
+            AND store_code = '${escapedStoreCode}'::VARCHAR
+          LIMIT 1
+        `);
+
+        if (existing && existing.length > 0) {
+          existingRecordSyncId = existing[0].sync_id;
+          console.log(`Found existing record with ${primaryCodeField} = ${primaryCodeValue} for store_code = ${locationCode}, sync_id = ${existingRecordSyncId}`);
+        }
       }
     }
 
@@ -401,7 +430,7 @@ export class SyncProcessor {
     switch (operation) {
       case 'INSERT':
         if (existingRecordSyncId) {
-          // Record exists by code, update it instead
+          // Record exists by sync_id (for user tables) or by code (for other tables), update it instead
           await this.handleUpdate(
             locationTableName,
             existingRecordSyncId,
@@ -409,8 +438,18 @@ export class SyncProcessor {
             parsedData.sync_source || 'server',
             locationCode
           );
+        } else if (isUserTable) {
+          // For user tables, sync_id is the primary identifier - insert directly
+          // Multiple users can share the same store_code, each with unique sync_id
+          await this.handleInsert(
+            locationTableName,
+            recordId,
+            mappedData,
+            parsedData.sync_source || 'server',
+            locationCode
+          );
         } else {
-          // Check if sync_id already exists globally (from another location)
+          // For other tables, check if sync_id already exists globally (from another location)
           const syncIdExists = await locationPrisma.$queryRawUnsafe<any[]>(`
             SELECT sync_id FROM ${locationTableName}
             WHERE sync_id = '${recordId}'::UUID
@@ -1271,10 +1310,25 @@ export class SyncProcessor {
                 const quotedKey = `"${key}"`;
                 const val: any = value;
                 
+                // Check if this is a boolean column (is_default is boolean in tbl_user_store_access)
+                const isTableBoolean = this.TABLE_BOOLEAN_COLUMNS[tableName]?.has(key);
+                const isTableInteger = this.TABLE_INTEGER_COLUMNS[tableName]?.has(key);
+                const isBooleanColumn = isTableBoolean || (!isTableInteger && this.BOOLEAN_COLUMNS.has(key));
+                
                 if (val === null) {
                   setParts.push(`${quotedKey} = NULL`);
                 } else if (typeof val === 'boolean') {
                   setParts.push(`${quotedKey} = ${val ? 'true' : 'false'}`);
+                } else if (isBooleanColumn) {
+                  // Handle boolean columns - convert number/string to boolean
+                  if (typeof val === 'number') {
+                    setParts.push(`${quotedKey} = ${val ? 'true' : 'false'}`);
+                  } else if (typeof val === 'string') {
+                    const boolVal = val === '1' || val.toLowerCase().trim() === 'true';
+                    setParts.push(`${quotedKey} = ${boolVal ? 'true' : 'false'}`);
+                  } else {
+                    setParts.push(`${quotedKey} = ${val ? 'true' : 'false'}`);
+                  }
                 } else if (val instanceof Date) {
                   setParts.push(`${quotedKey} = '${val.toISOString()}'`);
                 } else if (typeof val === 'number') {
@@ -1320,23 +1374,43 @@ export class SyncProcessor {
       // Type value as any to handle Prisma Decimal and other complex types
       const val: any = value;
       
+      // Check table-specific column types first
+      const isTableBoolean = this.TABLE_BOOLEAN_COLUMNS[tableName]?.has(key);
+      const isTableInteger = this.TABLE_INTEGER_COLUMNS[tableName]?.has(key);
+      const isBooleanColumn = isTableBoolean || (!isTableInteger && this.BOOLEAN_COLUMNS.has(key));
+      const isIntegerColumn = isTableInteger || this.INTEGER_COLUMNS.has(key);
+      
       if (val === null) {
         values.push('NULL');
       } else if (typeof val === 'boolean') {
-        // Check if this is a boolean column - if so, use PostgreSQL boolean
-        // If it's an integer column, convert to int
-        // Otherwise convert to int as fallback
-        if (this.BOOLEAN_COLUMNS.has(key)) {
+        // Handle boolean values
+        if (isBooleanColumn) {
           values.push(val ? 'true' : 'false');
         } else {
           // Convert boolean to integer (0 or 1)
           values.push(val ? '1' : '0');
         }
-      } else if (this.INTEGER_COLUMNS.has(key) && typeof val !== 'number') {
-        // Handle integer columns that might come as boolean or string - always convert to integer
+      } else if (isBooleanColumn) {
+        // Handle boolean columns - convert various formats to boolean
+        // This must come before integer column check to handle numeric values correctly
+        if (typeof val === 'number') {
+          // Convert 0/1 to boolean
+          values.push(val ? 'true' : 'false');
+        } else if (typeof val === 'string') {
+          // Handle string values like "1", "0", "true", "false"
+          const boolVal = val === '1' || val.toLowerCase().trim() === 'true';
+          values.push(boolVal ? 'true' : 'false');
+        } else {
+          // Fallback for other types
+          values.push(val ? 'true' : 'false');
+        }
+      } else if (isTableInteger) {
+        // Handle table-specific integer columns that might come as boolean or string
         let intVal: number;
         if (typeof val === 'boolean') {
           intVal = val ? 1 : 0;
+        } else if (typeof val === 'number') {
+          intVal = val;
         } else if (typeof val === 'string') {
           const normalized = val.toLowerCase().trim();
           intVal = (normalized === 'true' || normalized === '1') ? 1 : 0;
@@ -1344,18 +1418,20 @@ export class SyncProcessor {
           intVal = val ? 1 : 0;
         }
         values.push(String(intVal));
-      } else if (this.BOOLEAN_COLUMNS.has(key)) {
-        // Handle boolean columns - convert various formats to boolean
-        if (typeof val === 'number') {
-          values.push(val ? 'true' : 'false');
+      } else if (isIntegerColumn) {
+        // Handle integer columns that might come as boolean or string - always convert to integer
+        let intVal: number;
+        if (typeof val === 'boolean') {
+          intVal = val ? 1 : 0;
+        } else if (typeof val === 'number') {
+          intVal = val;
         } else if (typeof val === 'string') {
-          // Handle string values like "1", "0", "true", "false"
-          const boolVal = val === '1' || val.toLowerCase() === 'true';
-          values.push(boolVal ? 'true' : 'false');
+          const normalized = val.toLowerCase().trim();
+          intVal = (normalized === 'true' || normalized === '1') ? 1 : 0;
         } else {
-          // Fallback for other types
-          values.push(val ? 'true' : 'false');
+          intVal = val ? 1 : 0;
         }
+        values.push(String(intVal));
       } else if (val instanceof Date) {
         values.push(`'${val.toISOString()}'`);
       } else if (typeof val === 'number') {
@@ -1452,17 +1528,51 @@ export class SyncProcessor {
       // Type value as any to handle Prisma Decimal and other complex types
       const val: any = value;
       
+      // Check table-specific column types first
+      const isTableBoolean = this.TABLE_BOOLEAN_COLUMNS[tableName]?.has(key);
+      const isTableInteger = this.TABLE_INTEGER_COLUMNS[tableName]?.has(key);
+      // Determine if column should be treated as boolean (table-specific override takes precedence)
+      const isBooleanColumn = isTableBoolean || (!isTableInteger && this.BOOLEAN_COLUMNS.has(key));
+      const isIntegerColumn = isTableInteger || this.INTEGER_COLUMNS.has(key);
+      
       if (val === null) {
         setParts.push(`${quotedKey} = NULL`);
       } else if (typeof val === 'boolean') {
-        // Check if this is a boolean column - if so, use PostgreSQL boolean
-        // Otherwise convert to integer (0 or 1)
-        if (this.BOOLEAN_COLUMNS.has(key)) {
+        // Handle boolean values
+        if (isBooleanColumn) {
           setParts.push(`${quotedKey} = ${val ? 'true' : 'false'}`);
         } else {
           // Convert boolean to integer (0 or 1)
           setParts.push(`${quotedKey} = ${val ? '1' : '0'}`);
         }
+      } else if (isBooleanColumn) {
+        // Handle boolean columns - MUST check before integer columns
+        // Convert various formats (number, string) to boolean
+        if (typeof val === 'number') {
+          // Convert 0/1 to boolean
+          setParts.push(`${quotedKey} = ${val ? 'true' : 'false'}`);
+        } else if (typeof val === 'string') {
+          // Handle string values like "1", "0", "true", "false"
+          const boolVal = val === '1' || val.toLowerCase().trim() === 'true';
+          setParts.push(`${quotedKey} = ${boolVal ? 'true' : 'false'}`);
+        } else {
+          // Fallback for other types
+          setParts.push(`${quotedKey} = ${val ? 'true' : 'false'}`);
+        }
+      } else if (isIntegerColumn) {
+        // Handle integer columns - convert various formats to integer
+        let intVal: number;
+        if (typeof val === 'boolean') {
+          intVal = val ? 1 : 0;
+        } else if (typeof val === 'number') {
+          intVal = val;
+        } else if (typeof val === 'string') {
+          const normalized = val.toLowerCase().trim();
+          intVal = (normalized === 'true' || normalized === '1') ? 1 : 0;
+        } else {
+          intVal = val ? 1 : 0;
+        }
+        setParts.push(`${quotedKey} = ${intVal}`);
       } else if (this.INTEGER_COLUMNS.has(key) && typeof val !== 'number') {
         // Handle integer columns that might come as boolean or string - always convert to integer
         let intVal: number;
@@ -1475,7 +1585,7 @@ export class SyncProcessor {
           intVal = val ? 1 : 0;
         }
         setParts.push(`${quotedKey} = ${intVal}`);
-      } else if (this.BOOLEAN_COLUMNS.has(key)) {
+      } else if (isTableBoolean || this.BOOLEAN_COLUMNS.has(key)) {
         // Handle boolean columns - convert various formats to boolean
         if (typeof val === 'number') {
           setParts.push(`${quotedKey} = ${val ? 'true' : 'false'}`);

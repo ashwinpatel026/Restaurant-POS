@@ -2,6 +2,7 @@
 // Synchronizes master data templates to location databases with progress tracking
 
 import { masterPrisma, locationPrisma } from '@/lib/databaseManager'
+import { Prisma } from '@prisma/client'
 
 export type SyncType = 'FULL' | 'INCREMENTAL'
 export type SyncStatus = 'SUCCESS' | 'FAILED' | 'IN_PROGRESS'
@@ -486,18 +487,47 @@ async function syncModifierGroups(storeCode: string): Promise<{ recordsSynced: n
 
   let synced = 0
   for (const group of groups) {
+    // Get prefix value from master group
+    const prefixValue = (group as any).prefix
+    
+    // Build update/create data - always include prefix field
+    const baseData: Record<string, any> = {
+      modifierGroupCode: group.modifierGroupCode,
+      groupName: group.groupName,
+      labelName: group.labelName,
+      isRequired: group.isRequired,
+      isMultiselect: group.isMultiselect,
+      minSelection: group.minSelection,
+      maxSelection: group.maxSelection,
+      showDefaultTop: group.showDefaultTop,
+      inheritFromMenuGroup: group.inheritFromMenuGroup,
+      priceStrategy: group.priceStrategy,
+      price: group.price,
+      isActive: group.isActive,
+      createdBy: group.createdBy,
+      createdOn: group.createdOn,
+      updatedBy: group.updatedBy,
+      updatedOn: group.updatedOn,
+      syncId: group.syncId,
+      syncSource: group.syncSource || 'server',
+      storeCode: storeCode
+    }
+    
+    // Always include prefix field - handle null/empty/undefined properly
+    // This ensures the prefix field is always synced, even if it's null
+    if (prefixValue !== null && prefixValue !== undefined) {
+      baseData.prefix = prefixValue
+    } else {
+      // Set to null using Prisma.JsonNull for proper JSON null handling
+      baseData.prefix = Prisma.JsonNull
+    }
+
     await (locationPrisma as any).modifierGroup.upsert({
       where: {
         modifierGroupCode: group.modifierGroupCode
       },
-      update: {
-        ...group,
-        storeCode: storeCode
-      },
-      create: {
-        ...group,
-        storeCode: storeCode
-      }
+      update: baseData,
+      create: baseData
     })
     synced++
   }

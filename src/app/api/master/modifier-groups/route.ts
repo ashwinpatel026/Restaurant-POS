@@ -1,6 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { masterPrisma } from '@/lib/databaseManager'
+import { Prisma } from '@prisma/master-client'
+
+// Helper function to sanitize prefix array
+function sanitizePrefix(input: unknown): string[] {
+  if (!input) {
+    return []
+  }
+
+  const values = Array.isArray(input)
+    ? input
+    : typeof input === 'string'
+      ? input.split(',')
+      : []
+
+  const unique = new Set<string>()
+
+  for (const value of values) {
+    if (typeof value === 'string') {
+      const trimmed = value.trim()
+      if (trimmed) {
+        unique.add(trimmed)
+      }
+    }
+  }
+
+  return Array.from(unique)
+}
 
 // Helper function to generate unique modifier group code
 async function generateModifierGroupCode(): Promise<string> {
@@ -24,12 +51,26 @@ async function generateModifierGroupCode(): Promise<string> {
   return `MOD${nextNumber}`
 }
 
+// Helper function to normalize prefix from JSON
+function normalizePrefix(value: unknown): string[] {
+  if (!value) return []
+  const values = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(',')
+      : []
+  return values
+    .map((v) => (typeof v === 'string' ? v.trim() : String(v).trim()))
+    .filter((v) => v)
+}
+
 // Helper function to map modifier group response
 function mapModifierGroupResponse(group: any) {
   return {
     ...group,
     id: group.id.toString(),
     price: group.price ? group.price.toString() : null,
+    prefix: normalizePrefix(group.prefix),
     createdBy: group.createdBy ? group.createdBy.toString() : null,
     createdOn: group.createdOn ? group.createdOn.toISOString() : null,
     updatedBy: group.updatedBy ? group.updatedBy.toString() : null,
@@ -118,27 +159,37 @@ export async function POST(request: NextRequest) {
       inheritFromMenuGroup = 0,
       priceStrategy = 1,
       price,
+      prefix,
       isActive = 1,
     } = body
 
     const modifierGroupCode = await generateModifierGroupCode()
+    const prefixes = sanitizePrefix(prefix)
+
+    const groupData: Record<string, unknown> = {
+      modifierGroupCode,
+      groupName: groupName || null,
+      labelName: labelName || null,
+      isRequired,
+      isMultiselect,
+      minSelection: typeof minSelection === 'number' ? minSelection : null,
+      maxSelection: typeof maxSelection === 'number' ? maxSelection : null,
+      showDefaultTop,
+      inheritFromMenuGroup,
+      priceStrategy,
+      price: typeof price === 'number' && price > 0 ? parseFloat(price.toString()) : null,
+      isActive,
+      createdBy: admin.adminId,
+    }
+
+    if (prefixes.length > 0) {
+      groupData.prefix = prefixes
+    } else {
+      groupData.prefix = Prisma.JsonNull
+    }
 
     const created = await masterPrisma.masterModifierGroup.create({
-      data: {
-        modifierGroupCode,
-        groupName: groupName || null,
-        labelName: labelName || null,
-        isRequired,
-        isMultiselect,
-        minSelection: typeof minSelection === 'number' ? minSelection : null,
-        maxSelection: typeof maxSelection === 'number' ? maxSelection : null,
-        showDefaultTop,
-        inheritFromMenuGroup,
-        priceStrategy,
-        price: typeof price === 'number' && price > 0 ? parseFloat(price.toString()) : null,
-        isActive,
-        createdBy: admin.adminId,
-      },
+      data: groupData as Prisma.MasterModifierGroupCreateInput,
     })
 
     return NextResponse.json(mapModifierGroupResponse(created), { status: 201 })
