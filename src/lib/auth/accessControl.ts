@@ -99,10 +99,16 @@ export async function getUserAccessInfo(userId: number): Promise<UserAccessInfo>
     }
   }
 
+  // Filter accessLevel to only valid values
+  const validAccessLevels = ['COMPANY', 'DEALER', 'LOCATION'] as const
+  const accessLevel = user.accessLevel && validAccessLevels.includes(user.accessLevel as any)
+    ? user.accessLevel
+    : null
+
   return {
     userId: user.id,
     role: user.role,
-    accessLevel: user.accessLevel,
+    accessLevel: accessLevel as 'COMPANY' | 'DEALER' | 'LOCATION' | null,
     accessibleStoreCodes,
     defaultStoreCode: user.defaultStoreCode,
     companyId: user.companyId ? Number(user.companyId) : undefined,

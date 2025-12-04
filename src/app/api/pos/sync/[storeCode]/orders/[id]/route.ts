@@ -142,9 +142,6 @@ export async function PUT(
     // Prepare update data with POS sync metadata
     const updateData: any = addPOSSyncMetadata({}, storeCode)
 
-    // Preserve existing syncId - it should not change on update
-    updateData.syncId = existingOrder.syncId
-
     // Update allowed fields
     if (body.status !== undefined) updateData.status = body.status
     if (body.orderType !== undefined) updateData.orderType = body.orderType
@@ -240,9 +237,6 @@ export async function DELETE(
     const updateData = addPOSSyncMetadata({
       status: 'CANCELLED'
     }, storeCode)
-
-    // Preserve existing syncId - it should not change on update
-    updateData.syncId = existingOrder.syncId
 
     await locationPrisma.order.update({
       where: { orderId: existingOrder.orderId },

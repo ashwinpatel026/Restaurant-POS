@@ -189,12 +189,16 @@ export async function POST(request: NextRequest) {
 
         // If inherit from categories, add all modifier groups for the categories
         if (inheritModifiers && menuItem.menuCategoryCode) {
-          const categoryCodes = Array.isArray(menuItem.menuCategoryCode) 
-            ? menuItem.menuCategoryCode 
-            : [menuItem.menuCategoryCode]
-          const categoryModifiers = await masterPrisma.masterMenuCategoryModifier.findMany({
-            where: { menuCategoryCode: { in: categoryCodes } }
-          })
+          const categoryCodes: string[] = Array.isArray(menuItem.menuCategoryCode) 
+            ? menuItem.menuCategoryCode.filter((code): code is string => typeof code === 'string')
+            : typeof menuItem.menuCategoryCode === 'string' 
+              ? [menuItem.menuCategoryCode]
+              : []
+          const categoryModifiers = categoryCodes.length > 0
+            ? await masterPrisma.masterMenuCategoryModifier.findMany({
+                where: { menuCategoryCode: { in: categoryCodes } }
+              })
+            : []
 
           for (const cm of categoryModifiers) {
             if (cm.modifierGroupCode && !seenGroups.has(cm.modifierGroupCode)) {

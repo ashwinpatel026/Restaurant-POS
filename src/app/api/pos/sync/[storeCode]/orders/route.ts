@@ -78,10 +78,10 @@ export async function GET(
         offset: offset ? parseInt(offset, 10) : 0,
         total: totalCount
       },
-      data: orders.map(order => ({
+      data: orders.map((order: any) => ({
         ...order,
         orderId: order.orderId.toString(),
-        orderItems: order.orderItems.map(item => ({
+        orderItems: (order.orderItems || []).map((item: any) => ({
           ...item,
           orderItemId: item.orderItemId.toString()
         }))

@@ -29,7 +29,7 @@ async function generateMenuCategoryCode(storeCode: string): Promise<string> {
         const match = menuCategory.menuCategoryCode.match(new RegExp(`^${prefix}(\\d+)$`))
         return match ? parseInt(match[1]) : 0
       })
-      .filter(num => num > 0)
+      .filter((num: number) => num > 0)
     
     if (numbers.length > 0) {
       nextNumber = Math.max(...numbers) + 1

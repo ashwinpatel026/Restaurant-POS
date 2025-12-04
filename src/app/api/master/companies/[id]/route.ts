@@ -40,7 +40,6 @@ export async function GET(
         where: { companyId: company.companyId, isActive: 1 },
         select: {
           locationId: true,
-          locationCode: true,
           locationName: true,
           storeCode: true,
           isActive: true

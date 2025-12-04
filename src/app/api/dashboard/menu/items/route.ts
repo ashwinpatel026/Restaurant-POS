@@ -26,10 +26,11 @@ async function generateMenuItemCode(storeCode: string): Promise<string> {
     // Extract number from codes like "WLLOC01MI1", "WLLOC01MI2", etc.
     const numbers = menuItems
       .map(menuItem => {
+        if (!menuItem.menuItemCode) return 0
         const match = menuItem.menuItemCode.match(new RegExp(`^${prefix}(\\d+)$`))
         return match ? parseInt(match[1]) : 0
       })
-      .filter(num => num > 0)
+      .filter((num: number) => num > 0)
     
     if (numbers.length > 0) {
       nextNumber = Math.max(...numbers) + 1

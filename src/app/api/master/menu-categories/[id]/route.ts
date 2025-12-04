@@ -29,49 +29,61 @@ export async function GET(
     const categoryId = BigInt(resolvedParams.id)
 
     const category = await masterPrisma.masterMenuCategory.findUnique({
-      where: { menuCategoryId: categoryId },
-      include: {
-        menuMaster: {
-          select: {
-            menuMasterId: true,
-            name: true,
-            menuMasterCode: true
-          }
-        }
-      }
+      where: { menuCategoryId: categoryId }
     })
 
     if (!category) {
       return NextResponse.json({ error: 'Category not found' }, { status: 404 })
     }
 
+    // Fetch menu master separately since relation is not defined
+    const menuMaster = category.menuMasterCode 
+      ? await masterPrisma.masterMenuMaster.findUnique({
+          where: { menuMasterCode: category.menuMasterCode },
+          select: {
+            menuMasterId: true,
+            name: true,
+            menuMasterCode: true
+          }
+        })
+      : null
+
     // Fetch modifier groups for this category
-    const modifierGroups = await masterPrisma.masterMenuCategoryModifier.findMany({
+    const modifierGroupRelations = await masterPrisma.masterMenuCategoryModifier.findMany({
       where: {
         menuCategoryCode: category.menuCategoryCode
       },
-      include: {
-        modifierGroup: {
+      select: {
+        modifierGroupCode: true
+      }
+    })
+
+    // Fetch modifier group details separately
+    const modifierGroupCodes = modifierGroupRelations.map(mg => mg.modifierGroupCode)
+    const modifierGroups = modifierGroupCodes.length > 0
+      ? await masterPrisma.masterModifierGroup.findMany({
+          where: {
+            modifierGroupCode: { in: modifierGroupCodes }
+          },
           select: {
             modifierGroupCode: true,
             groupName: true,
             labelName: true
           }
-        }
-      }
-    })
+        })
+      : []
 
     const categoryWithStringId = {
       ...mapMenuCategoryResponse(category),
-      tblMenuMasterId: Number(category.menuMaster.menuMasterId),
-      menuMaster: {
-        ...category.menuMaster,
-        menuMasterId: category.menuMaster.menuMasterId.toString()
-      },
+      tblMenuMasterId: menuMaster ? Number(menuMaster.menuMasterId) : null,
+      menuMaster: menuMaster ? {
+        ...menuMaster,
+        menuMasterId: menuMaster.menuMasterId.toString()
+      } : null,
       modifierGroups: modifierGroups.map((mg: any) => 
-        mg.modifierGroup.groupName || mg.modifierGroup.labelName || mg.modifierGroup.modifierGroupCode
+        mg.groupName || mg.labelName || mg.modifierGroupCode
       ) || [],
-      modifierGroupCodes: modifierGroups.map((mg: any) => mg.modifierGroup.modifierGroupCode) || []
+      modifierGroupCodes: modifierGroups.map((mg: any) => mg.modifierGroupCode) || []
     }
 
     return NextResponse.json(categoryWithStringId)

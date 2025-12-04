@@ -23,9 +23,10 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ storeCode: string; tableName: string }> }
 ) {
+  const resolvedParams = await params
+  const { storeCode, tableName } = resolvedParams
+  
   try {
-    const resolvedParams = await params
-    const { storeCode, tableName } = resolvedParams
 
     // Verify POS authentication
     const authResult = await verifyPOSClient(request, storeCode)
@@ -112,7 +113,7 @@ export async function GET(
       }
     })
   } catch (error: any) {
-    console.error(`Error fetching ${tableName} data:`, error)
+    console.error(`Error fetching table data for ${tableName}:`, error)
     return NextResponse.json(
       { error: 'Internal server error', message: error.message },
       { status: 500 }
@@ -128,9 +129,10 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ storeCode: string; tableName: string }> }
 ) {
+  const resolvedParams = await params
+  const { storeCode, tableName } = resolvedParams
+  
   try {
-    const resolvedParams = await params
-    const { storeCode, tableName } = resolvedParams
 
     // Verify POS authentication
     const authResult = await verifyPOSClient(request, storeCode)

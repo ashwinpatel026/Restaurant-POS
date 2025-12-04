@@ -18,63 +18,59 @@ export async function GET(
     const dealerId = BigInt(resolvedParams.id)
 
     const dealer = await masterPrisma.dealer.findUnique({
-      where: { dealerId },
-      include: {
-        company: {
-          select: {
-            companyId: true,
-            companyCode: true,
-            companyName: true
-          }
-        },
-        locations: {
-          where: { isActive: 1 },
-          select: {
-            locationId: true,
-            locationCode: true,
-            locationName: true,
-            storeCode: true,
-            isActive: true
-          }
-        },
-        users: {
-          where: { isActive: true },
-          select: {
-            userId: true,
-            email: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-            role: true,
-            accessLevel: true
-          }
-        },
-        _count: {
-          select: {
-            locations: true,
-            users: true
-          }
-        }
-      }
+      where: { dealerId }
     })
 
     if (!dealer) {
       return NextResponse.json({ error: 'Dealer not found' }, { status: 404 })
     }
 
+    // Fetch related data separately since relations are not defined
+    const [company, locations, users] = await Promise.all([
+      dealer.companyId ? masterPrisma.company.findUnique({
+        where: { companyId: dealer.companyId },
+        select: {
+          companyId: true,
+          companyCode: true,
+          companyName: true
+        }
+      }) : Promise.resolve(null),
+      masterPrisma.location.findMany({
+        where: { dealerId: dealer.dealerId, isActive: 1 },
+        select: {
+          locationId: true,
+          locationName: true,
+          storeCode: true,
+          isActive: true
+        }
+      }),
+      masterPrisma.user.findMany({
+        where: { dealerId: dealer.dealerId, isActive: true },
+        select: {
+          userId: true,
+          email: true,
+          username: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          accessLevel: true
+        }
+      })
+    ])
+
     return NextResponse.json({
       ...dealer,
       dealerId: dealer.dealerId.toString(),
-      companyId: dealer.companyId.toString(),
-      company: {
-        ...dealer.company,
-        companyId: dealer.company.companyId.toString()
-      },
-      locations: dealer.locations.map(l => ({
+      companyId: dealer.companyId?.toString() || null,
+      company: company ? {
+        ...company,
+        companyId: company.companyId.toString()
+      } : null,
+      locations: locations.map(l => ({
         ...l,
         locationId: l.locationId.toString()
       })),
-      users: dealer.users.map(u => ({
+      users: users.map(u => ({
         ...u,
         userId: u.userId.toString()
       }))
@@ -142,7 +138,7 @@ export async function PUT(
     }
 
     // Verify company exists if companyId is being changed
-    if (companyId && companyId !== existingDealer.companyId.toString()) {
+    if (companyId && companyId !== (existingDealer.companyId?.toString() || '')) {
       const company = await masterPrisma.company.findUnique({
         where: { companyId: BigInt(companyId) }
       })
