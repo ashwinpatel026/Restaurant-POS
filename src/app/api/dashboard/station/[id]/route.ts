@@ -156,6 +156,9 @@ export async function PUT(
       isBill: isBill ?? false,
       isReport: isReport ?? false,
       ipAddress: ipAddress || null,
+      // Set updatedBy to current user ID
+      updatedBy: BigInt(parseInt(session.user.id)),
+      updatedOn: new Date(),
       // Keep original storeCode; if missing, set to currently selected store
       storeCode: existingStation.storeCode || selectedStoreCode,
       // Mark updates from dashboard/location

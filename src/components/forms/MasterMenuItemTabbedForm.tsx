@@ -35,6 +35,7 @@ export default function MasterMenuItemTabbedForm({
     description: "",
     itemSize: "",
     skuPlu: "",
+    barcode: "",
     itemContainAlcohol: 0,
     menuImg: "",
     priceStrategy: 1, // 1=Base Price, 3=Open Price
@@ -173,6 +174,7 @@ export default function MasterMenuItemTabbedForm({
         description: menuItem.description || menuItem.descrip || "",
         itemSize: menuItem.itemSize || "",
         skuPlu: menuItem.skuPlu?.toString() || "",
+        barcode: menuItem.barcode || "",
         itemContainAlcohol:
           menuItem.itemContainAlcohol ?? menuItem.isAlcohol ?? 0,
         menuImg: menuItem.menuImg || "",
@@ -423,6 +425,7 @@ export default function MasterMenuItemTabbedForm({
       const submitData = {
         ...formData,
         skuPlu: formData.skuPlu ? formData.skuPlu : null,
+        barcode: formData.barcode || null,
         priceStrategy: formData.priceStrategy
           ? parseInt(formData.priceStrategy.toString())
           : null,
@@ -1276,7 +1279,7 @@ export default function MasterMenuItemTabbedForm({
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Calories
@@ -1304,6 +1307,22 @@ export default function MasterMenuItemTabbedForm({
                     }
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Enter SKU/PLU"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Barcode
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.barcode}
+                    onChange={(e) =>
+                      setFormData({ ...formData, barcode: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Enter barcode"
+                    maxLength={100}
                   />
                 </div>
 

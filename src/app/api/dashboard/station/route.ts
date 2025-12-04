@@ -178,6 +178,9 @@ export async function POST(request: NextRequest) {
       isReport: isReport ?? false,
       ipAddress: ipAddress || null,
       storeCode: selectedStoreCode,
+      // Set createdBy to current user ID
+      createdBy: parseInt(session.user.id),
+      createdOn: new Date(),
       // Mark records created from dashboard/location
       syncSource: 'location',
     }

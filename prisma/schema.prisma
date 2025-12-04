@@ -234,6 +234,7 @@ model MenuItem {
   description                    String?   @map("description")
   itemSize                       String?   @map("item_size") @db.VarChar(50)
   skuPlu                         BigInt?   @map("sku_plu")
+  barcode                        String?   @map("barcode") @db.VarChar(100)
   isAlcohol                      Int       @default(0) @map("is_alcohol")
   menuImg                        String?   @map("menu_img")
   priceStrategy                  Int?      @map("price_strategy") // 1=Base Price, 3=Open Price
@@ -433,6 +434,10 @@ model Station {
   isBill        Boolean @default(false) @map("is_bill")
   isReport      Boolean @default(false) @map("is_report")
   ipAddress     String? @map("ip_address") @db.VarChar(50)
+  createdBy     Int?      @map("createdby")
+  createdOn     DateTime  @default(now()) @map("createdon")
+  updatedBy     BigInt?   @map("updatedby")
+  updatedOn     DateTime? @map("updatedon")
   isSyncToWeb   Int     @default(0) @map("is_sync_to_web")
   isSyncToLocal Int     @default(0) @map("is_sync_to_local")
   storeCode     String? @map("store_code") @db.VarChar(100)

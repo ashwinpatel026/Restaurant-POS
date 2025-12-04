@@ -250,9 +250,22 @@ export async function DELETE(
 
     // Check if category has any menu items
     // Use menuCategoryCode (string) instead of ID since MenuItem references by code
-    const itemsCount = await prisma.menuItem.count({
-      where: { menuCategoryCode: category.menuCategoryCode }
-    })
+    // menuCategoryCode is stored as JSON (string or array), so we need to use raw SQL
+    const categoryCodeStr = category.menuCategoryCode
+    const itemsCountResult = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*) as count
+      FROM tbl_menu_item
+      WHERE menu_category_code IS NOT NULL
+        AND (
+          menu_category_code::text = ${JSON.stringify(categoryCodeStr)}
+          OR (jsonb_typeof(menu_category_code::jsonb) = 'array' 
+              AND EXISTS (
+                SELECT 1 FROM jsonb_array_elements_text(menu_category_code::jsonb) AS elem
+                WHERE elem = ${categoryCodeStr}
+              ))
+        )
+    `
+    const itemsCount = Number(itemsCountResult[0]?.count || 0)
 
     // If category has menu items, prevent deletion
     if (itemsCount > 0) {

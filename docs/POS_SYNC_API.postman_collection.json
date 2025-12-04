@@ -1,0 +1,434 @@
+{
+  "info": {
+    "name": "POS Location Sync API",
+    "description": "Complete collection for testing POS Location Sync APIs",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Generate JWT Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set(\"jwt_token\", response.token);",
+                  "    pm.environment.set(\"jwt_token_expiry\", response.expiresAt);",
+                  "    console.log(\"JWT Token saved to environment\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"storeCode\": \"{{store_code}}\",\n  \"expiresIn\": \"24h\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/pos/auth/generate-token",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pos", "auth", "generate-token"]
+            }
+          }
+        },
+        {
+          "name": "Get Location Info (API Key)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"Response has location data\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('location');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/pos/sync/location/{{store_code}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pos", "sync", "location", "{{store_code}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Location Info (JWT Token)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/pos/sync/location/{{store_code}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pos", "sync", "location", "{{store_code}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Location Info",
+      "item": [
+        {
+          "name": "GET Location Info",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/pos/sync/location/{{store_code}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pos", "sync", "location", "{{store_code}}"]
+            }
+          }
+        },
+        {
+          "name": "POST Location Update",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+1987654321\",\n  \"email\": \"updated@example.com\",\n  \"addressLine1\": \"456 Updated St\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/pos/sync/location/{{store_code}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pos", "sync", "location", "{{store_code}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Comprehensive Data Sync",
+      "item": [
+        {
+          "name": "GET All Store Data (Full Sync)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.lastSyncAt) {",
+                  "        pm.environment.set(\"last_sync_at\", jsonData.lastSyncAt);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/pos/sync/location/{{store_code}}/data",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pos", "sync", "location", "{{store_code}}", "data"]
+            }
+          }
+        },
+        {
+          "name": "GET All Store Data (Incremental)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/pos/sync/location/{{store_code}}/data?incremental=true&lastSyncAt={{last_sync_at}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pos", "sync", "location", "{{store_code}}", "data"],
+              "query": [
+                {
+                  "key": "incremental",
+                  "value": "true"
+                },
+                {
+                  "key": "lastSyncAt",
+                  "value": "{{last_sync_at}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST Bulk Data Update",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"menu_items\": [\n      {\n        \"menuItemCode\": \"MI001\",\n        \"name\": \"Updated Burger\",\n        \"cashPrice\": 12.99,\n        \"cardPrice\": 13.99,\n        \"storeCode\": \"{{store_code}}\"\n      }\n    ],\n    \"orders\": [\n      {\n        \"orderNumber\": \"ORD001\",\n        \"orderType\": \"DINE_IN\",\n        \"status\": \"PENDING\",\n        \"subtotal\": 25.50,\n        \"storeCode\": \"{{store_code}}\"\n      }\n    ]\n  },\n  \"conflictStrategy\": \"{{conflict_strategy}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/pos/sync/location/{{store_code}}/data",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pos", "sync", "location", "{{store_code}}", "data"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Table-Specific Sync",
+      "item": [
+        {
+          "name": "GET Menu Items",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/pos/sync/location/{{store_code}}/menu_items",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pos", "sync", "location", "{{store_code}}", "menu_items"]
+            }
+          }
+        },
+        {
+          "name": "GET Menu Items (Pagination)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/pos/sync/location/{{store_code}}/menu_items?limit={{default_limit}}&offset={{default_offset}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pos", "sync", "location", "{{store_code}}", "menu_items"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "{{default_limit}}"
+                },
+                {
+                  "key": "offset",
+                  "value": "{{default_offset}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST Menu Item (Upsert)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"menuItemCode\": \"MI999\",\n    \"name\": \"New Item from POS\",\n    \"cashPrice\": 9.99,\n    \"cardPrice\": 10.99,\n    \"isActive\": 1,\n    \"storeCode\": \"{{store_code}}\"\n  },\n  \"operation\": \"upsert\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/pos/sync/location/{{store_code}}/menu_items",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pos", "sync", "location", "{{store_code}}", "menu_items"]
+            }
+          }
+        },
+        {
+          "name": "POST Menu Item (Delete)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"syncId\": \"uuid-to-delete\"\n  },\n  \"operation\": \"delete\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/pos/sync/location/{{store_code}}/menu_items",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pos", "sync", "location", "{{store_code}}", "menu_items"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Conflict Resolution",
+      "item": [
+        {
+          "name": "Test POS-Wins Strategy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"menuItemCode\": \"MI001\",\n    \"name\": \"POS Always Wins\",\n    \"cashPrice\": 15.99\n  },\n  \"conflictStrategy\": \"pos-wins\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/pos/sync/location/{{store_code}}/menu_items",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pos", "sync", "location", "{{store_code}}", "menu_items"]
+            }
+          }
+        },
+        {
+          "name": "Test Server-Wins Strategy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"menuItemCode\": \"MI001\",\n    \"name\": \"POS Update\"\n  },\n  \"conflictStrategy\": \"server-wins\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/pos/sync/location/{{store_code}}/menu_items",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pos", "sync", "location", "{{store_code}}", "menu_items"]
+            }
+          }
+        },
+        {
+          "name": "Test Last-Write-Wins Strategy",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-api-key",
+                "value": "{{api_key}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": {\n    \"menuItemCode\": \"MI001\",\n    \"name\": \"POS Update\",\n    \"updatedOn\": \"2024-01-15T11:00:00Z\"\n  },\n  \"conflictStrategy\": \"last-write-wins\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/pos/sync/location/{{store_code}}/menu_items",
+              "host": ["{{base_url}}"],
+              "path": ["api", "pos", "sync", "location", "{{store_code}}", "menu_items"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "conflict_strategy",
+      "value": "last-write-wins"
+    },
+    {
+      "key": "default_limit",
+      "value": "50"
+    },
+    {
+      "key": "default_offset",
+      "value": "0"
+    }
+  ]
+}
+

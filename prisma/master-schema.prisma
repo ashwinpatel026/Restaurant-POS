@@ -389,6 +389,7 @@ model MasterMenuItem {
   description                    String?   @map("description")
   itemSize                       String?   @map("item_size") @db.VarChar(50)
   skuPlu                         BigInt?   @map("sku_plu")
+  barcode                        String?   @map("barcode") @db.VarChar(100)
   isAlcohol                      Int       @default(0) @map("is_alcohol")
   menuImg                        String?   @map("menu_img")
   priceStrategy                  Int?      @map("price_strategy") // 1=Base Price, 3=Open Price

@@ -162,6 +162,7 @@ export const SYNC_FIELD_MAP: Record<string, Record<string, string>> = {
     'description': 'description',
     'item_size': 'item_size',
     'sku_plu': 'sku_plu',
+    'barcode': 'barcode',
     'is_alcohol': 'is_alcohol',
     'menu_img': 'menu_img',
     'price_strategy': 'price_strategy',
