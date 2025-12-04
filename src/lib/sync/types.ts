@@ -4,7 +4,7 @@
  */
 
 export type SyncOperation = 'INSERT' | 'UPDATE' | 'DELETE';
-export type SyncSource = 'server' | 'terminal' | 'website';
+export type SyncSource = 'server' | 'terminal' | 'website' | 'location';
 export type SyncStatus = 0 | 1 | 2; // 0=pending, 1=processed, 2=failed
 
 export interface SyncLogEntry {

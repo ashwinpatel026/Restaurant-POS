@@ -10,6 +10,7 @@ declare module 'next-auth' {
       outletId: string | null
       accessLevel: string | null
       defaultStoreCode: string | null
+      type?: string // Optional field to distinguish user types (e.g., 'master_admin')
     }
   }
 
@@ -21,6 +22,7 @@ declare module 'next-auth' {
     outletId: string | null
     accessLevel: string | null
     defaultStoreCode: string | null
+    type?: string // Optional field to distinguish user types (e.g., 'master_admin')
   }
 }
 
@@ -31,6 +33,7 @@ declare module 'next-auth/jwt' {
     outletId: string | null
     accessLevel: string | null
     defaultStoreCode: string | null
+    type?: string // Optional field to distinguish user types (e.g., 'master_admin')
   }
 }
 

@@ -44,41 +44,64 @@ export interface UserWithAccess {
 export async function getUserWithAccess(userId: number): Promise<UserWithAccess | null> {
   try {
     const user = await masterPrisma.user.findUnique({
-      where: { userId: BigInt(userId) },
-      include: {
-        company: {
-          include: {
-            locations: {
-              select: {
-                locationId: true,
-                storeCode: true,
-                isActive: true
-              }
-            }
-          }
-        },
-        dealer: {
-          include: {
-            locations: {
-              select: {
-                locationId: true,
-                storeCode: true,
-                isActive: true
-              }
-            }
-          }
-        },
-        location: {
+      where: { userId: BigInt(userId) }
+    })
+
+    if (!user) return null
+
+    // Fetch related data separately since relations are not defined
+    const [company, dealer, location] = await Promise.all([
+      user.companyId ? masterPrisma.company.findUnique({
+        where: { companyId: user.companyId },
+        select: {
+          companyId: true,
+          companyCode: true
+        }
+      }).then(async (c) => {
+        if (!c) return null
+        const locations = await masterPrisma.location.findMany({
+          where: { companyId: c.companyId, isActive: 1 },
           select: {
             locationId: true,
             storeCode: true,
             isActive: true
           }
+        })
+        return {
+          ...c,
+          locations
         }
-      }
-    })
-
-    if (!user) return null
+      }) : Promise.resolve(null),
+      user.dealerId ? masterPrisma.dealer.findUnique({
+        where: { dealerId: user.dealerId },
+        select: {
+          dealerId: true,
+          dealerCode: true
+        }
+      }).then(async (d) => {
+        if (!d) return null
+        const locations = await masterPrisma.location.findMany({
+          where: { dealerId: d.dealerId, isActive: 1 },
+          select: {
+            locationId: true,
+            storeCode: true,
+            isActive: true
+          }
+        })
+        return {
+          ...d,
+          locations
+        }
+      }) : Promise.resolve(null),
+      user.locationId ? masterPrisma.location.findUnique({
+        where: { locationId: user.locationId },
+        select: {
+          locationId: true,
+          storeCode: true,
+          isActive: true
+        }
+      }) : Promise.resolve(null)
+    ])
 
     return {
       userId: user.userId,
@@ -88,9 +111,9 @@ export async function getUserWithAccess(userId: number): Promise<UserWithAccess 
       locationId: user.locationId,
       accessLevel: user.accessLevel as AccessLevel,
       role: user.role,
-      company: user.company,
-      dealer: user.dealer,
-      location: user.location
+      company: company as any,
+      dealer: dealer as any,
+      location
     }
   } catch (error) {
     console.error('Error fetching user with access:', error)

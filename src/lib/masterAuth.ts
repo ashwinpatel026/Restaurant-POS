@@ -46,6 +46,9 @@ export const masterAuthOptions: NextAuthOptions = {
           email: admin.email,
           name: `${admin.firstName} ${admin.lastName}`,
           role: admin.role,
+          outletId: null, // Master admin doesn't belong to a location
+          accessLevel: null, // Master admin doesn't have access level
+          defaultStoreCode: null, // Master admin doesn't have default store
           type: 'master_admin' // Distinguish from location users
         }
       }

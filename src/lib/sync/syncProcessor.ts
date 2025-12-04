@@ -386,6 +386,9 @@ export class SyncProcessor {
     // This allows multiple users to be assigned to the same store_code (location)
     const isUserTable = tableName === 'tbl_user' || tableName === 'tbl_user_store_access';
     let existingRecordSyncId: string | null = null;
+    
+    // Get primary code field for use in DELETE case and other operations
+    const primaryCodeField = this.getPrimaryCodeField(tableName);
 
     if (isUserTable) {
       // For user tables, check by sync_id only (not by code + store_code)
@@ -402,7 +405,6 @@ export class SyncProcessor {
       }
     } else {
       // For other tables, check by primary code + store_code
-      const primaryCodeField = this.getPrimaryCodeField(tableName);
       
       if (primaryCodeField && mappedData[primaryCodeField]) {
         // Check if record with same code already exists for this store_code
@@ -1136,7 +1138,7 @@ export class SyncProcessor {
           `);
           
           if (!masterUser || masterUser.length === 0 || !masterUser[0].sync_id) {
-            return `User with user_id ${masterUserId} not found in master database or missing sync_id`;
+            throw new Error(`User with user_id ${masterUserId} not found in master database or missing sync_id`);
           }
           
           const userSyncId = masterUser[0].sync_id;
@@ -1150,10 +1152,10 @@ export class SyncProcessor {
           
           const count = userExists[0]?.count || BigInt(0);
           if (count === BigInt(0)) {
-            return `User with sync_id ${userSyncId} not found in location database. User must be synced first.`;
+            throw new Error(`User with sync_id ${userSyncId} not found in location database. User must be synced first.`);
           }
         } catch (error: any) {
-          return `Error validating user dependency: ${error.message}`;
+          throw new Error(`Error validating user dependency: ${error.message}`);
         }
         continue; // Skip the normal validation for user dependency
       }
@@ -1249,7 +1251,7 @@ export class SyncProcessor {
     }
 
     // Insert new record
-    let insertData = {
+    let insertData: any = {
       ...data,
       sync_id: syncId,
       sync_source: syncSource,
