@@ -248,7 +248,7 @@ export async function DELETE(
       }
     }
 
-    // Check if category has any menu item
+    // Check if category has any menu items
     // Use menuCategoryCode (string) instead of ID since MenuItem references by code
     // menuCategoryCode is stored as JSON (string or array), so we need to use raw SQL
     const categoryCodeStr = category.menuCategoryCode
