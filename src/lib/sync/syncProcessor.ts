@@ -274,8 +274,10 @@ export class SyncProcessor {
       targetLocationCode
     );
     
-    // Set target store_code
-    mappedData.store_code = targetLocationCode;
+    // Set target store_code (skip for users table - it doesn't have store_code column)
+    if (locationTableName !== 'users') {
+      mappedData.store_code = targetLocationCode;
+    }
     
     console.log(`Mapped data for ${tableName} -> ${locationTableName} (${sourceLocationCode} -> ${targetLocationCode}):`, Object.keys(mappedData));
 
@@ -293,28 +295,99 @@ export class SyncProcessor {
       throw new Error(fkValidationError);
     }
 
-    // Get the primary code field for this table to check for existing records
-    const primaryCodeField = this.getPrimaryCodeField(tableName);
-    if (!primaryCodeField || !mappedData[primaryCodeField]) {
-      throw new Error(`Cannot determine primary code field for table ${tableName}`);
+    // Special handling for user tables (they don't have primary code fields)
+    const isUserTable = tableName === 'tbl_user' || tableName === 'tbl_user_store_access';
+    let existing;
+    
+    if (isUserTable && tableName === 'tbl_user') {
+      // For users table, check by email (since it's the unique identifier)
+      // Users table doesn't have store_code column
+      const escapedEmail = String(mappedData.email || '').replace(/'/g, "''");
+      existing = await locationPrisma.$queryRawUnsafe(`
+        SELECT sync_id FROM ${locationTableName}
+        WHERE email = '${escapedEmail}'::VARCHAR
+      `);
+    } else if (isUserTable && tableName === 'tbl_user_store_access') {
+      // For location-to-location sync of tbl_user_store_access:
+      // 1. Get user from source location by user_id
+      // 2. Check if user role is SUPER_ADMIN (only sync SUPER_ADMIN)
+      // 3. Find same user in target location by sync_id
+      // 4. Create new entry with target location user_id, store_code, is_default = false
+      const sourceUserId = mappedData.user_id; // user_id from source location
+      const escapedStoreCode = targetLocationCode.replace(/'/g, "''");
+      
+      try {
+        // Get user from source location database to check role
+        const sourceUser = await locationPrisma.$queryRawUnsafe<any[]>(`
+          SELECT id, role, sync_id FROM users WHERE id = ${sourceUserId}::INTEGER LIMIT 1
+        `);
+
+        if (!sourceUser || sourceUser.length === 0) {
+          throw new Error(`User with id ${sourceUserId} not found in source location database`);
+        }
+
+        const userRole = sourceUser[0].role;
+        
+        // Only sync SUPER_ADMIN users
+        if (userRole !== 'SUPER_ADMIN') {
+          console.log(`Skipping user ${sourceUserId} - role is ${userRole}, only SUPER_ADMIN users are synced for store access`);
+          throw new Error(`User role is ${userRole}, only SUPER_ADMIN users are synced`);
+        }
+
+        const userSyncId = sourceUser[0].sync_id;
+        if (!userSyncId) {
+          throw new Error(`User ${sourceUserId} has no sync_id`);
+        }
+
+        // Find same user in target location by sync_id
+        const targetUser = await locationPrisma.$queryRawUnsafe<any[]>(`
+          SELECT id FROM users WHERE sync_id = '${userSyncId}'::UUID LIMIT 1
+        `);
+
+        if (!targetUser || targetUser.length === 0) {
+          throw new Error(`User with sync_id ${userSyncId} not found in target location database. User must exist in target location.`);
+        }
+
+        const targetUserId = targetUser[0].id;
+        
+        // Check if store access already exists in target location
+        existing = await locationPrisma.$queryRawUnsafe(`
+          SELECT sync_id FROM ${locationTableName}
+          WHERE user_id = ${targetUserId}::INTEGER
+            AND store_code = '${escapedStoreCode}'::VARCHAR
+        `);
+        
+        // Store target user_id for later use in insert
+        mappedData.user_id = targetUserId; // Replace with target location user_id
+        mappedData.store_code = targetLocationCode; // Set target store_code
+        mappedData.is_default = false; // Always set to false for new entries
+      } catch (error: any) {
+        console.error('Error checking user_store_access for location-to-location sync:', error);
+        throw error; // Re-throw to skip this record
+      }
+    } else {
+      // For other tables, get the primary code field and check by code and store_code
+      const primaryCodeField = this.getPrimaryCodeField(tableName);
+      if (!primaryCodeField || !mappedData[primaryCodeField]) {
+        throw new Error(`Cannot determine primary code field for table ${tableName}`);
+      }
+
+      const primaryCodeValue = mappedData[primaryCodeField];
+      const escapedCode = String(primaryCodeValue).replace(/'/g, "''");
+      const escapedStoreCode = targetLocationCode.replace(/'/g, "''");
+
+      existing = await locationPrisma.$queryRawUnsafe(`
+        SELECT sync_id FROM ${locationTableName}
+        WHERE "${primaryCodeField}" = '${escapedCode}'::VARCHAR
+          AND store_code = '${escapedStoreCode}'::VARCHAR
+      `);
     }
-
-    const primaryCodeValue = mappedData[primaryCodeField];
-    const escapedCode = String(primaryCodeValue).replace(/'/g, "''");
-    const escapedStoreCode = targetLocationCode.replace(/'/g, "''");
-
-    // Check if record with same code already exists in target location
-    const existing = await locationPrisma.$queryRawUnsafe(`
-      SELECT sync_id FROM ${locationTableName}
-      WHERE "${primaryCodeField}" = '${escapedCode}'::VARCHAR
-        AND store_code = '${escapedStoreCode}'::VARCHAR
-    `);
 
     const recordExists = existing && (existing as any[]).length > 0;
 
     if (cloneMode === 'merge' && recordExists) {
       // In merge mode, skip existing records
-      console.log(`Skipping existing record with ${primaryCodeField} = ${primaryCodeValue} in merge mode`);
+      console.log(`Skipping existing record in merge mode for table ${tableName}`);
       return;
     }
 
@@ -322,25 +395,72 @@ export class SyncProcessor {
     const newSyncId = randomUUID();
 
     if (recordExists && cloneMode === 'clone') {
-      // In clone mode, update existing record by code
-      await this.handleUpdateByCode(
-        locationTableName,
-        primaryCodeField,
-        primaryCodeValue,
-        mappedData,
-        newSyncId,
-        'location',
-        targetLocationCode
-      );
+      // In clone mode, update existing record
+      if (isUserTable && tableName === 'tbl_user') {
+        // For users table, update by email
+        const escapedEmail = String(mappedData.email || '').replace(/'/g, "''");
+        await locationPrisma.$executeRawUnsafe(`
+          UPDATE ${locationTableName}
+          SET sync_id = '${newSyncId}'::UUID,
+              sync_source = 'location'::VARCHAR
+          WHERE email = '${escapedEmail}'::VARCHAR
+        `);
+      } else if (isUserTable && tableName === 'tbl_user_store_access') {
+        // For tbl_user_store_access, use UPSERT to handle unique constraint
+        // User_id and store_code are already mapped for location-to-location sync
+        const targetUserId = mappedData.user_id;
+        const escapedStoreCode = targetLocationCode.replace(/'/g, "''");
+        
+        // Use UPSERT for tbl_user_store_access
+        await locationPrisma.$executeRawUnsafe(`
+          INSERT INTO tbl_user_store_access (user_id, store_code, is_default, sync_id, sync_source)
+          VALUES (${targetUserId}::INTEGER, '${escapedStoreCode}'::VARCHAR, false, '${newSyncId}'::UUID, 'location'::VARCHAR)
+          ON CONFLICT (user_id, store_code) 
+          DO UPDATE SET
+            is_default = false,
+            sync_id = '${newSyncId}'::UUID,
+            sync_source = 'location'::VARCHAR
+        `);
+      } else {
+        // For other tables, update by code
+        const primaryCodeField = this.getPrimaryCodeField(tableName);
+        const primaryCodeValue = mappedData[primaryCodeField!];
+        await this.handleUpdateByCode(
+          locationTableName,
+          primaryCodeField!,
+          primaryCodeValue,
+          mappedData,
+          newSyncId,
+          'location',
+          targetLocationCode
+        );
+      }
     } else {
       // Insert new record with new sync_id
-      await this.handleInsert(
-        locationTableName,
-        newSyncId,
-        mappedData,
-        'location',
-        targetLocationCode
-      );
+      if (isUserTable && tableName === 'tbl_user_store_access') {
+        // For tbl_user_store_access in location-to-location sync, create entry directly
+        const targetUserId = mappedData.user_id;
+        const escapedStoreCode = targetLocationCode.replace(/'/g, "''");
+        
+        // Use UPSERT for tbl_user_store_access
+        await locationPrisma.$executeRawUnsafe(`
+          INSERT INTO tbl_user_store_access (user_id, store_code, is_default, sync_id, sync_source)
+          VALUES (${targetUserId}::INTEGER, '${escapedStoreCode}'::VARCHAR, false, '${newSyncId}'::UUID, 'location'::VARCHAR)
+          ON CONFLICT (user_id, store_code) 
+          DO UPDATE SET
+            is_default = false,
+            sync_id = '${newSyncId}'::UUID,
+            sync_source = 'location'::VARCHAR
+        `);
+      } else {
+        await this.handleInsert(
+          locationTableName,
+          newSyncId,
+          mappedData,
+          'location',
+          targetLocationCode
+        );
+      }
     }
   }
 
@@ -1370,6 +1490,16 @@ export class SyncProcessor {
       // Skip undefined values
       if (value === undefined) continue;
       
+      // Skip store_code for users table (it doesn't have that column)
+      if (tableName === 'users' && (key === 'store_code' || key === 'storecode')) {
+        continue;
+      }
+      
+      // Skip created_on for tbl_user_store_access (location DB uses created_at with default)
+      if (tableName === 'tbl_user_store_access' && (key === 'created_on' || key === 'createdon')) {
+        continue;
+      }
+      
       // Use double quotes for column names to handle case sensitivity
       columns.push(`"${key}"`);
       
@@ -1977,11 +2107,31 @@ export class SyncProcessor {
       if (val === null) {
         setParts.push(`${quotedKey} = NULL`);
       } else if (typeof val === 'boolean') {
-        if (this.BOOLEAN_COLUMNS.has(key)) {
+        // Check table-specific column types first
+        const isTableBoolean = this.TABLE_BOOLEAN_COLUMNS[tableName]?.has(key);
+        const isTableInteger = this.TABLE_INTEGER_COLUMNS[tableName]?.has(key);
+        const isBooleanColumn = isTableBoolean || (!isTableInteger && this.BOOLEAN_COLUMNS.has(key));
+        
+        if (isBooleanColumn) {
           setParts.push(`${quotedKey} = ${val ? 'true' : 'false'}`);
         } else {
+          // Convert to integer (0 or 1)
           setParts.push(`${quotedKey} = ${val ? '1' : '0'}`);
         }
+      } else if (this.TABLE_INTEGER_COLUMNS[tableName]?.has(key)) {
+        // Handle integer columns (like is_default in tbl_modifier_item)
+        let intVal: number;
+        if (typeof val === 'boolean') {
+          intVal = val ? 1 : 0;
+        } else if (typeof val === 'number') {
+          intVal = val;
+        } else if (typeof val === 'string') {
+          const normalized = val.toLowerCase().trim();
+          intVal = (normalized === 'true' || normalized === '1') ? 1 : 0;
+        } else {
+          intVal = val ? 1 : 0;
+        }
+        setParts.push(`${quotedKey} = ${intVal}`);
       } else if (this.BOOLEAN_COLUMNS.has(key)) {
         if (typeof val === 'number') {
           setParts.push(`${quotedKey} = ${val ? 'true' : 'false'}`);
@@ -2023,11 +2173,24 @@ export class SyncProcessor {
     const escapedLocationCode = locationCode.replace(/'/g, "''");
 
     try {
+      // Skip store_code in WHERE clause for tables that don't have it (like users table)
+      const locationTableName = SYNC_TABLE_MAP[tableName] || tableName;
+      const isUserTable = locationTableName === 'users';
+      
+      let whereClause: string;
+      if (isUserTable) {
+        // For users table, don't use store_code in WHERE clause
+        whereClause = `"${codeField}" = '${escapedCode}'::VARCHAR`;
+      } else {
+        // For other tables, use store_code in WHERE clause
+        whereClause = `"${codeField}" = '${escapedCode}'::VARCHAR
+          AND store_code = '${escapedLocationCode}'::VARCHAR`;
+      }
+      
       await locationPrisma.$executeRawUnsafe(`
-        UPDATE ${tableName}
+        UPDATE ${locationTableName}
         SET ${setClause}
-        WHERE "${codeField}" = '${escapedCode}'::VARCHAR
-          AND store_code = '${escapedLocationCode}'::VARCHAR
+        WHERE ${whereClause}
       `);
     } catch (error: any) {
       console.error(`Failed to update ${tableName} by ${codeField}:`, error);

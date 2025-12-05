@@ -552,6 +552,13 @@ export class SyncService {
           continue;
         }
 
+        // Skip tbl_user table entirely for location-to-location sync
+        // Users are not synced between locations, only store access for SUPER_ADMIN is handled
+        if (masterTableName === 'tbl_user') {
+          console.log(`Skipping tbl_user table for location-to-location sync`);
+          continue;
+        }
+
         const tableResult = await this.cloneLocationTable(
           sourceLocationCode,
           targetLocationCode,
@@ -636,9 +643,16 @@ export class SyncService {
     };
 
     try {
-      // Get order by column
-      const orderByColumn = SYNC_ORDER_BY_COLUMN[masterTableName] || 'createdon';
+      // Get order by column - map master column names to location column names
+      let orderByColumn = SYNC_ORDER_BY_COLUMN[masterTableName] || 'createdon';
+      // Fix column name mismatches: master has created_on, location has created_at
+      if (orderByColumn === 'created_on' && locationTableName === 'tbl_user_store_access') {
+        orderByColumn = 'created_at'; // Location DB uses created_at
+      }
       const escapedSourceCode = sourceLocationCode.replace(/'/g, "''");
+
+      // Check if table has store_code column (users table doesn't have it)
+      const isUserTable = locationTableName === 'users' || locationTableName === 'tbl_user_store_access';
 
       // First, check total records in table for debugging
       const totalCount = await locationPrisma.$queryRawUnsafe<[{ count: bigint }]>(`
@@ -646,28 +660,227 @@ export class SyncService {
       `);
       console.log(`Total records in ${locationTableName}: ${totalCount[0]?.count || 0}`);
 
-      // Check records with any store_code for debugging
-      const anyStoreCodeCount = await locationPrisma.$queryRawUnsafe<[{ count: bigint }]>(`
-        SELECT COUNT(*) as count FROM ${locationTableName}
-        WHERE store_code IS NOT NULL
-      `);
-      console.log(`Records with store_code in ${locationTableName}: ${anyStoreCodeCount[0]?.count || 0}`);
+      // Check records with any store_code for debugging (skip for users table)
+      if (!isUserTable || locationTableName === 'tbl_user_store_access') {
+        try {
+          const anyStoreCodeCount = await locationPrisma.$queryRawUnsafe<[{ count: bigint }]>(`
+            SELECT COUNT(*) as count FROM ${locationTableName}
+            WHERE store_code IS NOT NULL
+          `);
+          console.log(`Records with store_code in ${locationTableName}: ${anyStoreCodeCount[0]?.count || 0}`);
 
-      // Check distinct store_codes for debugging
-      const distinctStores = await locationPrisma.$queryRawUnsafe<[{ store_code: string }]>(`
-        SELECT DISTINCT store_code FROM ${locationTableName}
-        WHERE store_code IS NOT NULL
-        LIMIT 10
-      `);
-      console.log(`Sample store_codes in ${locationTableName}:`, distinctStores.map(s => s.store_code));
+          // Check distinct store_codes for debugging
+          const distinctStores = await locationPrisma.$queryRawUnsafe<[{ store_code: string }]>(`
+            SELECT DISTINCT store_code FROM ${locationTableName}
+            WHERE store_code IS NOT NULL
+            LIMIT 10
+          `);
+          console.log(`Sample store_codes in ${locationTableName}:`, distinctStores.map(s => s.store_code));
+        } catch (error) {
+          // Ignore errors for tables without store_code
+          console.warn(`Could not check store_code for ${locationTableName}:`, error);
+        }
+      }
+
+      // Special handling for tbl_user_store_access: only sync SUPER_ADMIN users
+      if (masterTableName === 'tbl_user_store_access') {
+        // Fetch tbl_user_store_access records with user role JOIN
+        // Only sync SUPER_ADMIN users for location-to-location sync
+        const storeAccessRecords = await locationPrisma.$queryRawUnsafe<any[]>(`
+          SELECT 
+            usa.*,
+            u.role as user_role,
+            u.sync_id as user_sync_id
+          FROM "${locationTableName}" usa
+          INNER JOIN users u ON usa.user_id = u.id
+          WHERE usa.store_code = '${escapedSourceCode}'
+            AND u.role = 'SUPER_ADMIN'
+          ORDER BY usa."${orderByColumn}" DESC
+        `);
+
+        console.log(`Found ${storeAccessRecords.length} SUPER_ADMIN user store access records for source location ${sourceLocationCode}`);
+
+        if (storeAccessRecords.length === 0) {
+          result.completedAt = new Date();
+          result.duration = Date.now() - startTime;
+          return result;
+        }
+
+        // Process each SUPER_ADMIN user store access record
+        for (const record of storeAccessRecords) {
+          try {
+            const sourceUserId = record.user_id;
+            const userSyncId = record.user_sync_id;
+
+            // Step 1: Get master user_id from master database using sync_id
+            const masterUser = await masterPrisma.$queryRawUnsafe<any[]>(`
+              SELECT user_id FROM tbl_user WHERE sync_id = '${userSyncId}'::UUID LIMIT 1
+            `);
+
+            if (!masterUser || masterUser.length === 0) {
+              console.warn(`User with sync_id ${userSyncId} not found in master database, skipping`);
+              result.recordsProcessed++;
+              result.recordsFailed++;
+              result.errors.push({
+                recordId: record.sync_id || '',
+                operation: 'INSERT',
+                error: `User with sync_id ${userSyncId} not found in master database`,
+                tableName: masterTableName,
+              });
+              continue;
+            }
+
+            const masterUserId = masterUser[0].user_id;
+            
+            // Step 2: Get location_id from master database using target store_code
+            const targetLocation = await masterPrisma.$queryRawUnsafe<any[]>(`
+              SELECT location_id FROM tbl_location WHERE store_code = '${targetLocationCode.replace(/'/g, "''")}'::VARCHAR LIMIT 1
+            `);
+
+            if (!targetLocation || targetLocation.length === 0) {
+              console.warn(`Location with store_code ${targetLocationCode} not found in master database, skipping`);
+              result.recordsProcessed++;
+              result.recordsFailed++;
+              result.errors.push({
+                recordId: record.sync_id || '',
+                operation: 'INSERT',
+                error: `Location with store_code ${targetLocationCode} not found in master database`,
+                tableName: masterTableName,
+              });
+              continue;
+            }
+
+            const targetLocationId = targetLocation[0].location_id;
+            const escapedTargetStoreCode = targetLocationCode.replace(/'/g, "''");
+            const masterSyncId = randomUUID();
+
+            // Step 3: Check if record exists in master database
+            const existingInMaster = await masterPrisma.$queryRawUnsafe<any[]>(`
+              SELECT id FROM tbl_user_store_access
+              WHERE user_id = ${BigInt(masterUserId)}::BIGINT
+                AND store_code = '${escapedTargetStoreCode}'::VARCHAR
+              LIMIT 1
+            `);
+
+            // Step 4: If not exists, insert into master database first
+            if (!existingInMaster || existingInMaster.length === 0) {
+              await masterPrisma.$executeRawUnsafe(`
+                INSERT INTO tbl_user_store_access (user_id, location_id, store_code, is_default, sync_id, sync_source)
+                VALUES (
+                  ${BigInt(masterUserId)}::BIGINT,
+                  ${BigInt(targetLocationId)}::BIGINT,
+                  '${escapedTargetStoreCode}'::VARCHAR,
+                  false,
+                  '${masterSyncId}'::UUID,
+                  'location'::VARCHAR
+                )
+                ON CONFLICT (user_id, store_code) 
+                DO UPDATE SET
+                  is_default = false,
+                  sync_id = '${masterSyncId}'::UUID,
+                  sync_source = 'location'::VARCHAR
+              `);
+              console.log(`Inserted store access into master database for user_id ${masterUserId}, store_code ${targetLocationCode}`);
+            } else {
+              console.log(`Store access already exists in master database for user_id ${masterUserId}, store_code ${targetLocationCode}`);
+              // Update sync_id if needed
+              const existingSyncId = existingInMaster[0].sync_id || masterSyncId;
+              await masterPrisma.$executeRawUnsafe(`
+                UPDATE tbl_user_store_access
+                SET sync_id = '${existingSyncId}'::UUID,
+                    sync_source = 'location'::VARCHAR
+                WHERE user_id = ${BigInt(masterUserId)}::BIGINT
+                  AND store_code = '${escapedTargetStoreCode}'::VARCHAR
+              `);
+            }
+
+            // Step 5: Find same user in target location by sync_id
+            const targetUser = await locationPrisma.$queryRawUnsafe<any[]>(`
+              SELECT id FROM users WHERE sync_id = '${userSyncId}'::UUID LIMIT 1
+            `);
+
+            if (!targetUser || targetUser.length === 0) {
+              console.warn(`User with sync_id ${userSyncId} not found in target location ${targetLocationCode}, skipping location insert`);
+              result.recordsProcessed++;
+              result.recordsFailed++;
+              result.errors.push({
+                recordId: record.sync_id || '',
+                operation: 'INSERT',
+                error: `User with sync_id ${userSyncId} not found in target location`,
+                tableName: masterTableName,
+              });
+              continue;
+            }
+
+            const targetUserId = targetUser[0].id;
+            const locationSyncId = randomUUID();
+
+            // Step 6: Check if store access already exists in location database
+            const existingInLocation = await locationPrisma.$queryRawUnsafe<any[]>(`
+              SELECT id FROM tbl_user_store_access
+              WHERE user_id = ${targetUserId}::INTEGER
+                AND store_code = '${escapedTargetStoreCode}'::VARCHAR
+              LIMIT 1
+            `);
+
+            if (existingInLocation && existingInLocation.length > 0 && cloneMode === 'merge') {
+              // Skip existing records in merge mode
+              console.log(`Skipping existing store access for user ${targetUserId} in merge mode`);
+              result.recordsProcessed++;
+              continue;
+            }
+
+            // Step 7: Create/update store access entry in location database
+            await locationPrisma.$executeRawUnsafe(`
+              INSERT INTO tbl_user_store_access (user_id, store_code, is_default, sync_id, sync_source)
+              VALUES (${targetUserId}::INTEGER, '${escapedTargetStoreCode}'::VARCHAR, false, '${locationSyncId}'::UUID, 'location'::VARCHAR)
+              ON CONFLICT (user_id, store_code) 
+              DO UPDATE SET
+                is_default = false,
+                sync_id = '${locationSyncId}'::UUID,
+                sync_source = 'location'::VARCHAR
+            `);
+
+            result.recordsProcessed++;
+            result.recordsSucceeded++;
+            console.log(`Created store access for SUPER_ADMIN user ${targetUserId} in target location ${targetLocationCode} (master user_id: ${masterUserId})`);
+          } catch (error: any) {
+            console.error(`Error processing store access record:`, error);
+            result.recordsProcessed++;
+            result.recordsFailed++;
+            result.errors.push({
+              recordId: record.sync_id || '',
+              operation: 'INSERT',
+              error: error.message || 'Unknown error',
+              tableName: masterTableName,
+            });
+            result.success = false;
+          }
+        }
+
+        result.completedAt = new Date();
+        result.duration = Date.now() - startTime;
+        return result;
+      }
 
       // Fetch records from source location - handle case sensitivity
       // Use double quotes for table/column names and proper escaping for values
-      const sourceRecords = await locationPrisma.$queryRawUnsafe<any[]>(`
-        SELECT * FROM "${locationTableName}"
-        WHERE "store_code" = '${escapedSourceCode}'
-        ORDER BY "${orderByColumn}" DESC
-      `);
+      let sourceRecords: any[];
+      if (isUserTable && locationTableName === 'users') {
+        // For users table, don't filter by store_code (it doesn't have that column)
+        // Get all users from source location (they're location-specific by default)
+        sourceRecords = await locationPrisma.$queryRawUnsafe<any[]>(`
+          SELECT * FROM "${locationTableName}"
+          ORDER BY "created_at" DESC
+        `);
+      } else {
+        // For other tables, filter by store_code
+        sourceRecords = await locationPrisma.$queryRawUnsafe<any[]>(`
+          SELECT * FROM "${locationTableName}"
+          WHERE "store_code" = '${escapedSourceCode}'
+          ORDER BY "${orderByColumn}" DESC
+        `);
+      }
 
       console.log(`Found ${sourceRecords.length} records in ${locationTableName} for source location ${sourceLocationCode}`);
 
