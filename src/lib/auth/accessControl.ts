@@ -22,10 +22,7 @@ export interface UserAccessInfo {
  */
 export async function getUserAccessInfo(userId: number): Promise<UserAccessInfo> {
   const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: {
-      storeAccesses: true
-    }
+    where: { id: userId }
   })
 
   if (!user) {
@@ -94,8 +91,14 @@ export async function getUserAccessInfo(userId: number): Promise<UserAccessInfo>
         .filter(Boolean) as string[]
 
     } else if (user.accessLevel === 'LOCATION') {
-      // Get stores from user store access table
-      accessibleStoreCodes = user.storeAccesses.map(sa => sa.storeCode)
+      // Get stores from user store access table - query directly since relation is removed
+      const storeAccesses = await prisma.userStoreAccess.findMany({
+        where: { userId: userId },
+        select: { storeCode: true }
+      })
+      accessibleStoreCodes = storeAccesses
+        .map(sa => sa.storeCode)
+        .filter(Boolean) as string[]
     }
   }
 
