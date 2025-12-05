@@ -1281,27 +1281,27 @@ export class SyncProcessor {
             insertData.user_id = locationUserId;
             console.log(`Mapped user_id from master ${masterUserId} to location user id ${locationUserId} using sync_id ${userSyncId}`);
             
-            // Check if store access already exists by sync_id (sync_id is the primary identifier)
+            // Check if store access already exists by (user_id, store_code) - the unique constraint
             const storeCode = insertData.store_code || locationCode;
             const existingAccess = await locationPrisma.$queryRawUnsafe<any[]>(`
               SELECT id, sync_id FROM tbl_user_store_access
-              WHERE sync_id = '${syncId}'::UUID
+              WHERE user_id = ${locationUserId}
+                AND store_code = '${storeCode.replace(/'/g, "''")}'::VARCHAR
               LIMIT 1
             `);
             
             if (existingAccess && existingAccess.length > 0) {
-              // Record exists by sync_id, update it directly to avoid infinite loop
-              // Use the existing record's sync_id
+              // Record exists by (user_id, store_code), update it directly to avoid infinite loop
               const existingSyncId = existingAccess[0].sync_id || syncId;
               const existingId = existingAccess[0].id;
-              console.log(`Store access already exists with sync_id ${existingSyncId}, updating record id ${existingId}`);
+              console.log(`Store access already exists with (user_id=${locationUserId}, store_code=${storeCode}), updating record id ${existingId}`);
               
               // Build UPDATE query directly to avoid recursion
               const setParts: string[] = [];
               
               // Add all data fields
               for (const [key, value] of Object.entries({
-                ...data,
+                ...insertData,
                 user_id: locationUserId,
                 store_code: storeCode,
                 sync_id: existingSyncId,
@@ -1469,11 +1469,66 @@ export class SyncProcessor {
     console.log(`Values count:`, values.length);
 
     try {
-      await locationPrisma.$executeRawUnsafe(`
-        INSERT INTO ${tableName} (${columnsStr})
-        VALUES (${valuesStr})
-      `);
+      // For tbl_user_store_access, use UPSERT to handle unique constraint on (user_id, store_code)
+      if (tableName === 'tbl_user_store_access') {
+        // Build SET clause for ON CONFLICT DO UPDATE
+        const setParts: string[] = [];
+        for (let i = 0; i < columns.length; i++) {
+          const column = columns[i];
+          // Skip id column in UPDATE clause
+          if (column !== '"id"') {
+            setParts.push(`${column} = EXCLUDED.${column}`);
+          }
+        }
+        
+        await locationPrisma.$executeRawUnsafe(`
+          INSERT INTO ${tableName} (${columnsStr})
+          VALUES (${valuesStr})
+          ON CONFLICT (user_id, store_code) 
+          DO UPDATE SET ${setParts.join(', ')}
+        `);
+      } else {
+        await locationPrisma.$executeRawUnsafe(`
+          INSERT INTO ${tableName} (${columnsStr})
+          VALUES (${valuesStr})
+        `);
+      }
     } catch (error: any) {
+      // If it's a unique constraint violation and we're not already handling it, try to update instead
+      if (error.code === '23505' && tableName === 'tbl_user_store_access') {
+        console.log(`Unique constraint violation for ${tableName}, attempting to update instead...`);
+        // Try to find the existing record and update it
+        const userId = insertData.user_id;
+        const storeCode = insertData.store_code || locationCode;
+        const existing = await locationPrisma.$queryRawUnsafe<any[]>(`
+          SELECT id FROM ${tableName}
+          WHERE user_id = ${userId}
+            AND store_code = '${storeCode.replace(/'/g, "''")}'::VARCHAR
+          LIMIT 1
+        `);
+        
+        if (existing && existing.length > 0) {
+          // Build UPDATE query
+          const setParts: string[] = [];
+          for (let i = 0; i < columns.length; i++) {
+            const column = columns[i];
+            const value = values[i];
+            if (column !== '"id"') {
+              setParts.push(`${column} = ${value}`);
+            }
+          }
+          
+          await locationPrisma.$executeRawUnsafe(`
+            UPDATE ${tableName}
+            SET ${setParts.join(', ')}
+            WHERE user_id = ${userId}
+              AND store_code = '${storeCode.replace(/'/g, "''")}'::VARCHAR
+          `);
+          console.log(`Updated existing record for ${tableName} with (user_id=${userId}, store_code=${storeCode})`);
+          return;
+        }
+      }
+      
       console.error(`Failed to insert into ${tableName}:`, error);
       console.error('Columns:', columns);
       console.error('Data keys:', Object.keys(insertData));
@@ -1515,6 +1570,41 @@ export class SyncProcessor {
       // Record doesn't exist, treat as INSERT
       await this.handleInsert(tableName, syncId, data, syncSource, locationCode);
       return;
+    }
+
+    // Special handling for tbl_user_store_access: map user_id from master to location user id
+    if (tableName === 'tbl_user_store_access' && data.user_id) {
+      try {
+        // user_id in sync log is the master user_id (BigInt as string)
+        // We need to find the corresponding user in location DB by sync_id
+        // First, get the user sync_id from master DB using user_id
+        const masterUserId = data.user_id;
+        const masterUser = await masterPrisma.$queryRawUnsafe<any[]>(`
+          SELECT sync_id FROM tbl_user WHERE user_id = ${BigInt(masterUserId)}::BIGINT LIMIT 1
+        `);
+        
+        if (masterUser && masterUser.length > 0 && masterUser[0].sync_id) {
+          const userSyncId = masterUser[0].sync_id;
+          // Find user in location DB by sync_id
+          const locationUser = await locationPrisma.$queryRawUnsafe<any[]>(`
+            SELECT id FROM users WHERE sync_id = '${userSyncId}'::UUID LIMIT 1
+          `);
+          
+          if (locationUser && locationUser.length > 0) {
+            // Replace master user_id with location user id
+            const locationUserId = locationUser[0].id;
+            data.user_id = locationUserId;
+            console.log(`[UPDATE] Mapped user_id from master ${masterUserId} to location user id ${locationUserId} using sync_id ${userSyncId}`);
+          } else {
+            throw new Error(`User with sync_id ${userSyncId} not found in location database. User must be synced first.`);
+          }
+        } else {
+          throw new Error(`User with user_id ${masterUserId} not found in master database or missing sync_id`);
+        }
+      } catch (error: any) {
+        console.error('Error mapping user_id for store access UPDATE:', error);
+        throw new Error(`Failed to map user_id: ${error.message}`);
+      }
     }
 
     // Build UPDATE query with proper value formatting

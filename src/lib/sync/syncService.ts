@@ -381,14 +381,40 @@ export class SyncService {
     status: number,
     errorMessage: string | null
   ): Promise<void> {
-    await masterPrisma.$executeRaw`
-      SELECT update_sync_status(
-        ${locationCode}::VARCHAR,
-        ${tableName}::TEXT,
-        ${status}::SMALLINT,
-        ${errorMessage}::TEXT
-      )
-    `;
+    try {
+      // Use direct SQL INSERT/UPDATE instead of function call
+      // This works regardless of whether the function exists
+      await masterPrisma.$executeRaw`
+        INSERT INTO sync_status (
+          location_code,
+          table_name,
+          last_sync_time,
+          last_sync_status,
+          last_error_message,
+          updated_at,
+          total_records_synced
+        )
+        VALUES (
+          ${locationCode}::VARCHAR(100),
+          ${tableName}::TEXT,
+          CURRENT_TIMESTAMP,
+          ${status}::SMALLINT,
+          ${errorMessage || null}::TEXT,
+          CURRENT_TIMESTAMP,
+          1
+        )
+        ON CONFLICT (location_code, table_name) 
+        DO UPDATE SET
+          last_sync_time = CURRENT_TIMESTAMP,
+          last_sync_status = ${status}::SMALLINT,
+          last_error_message = ${errorMessage || null}::TEXT,
+          updated_at = CURRENT_TIMESTAMP,
+          total_records_synced = sync_status.total_records_synced + 1
+      `;
+    } catch (error: any) {
+      // Log error but don't throw - sync status update failure shouldn't break sync
+      console.error(`[syncService] Failed to update sync status for ${locationCode}.${tableName}:`, error.message);
+    }
   }
 
   /**

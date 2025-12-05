@@ -33,7 +33,8 @@ model User {
   syncSource      String?     @default("server") @map("sync_source") @db.VarChar(20)
 
   loginActivities UserLoginActivity[]
-  storeAccesses   UserStoreAccess[]
+  // Note: storeAccesses relation removed along with foreign key constraint
+  // storeAccesses   UserStoreAccess[]
 
   @@index([email])
   @@index([username])
@@ -53,7 +54,8 @@ model UserStoreAccess {
   syncId      String?   @unique @default(uuid()) @map("sync_id") @db.Uuid
   syncSource  String?   @default("server") @map("sync_source") @db.VarChar(20)
   
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Note: Foreign key constraint removed to allow sync flexibility
+  // user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   @@unique([userId, storeCode])
   @@index([userId])
