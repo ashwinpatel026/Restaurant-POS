@@ -1,4 +1,48 @@
-<!-- a5f4da17-d3fe-4edf-a32f-382e197cde0d 80a905b3-dd52-40e2-84cd-9507b4767a07 -->
+---
+name: Add apiDoc Annotations to POS Sync API Routes
+overview: ""
+todos:
+  - id: c5bdb865-e3de-4846-8f81-3f2d55f9d4f1
+    content: Install apidoc package as dev dependency
+    status: pending
+  - id: 54526f8f-b216-4876-bb68-d4996f7bfac6
+    content: Create apidoc.json configuration file with project settings and base URL from environment
+    status: pending
+  - id: 2618158b-765e-4d39-9cb4-8e1cc13be151
+    content: Add apiDoc annotations to tax route files (route.ts and [id]/route.ts)
+    status: pending
+  - id: 2320e6b6-8f77-4ebc-85b5-9579068179e8
+    content: Add apiDoc annotations to menu-items route files
+    status: pending
+  - id: 01b838c9-2a64-4949-bca3-246a386ea76f
+    content: Add apiDoc annotations to orders route files
+    status: pending
+  - id: fbc04051-13be-4831-a82f-9897949df25b
+    content: Add apiDoc annotations to modifier-groups route files
+    status: pending
+  - id: e46565af-5765-419d-a431-de5b3cdd81d0
+    content: Add apiDoc annotations to prep-zones route files
+    status: pending
+  - id: cf392adc-89ad-4354-b7c0-6f175d660e36
+    content: Add apiDoc annotations to stations route files
+    status: pending
+  - id: c4924154-cd3f-4a81-8eaf-216b694c0ea5
+    content: Add apiDoc annotations to printers route files
+    status: pending
+  - id: c37dd03d-19df-4b35-8122-d159f3f85921
+    content: Add apiDoc annotations to tables route files
+    status: pending
+  - id: 08bff3a6-415f-4652-896d-59e3e02efbda
+    content: Add apiDoc annotations to location route files
+    status: pending
+  - id: 3348894b-e153-47d2-a7c0-0535f13f3451
+    content: Add docs:generate script to package.json
+    status: pending
+  - id: 9e8e607b-f41c-4235-952a-bcef2d7dfaf7
+    content: Add apidoc/ directory to .gitignore
+    status: pending
+---
+
 # Add apiDoc Annotations to POS Sync API Routes
 
 This plan adds apiDoc inline documentation annotations to all POS sync API routes and sets up the necessary configuration to generate interactive API documentation.
@@ -144,19 +188,3 @@ Each route will follow this pattern:
 - Request bodies use `@apiBody` for POST/PUT endpoints
 - Error responses are documented with `@apiError`
 - Examples use realistic data based on the existing route implementations
-
-### To-dos
-
-- [ ] Install apidoc package as dev dependency
-- [ ] Create apidoc.json configuration file with project settings and base URL from environment
-- [ ] Add apiDoc annotations to tax route files (route.ts and [id]/route.ts)
-- [ ] Add apiDoc annotations to menu-items route files
-- [ ] Add apiDoc annotations to orders route files
-- [ ] Add apiDoc annotations to modifier-groups route files
-- [ ] Add apiDoc annotations to prep-zones route files
-- [ ] Add apiDoc annotations to stations route files
-- [ ] Add apiDoc annotations to printers route files
-- [ ] Add apiDoc annotations to tables route files
-- [ ] Add apiDoc annotations to location route files
-- [ ] Add docs:generate script to package.json
-- [ ] Add apidoc/ directory to .gitignore
