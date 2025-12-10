@@ -57,7 +57,9 @@ export default function LocationsPage() {
   const [dealers, setDealers] = useState<Dealer[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [locationToDelete, setLocationToDelete] = useState<Location | null>(null);
+  const [locationToDelete, setLocationToDelete] = useState<Location | null>(
+    null
+  );
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [syncProgress, setSyncProgress] = useState<any[]>([]);
   const [showSyncModal, setShowSyncModal] = useState(false);
@@ -117,7 +119,7 @@ export default function LocationsPage() {
       if (filterCompanyId) params.append("companyId", filterCompanyId);
       if (filterDealerId) params.append("dealerId", filterDealerId);
       if (params.toString()) url += `?${params.toString()}`;
-
+      console.log(url);
       const response = await fetch(url, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -147,12 +149,15 @@ export default function LocationsPage() {
 
     try {
       const token = localStorage.getItem("master_admin_token");
-      const response = await fetch(`/api/master/locations/${locationToDelete.locationId}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        `/api/master/locations/${locationToDelete.locationId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       if (response.ok) {
         toast.success("Location deactivated successfully");
@@ -417,7 +422,11 @@ export default function LocationsPage() {
                             <ArrowPathIcon className="w-5 h-5" />
                           </button>
                           <button
-                            onClick={() => router.push(`/master/locations/${location.locationId}/edit`)}
+                            onClick={() =>
+                              router.push(
+                                `/master/locations/${location.locationId}/edit`
+                              )
+                            }
                             className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
                           >
                             <PencilIcon className="w-5 h-5" />

@@ -86,6 +86,7 @@ export default function DealersPage() {
       });
       if (response.ok) {
         const data = await response.json();
+
         setDealers(data);
       } else {
         toast.error("Failed to fetch dealers");

@@ -4,23 +4,34 @@ import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 
 // Helper function to generate unique dealer code
 async function generateDealerCode(): Promise<string> {
-  const latestDealer = await masterPrisma.dealer.findFirst({
-    orderBy: { dealerId: 'desc' },
-    select: { dealerCode: true }
-  })
+  const prefix = 'DL';
 
-  let nextNumber = 1
-  
-  if (latestDealer?.dealerCode) {
-    // Extract number from code like "DL001" or "DEALER001"
-    const match = latestDealer.dealerCode.match(/^(DL|DEALER)(\d+)$/i)
-    if (match) {
-      nextNumber = parseInt(match[2]) + 1
+  // Fetch only dealer codes that start with DL
+  const dealers = await masterPrisma.dealer.findMany({
+    where: {
+      dealerCode: {
+        startsWith: prefix
+      }
+    },
+    select: { dealerCode: true }
+  });
+
+  let nextNumber = 1;
+
+  if (dealers.length > 0) {
+    const numbers = dealers
+      .map(dealer => {
+        const match = dealer.dealerCode.match(/^DL(\d+)$/);
+        return match ? parseInt(match[1], 10) : 0;
+      })
+      .filter(num => num > 0);
+
+    if (numbers.length > 0) {
+      nextNumber = Math.max(...numbers) + 1;
     }
   }
-  
-  // Format as DL + padded 3-digit number
-  return `DL${String(nextNumber).padStart(3, '0')}`
+
+  return `${prefix}${String(nextNumber).padStart(3, '0')}`;
 }
 
 export async function GET(request: NextRequest) {

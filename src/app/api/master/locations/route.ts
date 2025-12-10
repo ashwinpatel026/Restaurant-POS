@@ -163,6 +163,17 @@ export async function POST(request: NextRequest) {
       finalStoreCode = await generateStoreCode()
     }
 
+    const existingStore = await masterPrisma.location.findUnique({
+      where: { storeCode: finalStoreCode }
+    })
+
+    if (existingStore) {
+      return NextResponse.json(
+        { error: 'Store code already exists' },
+        { status: 400 }
+      )
+    }
+
     // Verify company exists if provided
     if (companyId) {
       const company = await masterPrisma.company.findUnique({
