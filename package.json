@@ -15,7 +15,8 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
-    "sync:migrate": "node scripts/run-sync-migrations.js"
+    "sync:migrate": "node scripts/run-sync-migrations.js",
+    "sync:triggers": "node scripts/create-sync-triggers.mjs"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",
