@@ -1,4 +1,5 @@
 import { Client } from 'pg';
+import { PrismaClient } from '@prisma/client';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -9,10 +10,34 @@ const __dirname = dirname(__filename);
 dotenv.config({ path: join(__dirname, '..', '.env') });
 
 const masterDbUrl = process.env.MASTER_DATABASE_URL;
+const isAccelerate = masterDbUrl?.startsWith('prisma+');
 
 if (!masterDbUrl) {
   console.error('❌ MASTER_DATABASE_URL is not set. Please add it to your .env file.');
   process.exit(1);
+}
+
+function buildClientConfig(connectionString) {
+  const url = new URL(connectionString);
+  const search = url.searchParams;
+
+  const sslMode = search.get('sslmode') || search.get('ssl');
+  const envSsl = process.env.MASTER_DATABASE_SSL;
+
+  // Accept any of the following to enable SSL:
+  // - sslmode=require
+  // - ssl=true
+  // - MASTER_DATABASE_SSL=1 or true
+  const shouldUseSsl =
+    (sslMode && sslMode.toLowerCase() === 'require') ||
+    (sslMode && sslMode.toLowerCase() === 'true') ||
+    (envSsl && ['1', 'true', 'require'].includes(envSsl.toLowerCase()));
+
+  const config = { connectionString };
+  if (shouldUseSsl) {
+    config.ssl = { rejectUnauthorized: false };
+  }
+  return config;
 }
 
 // Tables that need change-detection triggers
@@ -77,7 +102,7 @@ async function createTriggers(client) {
   }
 }
 
-async function verifyTriggers(client) {
+async function verifyTriggersPg(client) {
   const expected = triggerTargets.map(({ trigger }) => trigger);
   const { rows } = await client.query(
     `
@@ -101,18 +126,76 @@ async function verifyTriggers(client) {
   }
 }
 
+async function createTriggersPrisma(prisma) {
+  console.log('\n🔧 Creating log_sync_change() function and triggers on master tables (Prisma Accelerate)...');
+
+  // Run statements sequentially to stay compatible with the Data Proxy
+  await prisma.$executeRawUnsafe(triggerFunctionSQL);
+
+  for (const { table, trigger } of triggerTargets) {
+    await prisma.$executeRawUnsafe(`DROP TRIGGER IF EXISTS ${trigger} ON ${table};`);
+    await prisma.$executeRawUnsafe(`
+      CREATE TRIGGER ${trigger}
+      AFTER INSERT OR UPDATE OR DELETE ON ${table}
+      FOR EACH ROW EXECUTE FUNCTION log_sync_change();
+    `);
+    console.log(`  ✅ ${trigger} attached to ${table}`);
+  }
+
+  console.log('✅ Trigger function and triggers created successfully via Prisma.\n');
+}
+
+async function verifyTriggersPrisma(prisma) {
+  const expected = triggerTargets.map(({ trigger }) => trigger);
+  const rows = await prisma.$queryRawUnsafe(
+    `
+      SELECT trigger_name, event_object_table
+      FROM information_schema.triggers
+      WHERE trigger_schema = current_schema()
+        AND trigger_name = ANY($1)
+      ORDER BY trigger_name;
+    `,
+    expected,
+  );
+
+  console.log('🔍 Verification:');
+  for (const trigger of expected) {
+    const found = rows.find((r) => r.trigger_name === trigger);
+    if (found) {
+      console.log(`  ✅ ${trigger} exists on ${found.event_object_table}`);
+    } else {
+      console.log(`  ⚠️  ${trigger} not found`);
+    }
+  }
+}
+
 async function main() {
   console.log('\n════════════════════════════════════════════');
   console.log('  Phase 2: Change-Detection Trigger Installer');
   console.log('════════════════════════════════════════════\n');
 
-  const client = new Client({ connectionString: masterDbUrl });
+  if (isAccelerate) {
+    console.log('📡 Using Prisma Accelerate connection...');
+    const prisma = new PrismaClient();
+    try {
+      await createTriggersPrisma(prisma);
+      await verifyTriggersPrisma(prisma);
+      console.log('\n🎉 Done. Master tables now log changes into sync_log.');
+    } finally {
+      await prisma.$disconnect();
+      console.log('🔌 Disconnected from Prisma');
+    }
+    return;
+  }
+
+  // Standard direct Postgres connection
+  const client = new Client(buildClientConfig(masterDbUrl));
   await client.connect();
   console.log('✅ Connected to Master DB');
 
   try {
     await createTriggers(client);
-    await verifyTriggers(client);
+    await verifyTriggersPg(client);
     console.log('\n🎉 Done. Master tables now log changes into sync_log.');
   } finally {
     await client.end();
