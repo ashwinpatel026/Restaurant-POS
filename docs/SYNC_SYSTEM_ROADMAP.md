@@ -182,7 +182,7 @@ $$ LANGUAGE plpgsql;
 ```sql
 -- Example for printer_master table
 CREATE TRIGGER trigger_printer_master_sync
-AFTER INSERT OR UPDATE OR DELETE ON tbl_printer_master
+AFTER INSERT OR UPDATE OR DELETE ON tbl_master_printer
 FOR EACH ROW EXECUTE FUNCTION log_sync_change();
 
 -- Repeat for all master tables that need syncing
