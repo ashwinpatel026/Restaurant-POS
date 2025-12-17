@@ -4,7 +4,7 @@
   "description": "Comprehensive POS System for Restaurant Chain",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma generate --schema=prisma/master-schema.prisma && next build",
+    "build": "prisma generate && prisma generate --schema=prisma/master-schema.prisma && npm run docs:generate && next build",
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate && prisma generate --schema=prisma/master-schema.prisma",
@@ -17,7 +17,7 @@
     "db:studio": "prisma studio",
     "sync:migrate": "node scripts/run-sync-migrations.js",
     "sync:triggers": "node scripts/create-sync-triggers.mjs",
-    "docs:generate": "apidoc -i src/app/api/pos/sync -o public/apidoc"
+    "docs:generate": "apidoc -i src/app/api -o public/apidoc"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",

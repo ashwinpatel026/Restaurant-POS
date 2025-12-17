@@ -1,11 +1,11 @@
 {
   "name": "RPOS",
   "version": "1.0.0",
-  "description": "POS sync APIs for web to location data exchange",
-  "title": "POS Sync API",
+  "description": "Restaurant POS System API Documentation - Complete API reference for dashboard, master, and sync endpoints",
+  "title": "Restaurant POS API",
   "url": "http://localhost:3000",
   "sampleUrl": "http://localhost:3000",
-  "input": "src/app/api/pos/sync",
+  "input": "src/app/api",
   "output": "public/apidoc",
   "template": {
     "withCompare": true,
