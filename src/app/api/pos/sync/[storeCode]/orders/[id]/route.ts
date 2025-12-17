@@ -3,8 +3,28 @@ import { authenticatePOSRequest, addPOSSyncMetadata } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
 
 /**
- * GET /api/pos/sync/[storeCode]/orders/[id]
- * Get a specific order by ID or order number
+ * @api {get} /api/pos/sync/:storeCode/orders/:id Get order
+ * @apiName GetOrder
+ * @apiGroup Orders
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Order identifier (BigInt `orderId` or `orderNumber`)
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {Object}  data Order record with items
+ * @apiSuccess {String}  data.orderId Order ID (string)
+ * @apiSuccess {String}  data.orderNumber Order number
+ * @apiSuccess {String}  data.status Order status
+ * @apiSuccess {String}  data.orderType Order type
+ * @apiSuccess {Object[]} data.orderItems Order items (with `orderItemId` as string)
+ *
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Order not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function GET(
   request: NextRequest,
@@ -80,8 +100,45 @@ export async function GET(
 }
 
 /**
- * PUT /api/pos/sync/[storeCode]/orders/[id]
- * Update an order
+ * @api {put} /api/pos/sync/:storeCode/orders/:id Update order
+ * @apiName UpdateOrder
+ * @apiGroup Orders
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Order identifier (BigInt `orderId` or `orderNumber`)
+ *
+ * @apiBody {String} [status] Order status
+ * @apiBody {String} [orderType] Order type
+ * @apiBody {Number} [subtotal] Order subtotal
+ * @apiBody {Number} [tax] Order tax
+ * @apiBody {Number} [discount] Order discount
+ * @apiBody {Number} [total] Order total
+ * @apiBody {String} [customerName] Customer name
+ * @apiBody {String} [customerPhone] Customer phone
+ * @apiBody {String} [notes] Order notes
+ * @apiBody {String} [completedAt] Completion ISO timestamp
+ *
+ * @apiParamExample {json} Request Body
+ * {
+ *   "status": "COMPLETED",
+ *   "subtotal": 20.00,
+ *   "tax": 1.60,
+ *   "total": 21.60
+ * }
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  message Confirmation message
+ * @apiSuccess {Object}  data Updated order with items
+ * @apiSuccess {String}  data.orderId Order ID (string)
+ *
+ * @apiError (400) BadRequest Invalid JSON body
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Order not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function PUT(
   request: NextRequest,
@@ -185,8 +242,37 @@ export async function PUT(
 }
 
 /**
- * DELETE /api/pos/sync/[storeCode]/orders/[id]
- * Delete an order (soft delete by changing status to CANCELLED)
+ * @api {delete} /api/pos/sync/:storeCode/orders/:id Cancel order
+ * @apiName CancelOrder
+ * @apiGroup Orders
+ * @apiVersion 1.0.0
+ * @apiDescription Soft delete by setting status to `CANCELLED`.
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Order identifier (BigInt `orderId` or `orderNumber`)
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  message Confirmation message
+ * @apiSuccess {Object}  data Cancelled identifiers
+ * @apiSuccess {String}  data.orderNumber Order number
+ * @apiSuccess {String}  data.orderId Order ID (string)
+ *
+ * @apiSuccessExample {json} 200 OK
+ * {
+ *   "success": true,
+ *   "message": "Order cancelled successfully",
+ *   "data": {
+ *     "orderNumber": "ORD-001",
+ *     "orderId": "2001"
+ *   }
+ * }
+ *
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Order not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function DELETE(
   request: NextRequest,

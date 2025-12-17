@@ -16,7 +16,8 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "sync:migrate": "node scripts/run-sync-migrations.js",
-    "sync:triggers": "node scripts/create-sync-triggers.mjs"
+    "sync:triggers": "node scripts/create-sync-triggers.mjs",
+    "docs:generate": "apidoc -i src/app/api/pos/sync -o public/apidoc"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",
@@ -50,6 +51,7 @@
     "@types/qrcode": "^1.5.5",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "apidoc": "^1.2.0",
     "autoprefixer": "^10.4.19",
     "eslint": "^8.57.0",
     "eslint-config-next": "^15.5.7",

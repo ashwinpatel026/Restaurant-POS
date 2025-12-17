@@ -3,8 +3,31 @@ import { authenticatePOSRequest, addPOSSyncMetadata } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
 
 /**
- * GET /api/pos/sync/[storeCode]/prep-zones
- * Get all prep zones for a store
+ * @api {get} /api/pos/sync/:storeCode/prep-zones List prep zones
+ * @apiName GetPrepZones
+ * @apiGroup PrepZones
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ *
+ * @apiQuery {Boolean} [incremental=false] When true, return records updated since `lastSyncAt`
+ * @apiQuery {String}  [lastSyncAt] ISO timestamp for incremental sync filter
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  storeCode Store code used for the query
+ * @apiSuccess {Number}  count Number of records returned
+ * @apiSuccess {Object[]} data Prep zones
+ * @apiSuccess {String}  data.prepZoneId Prep zone ID (string)
+ * @apiSuccess {String}  data.prepZoneCode Prep zone code
+ * @apiSuccess {String}  data.prepZoneName Prep zone name
+ * @apiSuccess {Number}  data.isActive Active flag
+ *
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Store not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function GET(
   request: NextRequest,
@@ -59,8 +82,44 @@ export async function GET(
 }
 
 /**
- * POST /api/pos/sync/[storeCode]/prep-zones
- * Create a new prep zone
+ * @api {post} /api/pos/sync/:storeCode/prep-zones Create prep zone
+ * @apiName CreatePrepZone
+ * @apiGroup PrepZones
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ *
+ * @apiBody {String} prepZoneCode Unique prep zone code
+ * @apiBody {String} prepZoneName Prep zone name
+ * @apiBody {String} [stationCode] Station code
+ * @apiBody {Boolean} [isActive=1] Active flag
+ * @apiBody {Boolean} [sendToExpediter] Send tickets to expediter
+ * @apiBody {Boolean} [alwaysPrintTicket] Always print ticket
+ * @apiBody {String} [printerCode] Primary printer code
+ * @apiBody {String} [backupPrinterCode] Backup printer code
+ * @apiBody {Number} [createdBy] User ID (integer) who created the prep zone
+ *
+ * @apiParamExample {json} Request Body
+ * {
+ *   "prepZoneCode": "PZ001",
+ *   "prepZoneName": "Grill",
+ *   "stationCode": "KIT01",
+ *   "printerCode": "PRN01",
+ *   "sendToExpediter": true
+ * }
+ *
+ * @apiSuccess (201) {Boolean} success Request success flag
+ * @apiSuccess (201) {String}  message Confirmation message
+ * @apiSuccess (201) {Object}  data Created prep zone
+ * @apiSuccess (201) {String}  data.prepZoneId Prep zone ID (string)
+ *
+ * @apiError (400) BadRequest Missing or invalid body fields
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (409) Conflict Prep zone code already exists
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function POST(
   request: NextRequest,

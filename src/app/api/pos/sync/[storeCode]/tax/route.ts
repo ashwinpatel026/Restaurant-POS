@@ -1,10 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticatePOSRequest, getModelByEntity, addPOSSyncMetadata } from '@/lib/posApiHelper'
+import { authenticatePOSRequest, addPOSSyncMetadata } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
 
 /**
- * GET /api/pos/sync/[storeCode]/tax
- * Get all taxes for a store
+ * @api {get} /api/pos/sync/:storeCode/tax List taxes
+ * @apiName GetTaxes
+ * @apiGroup Tax
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam  {String} storeCode Store code (e.g., "LOC001")
+ *
+ * @apiQuery {Boolean} [incremental=false] When true, only return records updated since `lastSyncAt`
+ * @apiQuery {String}  [lastSyncAt] ISO timestamp to filter updated records (used with incremental)
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  storeCode Store code used for the query
+ * @apiSuccess {Number}  count Number of tax records returned
+ * @apiSuccess {Object[]} data List of tax records
+ * @apiSuccess {String}  data.tblTaxId Tax ID (string)
+ * @apiSuccess {String}  data.taxCode Tax code
+ * @apiSuccess {String}  data.taxname Tax display name
+ * @apiSuccess {Number}  data.taxrate Tax rate percentage
+ * @apiSuccess {String}  [data.updatedOn] Last update timestamp
+ *
+ * @apiSuccessExample {json} 200 OK
+ * {
+ *   "success": true,
+ *   "storeCode": "LOC001",
+ *   "count": 2,
+ *   "data": [
+ *     { "tblTaxId": "1", "taxCode": "TAX001", "taxname": "Sales Tax", "taxrate": 8.5 }
+ *   ]
+ * }
+ *
+ * @apiError (400) BadRequest Invalid query parameters
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Store not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function GET(
   request: NextRequest,
@@ -59,8 +94,53 @@ export async function GET(
 }
 
 /**
- * POST /api/pos/sync/[storeCode]/tax
- * Create a new tax
+ * @api {post} /api/pos/sync/:storeCode/tax Create tax
+ * @apiName CreateTax
+ * @apiGroup Tax
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam  {String} storeCode Store code (e.g., "LOC001")
+ *
+ * @apiBody {String} taxCode Unique tax code
+ * @apiBody {String} taxname Tax display name
+ * @apiBody {Number} taxrate Tax rate percentage
+ * @apiBody {Number} [createdBy] User ID (integer) who created the tax
+ *
+ * @apiParamExample {json} Request Body
+ * {
+ *   "taxCode": "TAX001",
+ *   "taxname": "Sales Tax",
+ *   "taxrate": 8.5,
+ *   "createdBy": 1001
+ * }
+ *
+ * @apiSuccess (201) {Boolean} success Request success flag
+ * @apiSuccess (201) {String}  message Confirmation message
+ * @apiSuccess (201) {Object}  data Created tax record
+ * @apiSuccess (201) {String}  data.tblTaxId Tax ID (string)
+ * @apiSuccess (201) {String}  data.taxCode Tax code
+ * @apiSuccess (201) {String}  data.taxname Tax display name
+ * @apiSuccess (201) {Number}  data.taxrate Tax rate percentage
+ *
+ * @apiSuccessExample {json} 201 Created
+ * {
+ *   "success": true,
+ *   "message": "Tax created successfully",
+ *   "data": {
+ *     "tblTaxId": "1",
+ *     "taxCode": "TAX001",
+ *     "taxname": "Sales Tax",
+ *     "taxrate": 8.5
+ *   }
+ * }
+ *
+ * @apiError (400) BadRequest Missing or invalid request body
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (409) Conflict Tax with this code already exists
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function POST(
   request: NextRequest,

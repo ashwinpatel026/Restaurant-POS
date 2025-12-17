@@ -1,0 +1,15 @@
+{
+  "name": "RPOS",
+  "version": "1.0.0",
+  "description": "POS sync APIs for web to location data exchange",
+  "title": "POS Sync API",
+  "url": "http://localhost:3000",
+  "sampleUrl": "http://localhost:3000",
+  "input": "src/app/api/pos/sync",
+  "output": "public/apidoc",
+  "template": {
+    "withCompare": true,
+    "withGenerator": true
+  }
+}
+

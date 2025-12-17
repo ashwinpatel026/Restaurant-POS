@@ -3,8 +3,26 @@ import { authenticatePOSRequest, addPOSSyncMetadata } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
 
 /**
- * GET /api/pos/sync/[storeCode]/printers/[id]
- * Get a specific printer by ID or code
+ * @api {get} /api/pos/sync/:storeCode/printers/:id Get printer
+ * @apiName GetPrinter
+ * @apiGroup Printers
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Printer identifier (BigInt `printerId` or `printerCode`)
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {Object}  data Printer record
+ * @apiSuccess {String}  data.printerId Printer ID (string)
+ * @apiSuccess {String}  data.printerCode Printer code
+ * @apiSuccess {String}  data.printerName Printer name
+ *
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Printer not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function GET(
   request: NextRequest,
@@ -68,8 +86,36 @@ export async function GET(
 }
 
 /**
- * PUT /api/pos/sync/[storeCode]/printers/[id]
- * Update a printer
+ * @api {put} /api/pos/sync/:storeCode/printers/:id Update printer
+ * @apiName UpdatePrinter
+ * @apiGroup Printers
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Printer identifier (BigInt `printerId` or `printerCode`)
+ *
+ * @apiBody {String} [printerName] Printer name
+ * @apiBody {Boolean} [isActive] Active flag
+ * @apiBody {Number} [updatedBy] User ID (BigInt) who updated the printer
+ *
+ * @apiParamExample {json} Request Body
+ * {
+ *   "printerName": "Kitchen Printer",
+ *   "isActive": true
+ * }
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  message Confirmation message
+ * @apiSuccess {Object}  data Updated printer
+ * @apiSuccess {String}  data.printerId Printer ID (string)
+ *
+ * @apiError (400) BadRequest Invalid JSON body
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Printer not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function PUT(
   request: NextRequest,
@@ -163,8 +209,26 @@ export async function PUT(
 }
 
 /**
- * DELETE /api/pos/sync/[storeCode]/printers/[id]
- * Delete a printer
+ * @api {delete} /api/pos/sync/:storeCode/printers/:id Delete printer
+ * @apiName DeletePrinter
+ * @apiGroup Printers
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Printer identifier (BigInt `printerId` or `printerCode`)
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  message Confirmation message
+ * @apiSuccess {Object}  data Deleted identifiers
+ * @apiSuccess {String}  data.printerCode Printer code
+ * @apiSuccess {String}  data.printerId Printer ID (string)
+ *
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Printer not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function DELETE(
   request: NextRequest,

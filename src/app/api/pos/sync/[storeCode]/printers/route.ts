@@ -3,8 +3,31 @@ import { authenticatePOSRequest, addPOSSyncMetadata } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
 
 /**
- * GET /api/pos/sync/[storeCode]/printers
- * Get all printers for a store
+ * @api {get} /api/pos/sync/:storeCode/printers List printers
+ * @apiName GetPrinters
+ * @apiGroup Printers
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ *
+ * @apiQuery {Boolean} [incremental=false] When true, return records updated since `lastSyncAt`
+ * @apiQuery {String}  [lastSyncAt] ISO timestamp for incremental sync filter
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  storeCode Store code used for the query
+ * @apiSuccess {Number}  count Number of records returned
+ * @apiSuccess {Object[]} data Printers
+ * @apiSuccess {String}  data.printerId Printer ID (string)
+ * @apiSuccess {String}  data.printerCode Printer code
+ * @apiSuccess {String}  data.printerName Printer name
+ * @apiSuccess {Number}  data.isActive Active flag
+ *
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Store not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function GET(
   request: NextRequest,
@@ -59,8 +82,37 @@ export async function GET(
 }
 
 /**
- * POST /api/pos/sync/[storeCode]/printers
- * Create a new printer
+ * @api {post} /api/pos/sync/:storeCode/printers Create printer
+ * @apiName CreatePrinter
+ * @apiGroup Printers
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ *
+ * @apiBody {String} printerCode Unique printer code
+ * @apiBody {String} printerName Printer name
+ * @apiBody {Boolean} [isActive=1] Active flag
+ * @apiBody {Number} [createdBy] User ID (integer) who created the printer
+ *
+ * @apiParamExample {json} Request Body
+ * {
+ *   "printerCode": "PRN01",
+ *   "printerName": "Kitchen Printer",
+ *   "isActive": 1
+ * }
+ *
+ * @apiSuccess (201) {Boolean} success Request success flag
+ * @apiSuccess (201) {String}  message Confirmation message
+ * @apiSuccess (201) {Object}  data Created printer
+ * @apiSuccess (201) {String}  data.printerId Printer ID (string)
+ *
+ * @apiError (400) BadRequest Missing or invalid body fields
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (409) Conflict Printer code already exists
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function POST(
   request: NextRequest,

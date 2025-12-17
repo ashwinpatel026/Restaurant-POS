@@ -3,8 +3,32 @@ import { authenticatePOSRequest } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
 
 /**
- * GET /api/pos/sync/[storeCode]/tables
- * Get all tables for a store
+ * @api {get} /api/pos/sync/:storeCode/tables List tables
+ * @apiName GetTables
+ * @apiGroup Tables
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ *
+ * @apiQuery {Boolean} [incremental=false] When true, return records created since `lastSyncAt`
+ * @apiQuery {String}  [lastSyncAt] ISO timestamp for incremental sync filter
+ * @apiQuery {Number}  [status] Filter by status code
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  storeCode Store code used for the query
+ * @apiSuccess {Number}  count Number of records returned
+ * @apiSuccess {Object[]} data Tables
+ * @apiSuccess {String}  data.tableId Table ID (string)
+ * @apiSuccess {String}  data.tableNumber Table number/name
+ * @apiSuccess {Number}  data.seatingCapacity Seating capacity
+ * @apiSuccess {Number}  data.status Status code
+ *
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Store not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function GET(
   request: NextRequest,
@@ -63,8 +87,37 @@ export async function GET(
 }
 
 /**
- * POST /api/pos/sync/[storeCode]/tables
- * Create a new table
+ * @api {post} /api/pos/sync/:storeCode/tables Create table
+ * @apiName CreateTable
+ * @apiGroup Tables
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ *
+ * @apiBody {String} tableNumber Table number/name
+ * @apiBody {Number} seatingCapacity Seating capacity
+ * @apiBody {String} [location] Location/section
+ * @apiBody {Number} [status=0] Status code
+ *
+ * @apiParamExample {json} Request Body
+ * {
+ *   "tableNumber": "T01",
+ *   "seatingCapacity": 4,
+ *   "status": 0
+ * }
+ *
+ * @apiSuccess (201) {Boolean} success Request success flag
+ * @apiSuccess (201) {String}  message Confirmation message
+ * @apiSuccess (201) {Object}  data Created table
+ * @apiSuccess (201) {String}  data.tableId Table ID (string)
+ *
+ * @apiError (400) BadRequest Missing or invalid body fields
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (409) Conflict Table number already exists
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function POST(
   request: NextRequest,

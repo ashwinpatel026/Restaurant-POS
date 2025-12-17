@@ -3,8 +3,38 @@ import { authenticatePOSRequest, addPOSSyncMetadata } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
 
 /**
- * GET /api/pos/sync/[storeCode]/tax/[id]
- * Get a specific tax by ID or code
+ * @api {get} /api/pos/sync/:storeCode/tax/:id Get tax
+ * @apiName GetTax
+ * @apiGroup Tax
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code (e.g., "LOC001")
+ * @apiParam {String} id Tax identifier (numeric `tblTaxId` or string `taxCode`)
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {Object}  data Tax record
+ * @apiSuccess {String}  data.tblTaxId Tax ID (string)
+ * @apiSuccess {String}  data.taxCode Tax code
+ * @apiSuccess {String}  data.taxname Tax display name
+ * @apiSuccess {Number}  data.taxrate Tax rate percentage
+ *
+ * @apiSuccessExample {json} 200 OK
+ * {
+ *   "success": true,
+ *   "data": {
+ *     "tblTaxId": "1",
+ *     "taxCode": "TAX001",
+ *     "taxname": "Sales Tax",
+ *     "taxrate": 8.5
+ *   }
+ * }
+ *
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Tax not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function GET(
   request: NextRequest,
@@ -66,8 +96,52 @@ export async function GET(
 }
 
 /**
- * PUT /api/pos/sync/[storeCode]/tax/[id]
- * Update a tax
+ * @api {put} /api/pos/sync/:storeCode/tax/:id Update tax
+ * @apiName UpdateTax
+ * @apiGroup Tax
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Tax identifier (numeric `tblTaxId` or string `taxCode`)
+ *
+ * @apiBody {String} [taxname] Tax display name
+ * @apiBody {Number} [taxrate] Tax rate percentage
+ * @apiBody {Number} [updatedBy] User ID (integer) who updated the tax
+ *
+ * @apiParamExample {json} Request Body
+ * {
+ *   "taxname": "Updated Sales Tax",
+ *   "taxrate": 8.75,
+ *   "updatedBy": 1002
+ * }
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  message Confirmation message
+ * @apiSuccess {Object}  data Updated tax record
+ * @apiSuccess {String}  data.tblTaxId Tax ID (string)
+ * @apiSuccess {String}  data.taxCode Tax code
+ * @apiSuccess {String}  data.taxname Tax display name
+ * @apiSuccess {Number}  data.taxrate Tax rate percentage
+ *
+ * @apiSuccessExample {json} 200 OK
+ * {
+ *   "success": true,
+ *   "message": "Tax updated successfully",
+ *   "data": {
+ *     "tblTaxId": "1",
+ *     "taxCode": "TAX001",
+ *     "taxname": "Updated Sales Tax",
+ *     "taxrate": 8.75
+ *   }
+ * }
+ *
+ * @apiError (400) BadRequest Invalid JSON body
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Tax not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function PUT(
   request: NextRequest,
@@ -158,8 +232,36 @@ export async function PUT(
 }
 
 /**
- * DELETE /api/pos/sync/[storeCode]/tax/[id]
- * Delete a tax
+ * @api {delete} /api/pos/sync/:storeCode/tax/:id Delete tax
+ * @apiName DeleteTax
+ * @apiGroup Tax
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Tax identifier (numeric `tblTaxId` or string `taxCode`)
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  message Confirmation message
+ * @apiSuccess {Object}  data Deleted identifiers
+ * @apiSuccess {String}  data.taxCode Tax code
+ * @apiSuccess {String}  data.tblTaxId Tax ID (string)
+ *
+ * @apiSuccessExample {json} 200 OK
+ * {
+ *   "success": true,
+ *   "message": "Tax deleted successfully",
+ *   "data": {
+ *     "taxCode": "TAX001",
+ *     "tblTaxId": "1"
+ *   }
+ * }
+ *
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Tax not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function DELETE(
   request: NextRequest,

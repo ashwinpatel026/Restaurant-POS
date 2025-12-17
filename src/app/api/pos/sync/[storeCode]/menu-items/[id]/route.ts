@@ -3,8 +3,29 @@ import { authenticatePOSRequest, addPOSSyncMetadata } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
 
 /**
- * GET /api/pos/sync/[storeCode]/menu-items/[id]
- * Get a specific menu item by ID or code
+ * @api {get} /api/pos/sync/:storeCode/menu-items/:id Get menu item
+ * @apiName GetMenuItem
+ * @apiGroup MenuItems
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Menu item identifier (BigInt `menuItemId` or `menuItemCode`)
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {Object}  data Menu item record
+ * @apiSuccess {String}  data.menuItemId Menu item ID (string)
+ * @apiSuccess {String}  data.menuItemCode Menu item code
+ * @apiSuccess {String}  data.name Menu item name
+ * @apiSuccess {Number}  [data.cashPrice] Cash price
+ * @apiSuccess {Number}  [data.cardPrice] Card price
+ * @apiSuccess {Number}  data.isActive Active flag
+ *
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Menu item not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function GET(
   request: NextRequest,
@@ -71,8 +92,46 @@ export async function GET(
 }
 
 /**
- * PUT /api/pos/sync/[storeCode]/menu-items/[id]
- * Update a menu item
+ * @api {put} /api/pos/sync/:storeCode/menu-items/:id Update menu item
+ * @apiName UpdateMenuItem
+ * @apiGroup MenuItems
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Menu item identifier (BigInt `menuItemId` or `menuItemCode`)
+ *
+ * @apiBody {String} [name] Menu item name
+ * @apiBody {String} [kitchenName] Kitchen display name
+ * @apiBody {String} [labelName] Label display name
+ * @apiBody {Number} [cashPrice] Cash price
+ * @apiBody {Number} [cardPrice] Card price
+ * @apiBody {Number|Boolean} [isActive] Active flag (1/0 or true/false)
+ * @apiBody {String} [description] Description
+ * @apiBody {Number} [stockinhand] Current stock
+ * @apiBody {Number} [updatedBy] User ID (integer) who updated the item
+ *
+ * @apiParamExample {json} Request Body
+ * {
+ *   "name": "Classic Burger (Large)",
+ *   "cashPrice": 13.49,
+ *   "isActive": 1,
+ *   "updatedBy": 1002
+ * }
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  message Confirmation message
+ * @apiSuccess {Object}  data Updated menu item
+ * @apiSuccess {String}  data.menuItemId Menu item ID (string)
+ * @apiSuccess {String}  data.menuItemCode Menu item code
+ * @apiSuccess {String}  data.name Menu item name
+ *
+ * @apiError (400) BadRequest Invalid JSON body
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Menu item not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function PUT(
   request: NextRequest,
@@ -175,8 +234,36 @@ export async function PUT(
 }
 
 /**
- * DELETE /api/pos/sync/[storeCode]/menu-items/[id]
- * Delete a menu item
+ * @api {delete} /api/pos/sync/:storeCode/menu-items/:id Delete menu item
+ * @apiName DeleteMenuItem
+ * @apiGroup MenuItems
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Menu item identifier (BigInt `menuItemId` or `menuItemCode`)
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  message Confirmation message
+ * @apiSuccess {Object}  data Deleted identifiers
+ * @apiSuccess {String}  data.menuItemCode Menu item code
+ * @apiSuccess {String}  data.menuItemId Menu item ID (string)
+ *
+ * @apiSuccessExample {json} 200 OK
+ * {
+ *   "success": true,
+ *   "message": "Menu item deleted successfully",
+ *   "data": {
+ *     "menuItemCode": "MI001",
+ *     "menuItemId": "101"
+ *   }
+ * }
+ *
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Menu item not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function DELETE(
   request: NextRequest,

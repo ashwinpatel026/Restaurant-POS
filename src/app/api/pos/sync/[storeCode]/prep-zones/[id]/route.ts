@@ -3,8 +3,26 @@ import { authenticatePOSRequest, addPOSSyncMetadata } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
 
 /**
- * GET /api/pos/sync/[storeCode]/prep-zones/[id]
- * Get a specific prep zone by ID or code
+ * @api {get} /api/pos/sync/:storeCode/prep-zones/:id Get prep zone
+ * @apiName GetPrepZone
+ * @apiGroup PrepZones
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Prep zone identifier (BigInt `prepZoneId` or `prepZoneCode`)
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {Object}  data Prep zone record
+ * @apiSuccess {String}  data.prepZoneId Prep zone ID (string)
+ * @apiSuccess {String}  data.prepZoneCode Prep zone code
+ * @apiSuccess {String}  data.prepZoneName Prep zone name
+ *
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Prep zone not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function GET(
   request: NextRequest,
@@ -68,8 +86,42 @@ export async function GET(
 }
 
 /**
- * PUT /api/pos/sync/[storeCode]/prep-zones/[id]
- * Update a prep zone
+ * @api {put} /api/pos/sync/:storeCode/prep-zones/:id Update prep zone
+ * @apiName UpdatePrepZone
+ * @apiGroup PrepZones
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Prep zone identifier (BigInt `prepZoneId` or `prepZoneCode`)
+ *
+ * @apiBody {String} [prepZoneName] Prep zone name
+ * @apiBody {String} [stationCode] Station code
+ * @apiBody {Boolean} [isActive] Active flag
+ * @apiBody {Boolean} [sendToExpediter] Send tickets to expediter
+ * @apiBody {Boolean} [alwaysPrintTicket] Always print ticket
+ * @apiBody {String} [printerCode] Primary printer code
+ * @apiBody {String} [backupPrinterCode] Backup printer code
+ * @apiBody {Number} [updatedBy] User ID (integer) who updated the prep zone
+ *
+ * @apiParamExample {json} Request Body
+ * {
+ *   "prepZoneName": "Grill",
+ *   "printerCode": "PRN01",
+ *   "isActive": true
+ * }
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  message Confirmation message
+ * @apiSuccess {Object}  data Updated prep zone
+ * @apiSuccess {String}  data.prepZoneId Prep zone ID (string)
+ *
+ * @apiError (400) BadRequest Invalid JSON body
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Prep zone not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function PUT(
   request: NextRequest,
@@ -168,8 +220,26 @@ export async function PUT(
 }
 
 /**
- * DELETE /api/pos/sync/[storeCode]/prep-zones/[id]
- * Delete a prep zone
+ * @api {delete} /api/pos/sync/:storeCode/prep-zones/:id Delete prep zone
+ * @apiName DeletePrepZone
+ * @apiGroup PrepZones
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Prep zone identifier (BigInt `prepZoneId` or `prepZoneCode`)
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  message Confirmation message
+ * @apiSuccess {Object}  data Deleted identifiers
+ * @apiSuccess {String}  data.prepZoneCode Prep zone code
+ * @apiSuccess {String}  data.prepZoneId Prep zone ID (string)
+ *
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Prep zone not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function DELETE(
   request: NextRequest,

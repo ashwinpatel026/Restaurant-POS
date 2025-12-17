@@ -39,3 +39,7 @@ next-env.d.ts
 # scripts
 node_modules
 
+# apiDoc output
+apidoc/
+public/apidoc/
+

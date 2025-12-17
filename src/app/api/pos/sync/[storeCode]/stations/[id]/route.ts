@@ -3,8 +3,26 @@ import { authenticatePOSRequest, addPOSSyncMetadata } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
 
 /**
- * GET /api/pos/sync/[storeCode]/stations/[id]
- * Get a specific station by ID or code
+ * @api {get} /api/pos/sync/:storeCode/stations/:id Get station
+ * @apiName GetStation
+ * @apiGroup Stations
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Station identifier (BigInt `tblStationId` or `stationCode`)
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {Object}  data Station record
+ * @apiSuccess {String}  data.tblStationId Station ID (string)
+ * @apiSuccess {String}  data.stationCode Station code
+ * @apiSuccess {String}  data.stationname Station name
+ *
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Station not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function GET(
   request: NextRequest,
@@ -68,8 +86,43 @@ export async function GET(
 }
 
 /**
- * PUT /api/pos/sync/[storeCode]/stations/[id]
- * Update a station
+ * @api {put} /api/pos/sync/:storeCode/stations/:id Update station
+ * @apiName UpdateStation
+ * @apiGroup Stations
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Station identifier (BigInt `tblStationId` or `stationCode`)
+ *
+ * @apiBody {String} [stationname] Station name
+ * @apiBody {Boolean} [isActive] Active flag
+ * @apiBody {String} [stationGroups] Station group info
+ * @apiBody {Boolean} [isKitchen] Kitchen station flag
+ * @apiBody {Boolean} [isBar] Bar station flag
+ * @apiBody {Boolean} [isBill] Billing station flag
+ * @apiBody {Boolean} [isReport] Reporting station flag
+ * @apiBody {String} [ipAddress] Station IP address
+ * @apiBody {Number} [updatedBy] User ID (BigInt) who updated the station
+ *
+ * @apiParamExample {json} Request Body
+ * {
+ *   "stationname": "Kitchen - Hot",
+ *   "isKitchen": true,
+ *   "isActive": 1
+ * }
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  message Confirmation message
+ * @apiSuccess {Object}  data Updated station
+ * @apiSuccess {String}  data.tblStationId Station ID (string)
+ *
+ * @apiError (400) BadRequest Invalid JSON body
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Station not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function PUT(
   request: NextRequest,
@@ -170,8 +223,26 @@ export async function PUT(
 }
 
 /**
- * DELETE /api/pos/sync/[storeCode]/stations/[id]
- * Delete a station
+ * @api {delete} /api/pos/sync/:storeCode/stations/:id Delete station
+ * @apiName DeleteStation
+ * @apiGroup Stations
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Station identifier (BigInt `tblStationId` or `stationCode`)
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  message Confirmation message
+ * @apiSuccess {Object}  data Deleted identifiers
+ * @apiSuccess {String}  data.stationCode Station code
+ * @apiSuccess {String}  data.tblStationId Station ID (string)
+ *
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Station not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function DELETE(
   request: NextRequest,

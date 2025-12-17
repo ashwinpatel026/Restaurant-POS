@@ -3,8 +3,59 @@ import { authenticatePOSRequest, addPOSSyncMetadata } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
 
 /**
- * GET /api/pos/sync/[storeCode]/orders
- * Get all orders for a store
+ * @api {get} /api/pos/sync/:storeCode/orders List orders
+ * @apiName GetOrders
+ * @apiGroup Orders
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam  {String} storeCode Store code (e.g., "LOC001")
+ *
+ * @apiQuery {Boolean} [incremental=false] When true, return records updated since `lastSyncAt`
+ * @apiQuery {String}  [lastSyncAt] ISO timestamp for incremental sync filter
+ * @apiQuery {String}  [status] Filter by order status (e.g., PENDING, COMPLETED)
+ * @apiQuery {String}  [orderType] Filter by order type (e.g., DINE_IN, TAKE_AWAY)
+ * @apiQuery {Number}  [limit] Maximum records to return
+ * @apiQuery {Number}  [offset=0] Records to skip (for pagination)
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  storeCode Store code used for the query
+ * @apiSuccess {Number}  count Number of records returned
+ * @apiSuccess {Number}  total Total matching records
+ * @apiSuccess {Object}  pagination Pagination info
+ * @apiSuccess {Object[]} data Array of orders with items
+ * @apiSuccess {String}  data.orderId Order ID (string)
+ * @apiSuccess {String}  data.orderNumber Order number
+ * @apiSuccess {String}  data.status Order status
+ * @apiSuccess {String}  data.orderType Order type
+ * @apiSuccess {Object[]} data.orderItems Order items (with `orderItemId` as string)
+ *
+ * @apiSuccessExample {json} 200 OK
+ * {
+ *   "success": true,
+ *   "storeCode": "LOC001",
+ *   "count": 1,
+ *   "total": 1,
+ *   "pagination": { "limit": 50, "offset": 0, "total": 1 },
+ *   "data": [
+ *     {
+ *       "orderId": "2001",
+ *       "orderNumber": "ORD-001",
+ *       "orderType": "DINE_IN",
+ *       "status": "PENDING",
+ *       "orderItems": [
+ *         { "orderItemId": "3001", "menuItemCode": "MI001", "quantity": 2 }
+ *       ]
+ *     }
+ *   ]
+ * }
+ *
+ * @apiError (400) BadRequest Invalid query parameters
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Store not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function GET(
   request: NextRequest,
@@ -97,8 +148,61 @@ export async function GET(
 }
 
 /**
- * POST /api/pos/sync/[storeCode]/orders
- * Create a new order
+ * @api {post} /api/pos/sync/:storeCode/orders Create order
+ * @apiName CreateOrder
+ * @apiGroup Orders
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam  {String} storeCode Store code
+ *
+ * @apiBody {String} orderNumber Unique order number
+ * @apiBody {String} orderType Order type (e.g., DINE_IN, TAKE_AWAY)
+ * @apiBody {String} [status=PENDING] Order status
+ * @apiBody {Number} [tableId] Table ID (integer)
+ * @apiBody {Object[]} [orderItems] Order items to create
+ * @apiBody {String} orderItems.menuItemCode Menu item code
+ * @apiBody {String} orderItems.name Menu item name
+ * @apiBody {Number} [orderItems.quantity=1] Quantity
+ * @apiBody {Number} [orderItems.price=0] Item price
+ * @apiBody {Number} [orderItems.subtotal] Item subtotal
+ * @apiBody {String} [orderItems.notes] Item notes
+ * @apiBody {String} [orderItems.status=PENDING] Item status
+ * @apiBody {Number} [subtotal=0] Order subtotal
+ * @apiBody {Number} [tax=0] Order tax
+ * @apiBody {Number} [discount=0] Order discount
+ * @apiBody {Number} [total=0] Order total
+ * @apiBody {String} [customerName] Customer name
+ * @apiBody {String} [customerPhone] Customer phone
+ * @apiBody {String} [notes] Order notes
+ * @apiBody {Number} [createdBy] User ID (integer) who created the order
+ *
+ * @apiParamExample {json} Request Body
+ * {
+ *   "orderNumber": "ORD-001",
+ *   "orderType": "DINE_IN",
+ *   "tableId": 5,
+ *   "orderItems": [
+ *     { "menuItemCode": "MI001", "name": "Burger", "quantity": 2, "price": 12.99 }
+ *   ],
+ *   "subtotal": 25.98,
+ *   "tax": 2.08,
+ *   "total": 28.06
+ * }
+ *
+ * @apiSuccess (201) {Boolean} success Request success flag
+ * @apiSuccess (201) {String}  message Confirmation message
+ * @apiSuccess (201) {Object}  data Created order with items
+ * @apiSuccess (201) {String}  data.orderId Order ID (string)
+ * @apiSuccess (201) {String}  data.orderNumber Order number
+ * @apiSuccess (201) {Object[]} data.orderItems Order items (with `orderItemId` as string)
+ *
+ * @apiError (400) BadRequest Missing or invalid body fields
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (409) Conflict Order number already exists
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function POST(
   request: NextRequest,

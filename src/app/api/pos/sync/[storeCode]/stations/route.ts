@@ -3,8 +3,31 @@ import { authenticatePOSRequest, addPOSSyncMetadata } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
 
 /**
- * GET /api/pos/sync/[storeCode]/stations
- * Get all stations for a store
+ * @api {get} /api/pos/sync/:storeCode/stations List stations
+ * @apiName GetStations
+ * @apiGroup Stations
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ *
+ * @apiQuery {Boolean} [incremental=false] When true, return records updated since `lastSyncAt`
+ * @apiQuery {String}  [lastSyncAt] ISO timestamp for incremental sync filter
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  storeCode Store code used for the query
+ * @apiSuccess {Number}  count Number of records returned
+ * @apiSuccess {Object[]} data Stations
+ * @apiSuccess {String}  data.tblStationId Station ID (string)
+ * @apiSuccess {String}  data.stationCode Station code
+ * @apiSuccess {String}  data.stationname Station name
+ * @apiSuccess {Number}  data.isActive Active flag
+ *
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Store not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function GET(
   request: NextRequest,
@@ -61,8 +84,44 @@ export async function GET(
 }
 
 /**
- * POST /api/pos/sync/[storeCode]/stations
- * Create a new station
+ * @api {post} /api/pos/sync/:storeCode/stations Create station
+ * @apiName CreateStation
+ * @apiGroup Stations
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ *
+ * @apiBody {String} stationCode Unique station code
+ * @apiBody {String} stationname Station name
+ * @apiBody {Boolean} [isActive=1] Active flag
+ * @apiBody {String} [stationGroups] Station group info
+ * @apiBody {Boolean} [isKitchen] Kitchen station flag
+ * @apiBody {Boolean} [isBar] Bar station flag
+ * @apiBody {Boolean} [isBill] Billing station flag
+ * @apiBody {Boolean} [isReport] Reporting station flag
+ * @apiBody {String} [ipAddress] Station IP address
+ * @apiBody {Number} [createdBy] User ID (integer) who created the station
+ *
+ * @apiParamExample {json} Request Body
+ * {
+ *   "stationCode": "KIT01",
+ *   "stationname": "Kitchen",
+ *   "isKitchen": true,
+ *   "isActive": 1
+ * }
+ *
+ * @apiSuccess (201) {Boolean} success Request success flag
+ * @apiSuccess (201) {String}  message Confirmation message
+ * @apiSuccess (201) {Object}  data Created station
+ * @apiSuccess (201) {String}  data.tblStationId Station ID (string)
+ *
+ * @apiError (400) BadRequest Missing or invalid body fields
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (409) Conflict Station code already exists
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function POST(
   request: NextRequest,

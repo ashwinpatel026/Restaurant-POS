@@ -3,8 +3,26 @@ import { authenticatePOSRequest } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
 
 /**
- * GET /api/pos/sync/[storeCode]/tables/[id]
- * Get a specific table by ID or table number
+ * @api {get} /api/pos/sync/:storeCode/tables/:id Get table
+ * @apiName GetTable
+ * @apiGroup Tables
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Table identifier (integer `tableId` or `tableNumber`)
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {Object}  data Table record
+ * @apiSuccess {String}  data.tableId Table ID (string)
+ * @apiSuccess {String}  data.tableNumber Table number/name
+ * @apiSuccess {Number}  data.seatingCapacity Seating capacity
+ *
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Table not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function GET(
   request: NextRequest,
@@ -66,8 +84,37 @@ export async function GET(
 }
 
 /**
- * PUT /api/pos/sync/[storeCode]/tables/[id]
- * Update a table
+ * @api {put} /api/pos/sync/:storeCode/tables/:id Update table
+ * @apiName UpdateTable
+ * @apiGroup Tables
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Table identifier (integer `tableId` or `tableNumber`)
+ *
+ * @apiBody {Number} [seatingCapacity] Seating capacity
+ * @apiBody {Number} [currentOccupancy] Current occupancy
+ * @apiBody {String} [location] Location/section
+ * @apiBody {Number} [status] Status code
+ *
+ * @apiParamExample {json} Request Body
+ * {
+ *   "seatingCapacity": 6,
+ *   "status": 1
+ * }
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  message Confirmation message
+ * @apiSuccess {Object}  data Updated table
+ * @apiSuccess {String}  data.tableId Table ID (string)
+ *
+ * @apiError (400) BadRequest Invalid JSON body
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Table not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function PUT(
   request: NextRequest,
@@ -155,8 +202,26 @@ export async function PUT(
 }
 
 /**
- * DELETE /api/pos/sync/[storeCode]/tables/[id]
- * Delete a table
+ * @api {delete} /api/pos/sync/:storeCode/tables/:id Delete table
+ * @apiName DeleteTable
+ * @apiGroup Tables
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Table identifier (integer `tableId` or `tableNumber`)
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  message Confirmation message
+ * @apiSuccess {Object}  data Deleted identifiers
+ * @apiSuccess {String}  data.tableNumber Table number/name
+ * @apiSuccess {String}  data.tableId Table ID (string)
+ *
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Table not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function DELETE(
   request: NextRequest,

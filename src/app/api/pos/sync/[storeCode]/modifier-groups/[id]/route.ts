@@ -3,8 +3,26 @@ import { authenticatePOSRequest, addPOSSyncMetadata } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
 
 /**
- * GET /api/pos/sync/[storeCode]/modifier-groups/[id]
- * Get a specific modifier group by ID or code
+ * @api {get} /api/pos/sync/:storeCode/modifier-groups/:id Get modifier group
+ * @apiName GetModifierGroup
+ * @apiGroup ModifierGroups
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Modifier group identifier (BigInt `id` or `modifierGroupCode`)
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {Object}  data Modifier group record
+ * @apiSuccess {String}  data.id Modifier group ID (string)
+ * @apiSuccess {String}  data.modifierGroupCode Modifier group code
+ * @apiSuccess {String}  data.groupName Display name
+ *
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Modifier group not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function GET(
   request: NextRequest,
@@ -71,8 +89,44 @@ export async function GET(
 }
 
 /**
- * PUT /api/pos/sync/[storeCode]/modifier-groups/[id]
- * Update a modifier group
+ * @api {put} /api/pos/sync/:storeCode/modifier-groups/:id Update modifier group
+ * @apiName UpdateModifierGroup
+ * @apiGroup ModifierGroups
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Modifier group identifier (BigInt `id` or `modifierGroupCode`)
+ *
+ * @apiBody {String} [groupName] Group display name
+ * @apiBody {String} [labelName] Label name
+ * @apiBody {Boolean} [isRequired] Whether selection is required
+ * @apiBody {Boolean} [isMultiselect] Allow multiple selections
+ * @apiBody {Number} [minSelection] Minimum selections
+ * @apiBody {Number} [maxSelection] Maximum selections
+ * @apiBody {Number} [priceStrategy] Pricing strategy
+ * @apiBody {Number} [price] Additional price
+ * @apiBody {String} [prefix] Display prefix
+ * @apiBody {Number|Boolean} [isActive] Active flag (1/0 or true/false)
+ *
+ * @apiParamExample {json} Request Body
+ * {
+ *   "groupName": "Add-ons",
+ *   "isRequired": true,
+ *   "maxSelection": 2
+ * }
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  message Confirmation message
+ * @apiSuccess {Object}  data Updated modifier group
+ * @apiSuccess {String}  data.id Modifier group ID (string)
+ *
+ * @apiError (400) BadRequest Invalid JSON body
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Modifier group not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function PUT(
   request: NextRequest,
@@ -175,8 +229,26 @@ export async function PUT(
 }
 
 /**
- * DELETE /api/pos/sync/[storeCode]/modifier-groups/[id]
- * Delete a modifier group
+ * @api {delete} /api/pos/sync/:storeCode/modifier-groups/:id Delete modifier group
+ * @apiName DeleteModifierGroup
+ * @apiGroup ModifierGroups
+ * @apiVersion 1.0.0
+ *
+ * @apiHeader {String} x-api-key API key for POS authentication
+ * @apiHeader {String} [Authorization] Bearer POS JWT token (alternative to API key)
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Modifier group identifier (BigInt `id` or `modifierGroupCode`)
+ *
+ * @apiSuccess {Boolean} success Request success flag
+ * @apiSuccess {String}  message Confirmation message
+ * @apiSuccess {Object}  data Deleted identifiers
+ * @apiSuccess {String}  data.modifierGroupCode Modifier group code
+ * @apiSuccess {String}  data.id Modifier group ID (string)
+ *
+ * @apiError (401) Unauthorized Authentication failed
+ * @apiError (404) NotFound Modifier group not found
+ * @apiError (500) InternalServerError Unexpected error
  */
 export async function DELETE(
   request: NextRequest,
