@@ -104,19 +104,38 @@ export async function GET(
  * @apiParam {String} id Menu item identifier (BigInt `menuItemId` or `menuItemCode`)
  *
  * @apiBody {String} [name] Menu item name
- * @apiBody {String} [kitchenName] Kitchen display name
- * @apiBody {String} [labelName] Label display name
+ * @apiBody {String} [menuMasterCode] Menu master code
+ * @apiBody {String[]} [menuCategoryCode] Menu category codes (array)
+ * @apiBody {String[]} [prepZoneCode] Prep zone codes (array)
+ * @apiBody {Number} [isPrice] Price flag (1/0)
  * @apiBody {Number} [cashPrice] Cash price
  * @apiBody {Number} [cardPrice] Card price
+ * @apiBody {Boolean} [inheritModifierGroup] Inherit modifiers from menu categories
+ * @apiBody {String[]} [modifierGroupCodes] Direct modifier group codes to assign (replaces existing)
+ * @apiBody {String} [taxCode] Tax code to apply
+ * @apiBody {Boolean} [inheritTaxInclusion] Inherit tax inclusion from category
+ * @apiBody {Boolean} [isTaxIncluded] Whether tax is included in price
+ * @apiBody {Boolean} [inheritDiningTax] Inherit dining tax from category
+ * @apiBody {String} [diningTaxEffect] Dining tax effect (e.g., "No Effect", "Add", "Subtract")
+ * @apiBody {Boolean} [disqualifyDiningTaxExemption] Disqualify dining tax exemption
  * @apiBody {Number|Boolean} [isActive] Active flag (1/0 or true/false)
- * @apiBody {String} [description] Description
- * @apiBody {Number} [stockinhand] Current stock
  * @apiBody {Number} [updatedBy] User ID (integer) who updated the item
+ * @apiBody {Object} [*] Any other menu item fields from schema
  *
  * @apiParamExample {json} Request Body
  * {
  *   "name": "Classic Burger (Large)",
+ *   "menuMasterCode": "MM001",
+ *   "menuCategoryCode": ["MC001", "MC002"],
+ *   "prepZoneCode": ["PZ001"],
+ *   "isPrice": 1,
  *   "cashPrice": 13.49,
+ *   "cardPrice": 14.49,
+ *   "inheritModifierGroup": true,
+ *   "modifierGroupCodes": ["MG001"],
+ *   "taxCode": "TAX001",
+ *   "inheritTaxInclusion": true,
+ *   "isTaxIncluded": false,
  *   "isActive": 1,
  *   "updatedBy": 1002
  * }
@@ -163,9 +182,10 @@ export async function PUT(
 
     // Find existing menu item
     let existingItem = null
-    const itemId = BigInt(id)
+    let itemId: bigint | null = null
     
     try {
+      itemId = BigInt(id)
       existingItem = await locationPrisma.menuItem.findFirst({
         where: {
           menuItemId: itemId,
@@ -192,29 +212,183 @@ export async function PUT(
       )
     }
 
+    const {
+      name,
+      menuMasterCode,
+      menuCategoryCode,
+      prepZoneCode,
+      isPrice,
+      cashPrice,
+      cardPrice,
+      isActive,
+      inheritModifierGroup,
+      modifierGroupCodes,
+      // Tax Configuration
+      taxCode,
+      inheritTaxInclusion,
+      isTaxIncluded,
+      inheritDiningTax,
+      diningTaxEffect,
+      disqualifyDiningTaxExemption,
+      updatedBy,
+      ...otherFields
+    } = body
+
     // Prepare update data with POS sync metadata
     const updateData: any = addPOSSyncMetadata({
-      updatedBy: body.updatedBy ? parseInt(body.updatedBy) : null
+      updatedBy: updatedBy ? parseInt(updatedBy) : null
     }, storeCode)
 
     // Preserve existing syncId - it should not change on update
     updateData.syncId = existingItem.syncId
 
-    // Update allowed fields
-    if (body.name !== undefined) updateData.name = body.name
-    if (body.kitchenName !== undefined) updateData.kitchenName = body.kitchenName
-    if (body.labelName !== undefined) updateData.labelName = body.labelName
-    if (body.cashPrice !== undefined) updateData.cashPrice = body.cashPrice ? parseFloat(body.cashPrice) : null
-    if (body.cardPrice !== undefined) updateData.cardPrice = body.cardPrice ? parseFloat(body.cardPrice) : null
-    if (body.isActive !== undefined) updateData.isActive = body.isActive ? 1 : 0
-    if (body.description !== undefined) updateData.description = body.description
-    if (body.stockinhand !== undefined) updateData.stockinhand = body.stockinhand ? parseFloat(body.stockinhand) : null
+    // Update basic fields
+    if (name !== undefined) updateData.name = name
+    if (menuMasterCode !== undefined) updateData.menuMasterCode = menuMasterCode || null
+    if (menuCategoryCode !== undefined) {
+      updateData.menuCategoryCode = menuCategoryCode 
+        ? (Array.isArray(menuCategoryCode) ? menuCategoryCode : [menuCategoryCode]) 
+        : null
+    }
+    if (prepZoneCode !== undefined) {
+      updateData.prepZoneCode = prepZoneCode 
+        ? (Array.isArray(prepZoneCode) ? prepZoneCode : [prepZoneCode]) 
+        : null
+    }
+    if (isPrice !== undefined) updateData.isPrice = isPrice ? 1 : 0
+    if (cashPrice !== undefined) updateData.cashPrice = cashPrice ? parseFloat(cashPrice) : null
+    if (cardPrice !== undefined) updateData.cardPrice = cardPrice ? parseFloat(cardPrice) : null
+    if (isActive !== undefined) updateData.isActive = isActive ? 1 : 0
+    if (inheritModifierGroup !== undefined) {
+      updateData.inheritModifierGroup = inheritModifierGroup ? true : false
+    }
+
+    // Tax Configuration
+    if (taxCode !== undefined) updateData.taxCode = taxCode || null
+    if (inheritTaxInclusion !== undefined) {
+      updateData.inheritTaxInclusion = inheritTaxInclusion ? true : false
+    }
+    if (isTaxIncluded !== undefined) {
+      updateData.isTaxIncluded = isTaxIncluded ? true : false
+    }
+    if (inheritDiningTax !== undefined) {
+      updateData.inheritDiningTax = inheritDiningTax ? true : false
+    }
+    if (diningTaxEffect !== undefined) updateData.diningTaxEffect = diningTaxEffect || "No Effect"
+    if (disqualifyDiningTaxExemption !== undefined) {
+      updateData.disqualifyDiningTaxExemption = disqualifyDiningTaxExemption ? true : false
+    }
+
+    // Add all other fields from schema if provided
+    const allowedFields = [
+      'kitchenName', 'labelName', 'colorCode', 'calories', 'description', 'itemSize',
+      'skuPlu', 'barcode', 'isAlcohol', 'menuImg', 'priceStrategy', 'stockinhand',
+      'isOutStock', 'itemContainAlcohol', 'isPosVisible', 'isKioskOrderPay',
+      'isOnlineOrderByApp', 'isOnlineOrdering', 'isCustomerInvoice'
+    ]
+
+    for (const field of allowedFields) {
+      if (otherFields[field] !== undefined) {
+        if (typeof otherFields[field] === 'boolean') {
+          updateData[field] = otherFields[field]
+        } else if (field === 'skuPlu' && otherFields[field]) {
+          updateData[field] = BigInt(otherFields[field])
+        } else if ((field === 'cashPrice' || field === 'cardPrice' || field === 'stockinhand') && otherFields[field]) {
+          updateData[field] = parseFloat(otherFields[field])
+        } else {
+          updateData[field] = otherFields[field]
+        }
+      }
+    }
 
     // Update menu item
     const updatedItem = await locationPrisma.menuItem.update({
       where: { menuItemId: existingItem.menuItemId },
       data: updateData
     })
+
+    // Handle modifier groups if provided
+    if (modifierGroupCodes !== undefined || inheritModifierGroup !== undefined) {
+      const menuItemCode = existingItem.menuItemCode
+
+      if (menuItemCode) {
+        // Delete existing modifier group assignments
+        await locationPrisma.menuItemModifierGroup.deleteMany({
+          where: {
+            menuItemCode,
+            storeCode
+          }
+        })
+
+        // Rebuild modifier groups
+        const modifierGroupsToAssign: string[] = []
+        const finalInheritModifierGroup = inheritModifierGroup !== undefined 
+          ? inheritModifierGroup 
+          : (existingItem.inheritModifierGroup || true)
+
+        // 1. If inheritModifierGroup is true, fetch modifiers from menu categories
+        if (finalInheritModifierGroup) {
+          const categoryCodes = updateData.menuCategoryCode 
+            ? (Array.isArray(updateData.menuCategoryCode) ? updateData.menuCategoryCode : [updateData.menuCategoryCode])
+            : (existingItem.menuCategoryCode 
+              ? (Array.isArray(existingItem.menuCategoryCode as any) 
+                ? (existingItem.menuCategoryCode as any) 
+                : [existingItem.menuCategoryCode])
+              : [])
+
+          if (categoryCodes.length > 0) {
+            const categoryModifiers = await locationPrisma.menuCategoryModifier.findMany({
+              where: {
+                menuCategoryCode: { in: categoryCodes },
+                storeCode
+              },
+              select: {
+                modifierGroupCode: true
+              }
+            })
+
+            // Get unique modifier group codes
+            const inheritedCodes = [...new Set(categoryModifiers.map(m => m.modifierGroupCode).filter(Boolean))]
+            modifierGroupsToAssign.push(...inheritedCodes)
+          }
+        }
+
+        // 2. Add directly provided modifier group codes
+        if (modifierGroupCodes && Array.isArray(modifierGroupCodes)) {
+          modifierGroupsToAssign.push(...modifierGroupCodes)
+        }
+
+        // Remove duplicates
+        const uniqueModifierGroups = [...new Set(modifierGroupsToAssign)]
+
+        // Insert modifier group assignments
+        if (uniqueModifierGroups.length > 0) {
+          const createdBy = updatedBy ? parseInt(updatedBy) : null
+
+          await locationPrisma.menuItemModifierGroup.createMany({
+            data: uniqueModifierGroups.map(modifierGroupCode => {
+              const modifierData = addPOSSyncMetadata(
+                {
+                  menuItemCode,
+                  modifierGroupCode,
+                  inheritFromMenuGroup: finalInheritModifierGroup ? 1 : 0,
+                  isInheritFromMenuCategory: finalInheritModifierGroup ? 1 : 0,
+                  isRequired: 0,
+                  isMultiselect: 0,
+                  createdBy,
+                  createdOn: new Date()
+                },
+                storeCode
+              )
+              // MenuItemModifierGroup doesn't have updatedOn/updatedBy
+              const { updatedOn, updatedBy: _, ...dataWithoutUpdated } = modifierData
+              return dataWithoutUpdated
+            }),
+            skipDuplicates: true
+          })
+        }
+      }
+    }
 
     return NextResponse.json({
       success: true,

@@ -581,6 +581,47 @@ model OrderItem {
   @@map("tbl_order_item")
 }
 
+model DepartmentType {
+
+  deptTypeId         BigInt    @id @default(autoincrement()) @map("dept_type_id")
+  deptTypeCode       String    @unique @map("dept_type_code") @db.VarChar(100)
+  name               String?   @map("name") @db.VarChar(500)
+  isActive           Int       @default(1) @map("is_active")
+  createdBy          BigInt?   @map("createdby")
+  createdOn          DateTime  @default(now()) @map("createdon")
+  updatedBy          BigInt?   @map("updatedby")
+  updatedOn          DateTime? @map("updatedon")
+  isSyncToWeb        Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal      Int       @default(0) @map("is_sync_to_local")
+  storeCode          String?   @map("store_code") @db.VarChar(100)
+  syncId             String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource         String?   @default("location") @map("sync_source") @db.VarChar(20)
+
+  @@map("tbl_department_type")
+}
+
+model Department {
+
+  deptId             BigInt    @id @default(autoincrement()) @map("dept_id")
+  deptCode           String    @unique @map("dept_code") @db.VarChar(100)
+  deptName           String?   @map("dept_name") @db.VarChar(500)
+  deptTaxCode        String?   @map("dept_taxcode") @db.VarChar(100)
+  deptTypeCode       String?   @map("dept_type") @db.VarChar(100)
+  isActive           Int       @default(1) @map("is_active")
+  createdBy          BigInt?   @map("createdby")
+  createdOn          DateTime  @default(now()) @map("createdon")
+  updatedBy          BigInt?   @map("updatedby")
+  updatedOn          DateTime? @map("updatedon")
+  isSyncToWeb        Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal      Int       @default(0) @map("is_sync_to_local")
+  storeCode          String?   @map("store_code") @db.VarChar(100)
+  syncId             String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource         String?   @default("location") @map("sync_source") @db.VarChar(20)
+
+  @@map("tbl_department")
+}
+
+
 // Enums
 enum UserRole {
   SUPER_ADMIN

@@ -132,6 +132,23 @@ const navigation: MenuItem[] = [
       },
     ],
   },
+  {
+    name: "Department",
+    icon: BuildingOfficeIcon,
+    roles: ["SUPER_ADMIN", "COMPANY_ADMIN", "DEALER_ADMIN"],
+    children: [
+      {
+        name: "Department",
+        href: "/master/department",
+        icon: BuildingOfficeIcon,
+      },
+      {
+        name: "Department Type",
+        href: "/master/department/type",
+        icon: FolderIcon,
+      },
+    ],
+  },
 ];
 
 export default function MasterDashboardLayout({
@@ -188,22 +205,65 @@ export default function MasterDashboardLayout({
 
   const isChildActive = (children?: MenuItem[]): boolean => {
     if (!children) return false;
-    return children.some(
-      (child) =>
-        !!child.href &&
-        (pathname === child.href || pathname.startsWith(child.href + "/"))
-    );
+    return children.some((child) => {
+      if (!child.href) return false;
+
+      // Exact match
+      if (pathname === child.href) return true;
+
+      // Check if pathname starts with child href + "/"
+      // But exclude sibling routes (routes at the same level)
+      if (pathname.startsWith(child.href + "/")) {
+        // Get all sibling hrefs (other children at same level)
+        const siblingHrefs = children
+          .map((c) => c.href)
+          .filter((href) => href && href !== child.href);
+
+        // Check if the pathname matches any sibling route exactly
+        // If it does, this child is not active
+        const matchesSibling = siblingHrefs.some(
+          (siblingHref) =>
+            pathname === siblingHref || pathname.startsWith(siblingHref + "/")
+        );
+
+        // Only return true if it doesn't match a sibling
+        return !matchesSibling;
+      }
+
+      return false;
+    });
   };
 
   // Auto-expand menu if any child is active (including nested add/edit pages)
   useEffect(() => {
     navigation.forEach((item) => {
       if (item.children) {
-        const hasActiveChild = item.children.some(
-          (child) =>
-            !!child.href &&
-            (pathname === child.href || pathname.startsWith(child.href + "/"))
-        );
+        const hasActiveChild = item.children.some((child) => {
+          if (!child.href) return false;
+
+          // Exact match
+          if (pathname === child.href) return true;
+
+          // Check if pathname starts with child href + "/"
+          if (pathname.startsWith(child.href + "/")) {
+            // Get all sibling hrefs (other children at same level)
+            const siblingHrefs = item.children
+              .map((c) => c.href)
+              .filter((href) => href && href !== child.href);
+
+            // Check if the pathname matches any sibling route exactly
+            const matchesSibling = siblingHrefs.some(
+              (siblingHref) =>
+                pathname === siblingHref ||
+                pathname.startsWith(siblingHref + "/")
+            );
+
+            // Only return true if it doesn't match a sibling
+            return !matchesSibling;
+          }
+
+          return false;
+        });
         if (hasActiveChild && !expandedMenus.includes(item.name)) {
           setExpandedMenus((prev) => [...prev, item.name]);
         }
@@ -296,10 +356,35 @@ export default function MasterDashboardLayout({
                     {isExpanded && (
                       <div className="ml-4 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-700 pl-4">
                         {item.children?.map((child) => {
-                          const isChildActive =
-                            !!child.href &&
-                            (pathname === child.href ||
-                              pathname.startsWith(child.href + "/"));
+                          if (!child.href) return null;
+
+                          // Exact match
+                          let isChildActive = pathname === child.href;
+
+                          // Check if pathname starts with child href + "/"
+                          if (
+                            !isChildActive &&
+                            pathname.startsWith(child.href + "/")
+                          ) {
+                            // Get all sibling hrefs (other children at same level)
+                            const siblingHrefs =
+                              item.children
+                                ?.map((c) => c.href)
+                                .filter(
+                                  (href) => href && href !== child.href
+                                ) || [];
+
+                            // Check if the pathname matches any sibling route exactly
+                            const matchesSibling = siblingHrefs.some(
+                              (siblingHref) =>
+                                pathname === siblingHref ||
+                                pathname.startsWith(siblingHref + "/")
+                            );
+
+                            // Only mark as active if it doesn't match a sibling
+                            isChildActive = !matchesSibling;
+                          }
+
                           return (
                             <Link
                               key={child.name}

@@ -29,6 +29,7 @@ import {
   FolderIcon,
   DocumentTextIcon,
   BuildingStorefrontIcon,
+  BuildingOfficeIcon,
 } from "@heroicons/react/24/outline";
 import { useTheme } from "@/contexts/ThemeContext";
 import StoreSelector from "@/components/store/StoreSelector";
@@ -93,6 +94,23 @@ const navigation: MenuItem[] = [
     href: "/dashboard/tax",
     icon: CalculatorIcon,
     roles: ["SUPER_ADMIN", "ADMIN", "OUTLET_MANAGER"],
+  },
+  {
+    name: "Department",
+    icon: BuildingOfficeIcon,
+    roles: ["SUPER_ADMIN", "ADMIN", "OUTLET_MANAGER"],
+    children: [
+      {
+        name: "Department",
+        href: "/dashboard/department",
+        icon: BuildingOfficeIcon,
+      },
+      {
+        name: "Department Type",
+        href: "/dashboard/department/type",
+        icon: FolderIcon,
+      },
+    ],
   },
   {
     name: "Station",
@@ -229,7 +247,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     width={280}
                     height={280}
                     className="object-contain"
-                    
                   />
                 </div>
               </Link>
