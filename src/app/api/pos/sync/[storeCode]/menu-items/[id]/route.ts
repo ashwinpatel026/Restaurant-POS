@@ -120,7 +120,6 @@ export async function GET(
  * @apiBody {Boolean} [disqualifyDiningTaxExemption] Disqualify dining tax exemption
  * @apiBody {Number|Boolean} [isActive] Active flag (1/0 or true/false)
  * @apiBody {Number} [updatedBy] User ID (integer) who updated the item
- * @apiBody {Object} [*] Any other menu item fields from schema
  *
  * @apiParamExample {json} Request Body
  * {
