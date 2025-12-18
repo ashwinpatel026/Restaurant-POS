@@ -92,7 +92,7 @@ export async function getUserAccessInfo(userId: number): Promise<UserAccessInfo>
 
     } else if (user.accessLevel === 'LOCATION') {
       // Get stores from user store access table - query directly since relation is removed
-      const storeAccesses = await prisma.userStoreAccess.findMany({
+      const storeAccesses = await masterPrisma.userStoreAccess.findMany({
         where: { userId: userId },
         select: { storeCode: true }
       })

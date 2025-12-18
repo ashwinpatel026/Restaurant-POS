@@ -30,7 +30,9 @@ const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const { data: session } = useSession();
-  const [selectedStoreCode, setSelectedStoreCodeState] = useState<string | null>(null);
+  const [selectedStoreCode, setSelectedStoreCodeState] = useState<
+    string | null
+  >(null);
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -72,16 +74,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
       // Check localStorage first
       let selectedStore: string | null = null;
-      
-      if (typeof window !== 'undefined') {
-        const savedStore = localStorage.getItem('selectedStoreCode');
+
+      if (typeof window !== "undefined") {
+        const savedStore = localStorage.getItem("selectedStoreCode");
         if (savedStore && accessibleCodes.includes(savedStore)) {
           selectedStore = savedStore;
         }
       }
 
       // Fallback to user default
-      if (!selectedStore && userDefaultStore && accessibleCodes.includes(userDefaultStore)) {
+      if (
+        !selectedStore &&
+        userDefaultStore &&
+        accessibleCodes.includes(userDefaultStore)
+      ) {
         selectedStore = userDefaultStore;
       }
 
@@ -105,7 +111,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const setSelectedStoreCode = useCallback((storeCode: string) => {
     setSelectedStoreCodeState(storeCode);
     StoreManager.saveToLocalStorage(storeCode);
-    
+
     // Dispatch event for any components that need to refresh
     window.dispatchEvent(
       new CustomEvent("storeChanged", {
@@ -141,4 +147,3 @@ export function useStore() {
   }
   return context;
 }
-
