@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { masterPrisma, locationPrisma } from '@/lib/databaseManager'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { syncMasterDataToLocation } from '@/services/syncService'
+import { randomBytes } from 'crypto'
 
 // GET single location
 export async function GET(
@@ -85,6 +86,7 @@ export async function GET(
       locationId: location.locationId.toString(),
       companyId: location.companyId?.toString() || null,
       dealerId: location.dealerId?.toString() || null,
+      apiKey: location.apiKey,
       company: company ? {
         ...company,
         companyId: company.companyId.toString()
@@ -216,12 +218,63 @@ export async function PUT(
       ...location,
       locationId: location.locationId.toString(),
       companyId: location.companyId?.toString() || null,
-      dealerId: location.dealerId?.toString() || null
+      dealerId: location.dealerId?.toString() || null,
+      apiKey: location.apiKey
     })
   } catch (error) {
     console.error('Error updating location:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+// Regenerate API key for a location
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const admin = await verifyMasterAdmin(request)
+    
+    if (!admin || !['SUPER_ADMIN', 'COMPANY_ADMIN', 'DEALER_ADMIN'].includes(admin.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const resolvedParams = await params
+    const locationId = BigInt(resolvedParams.id)
+    const body = await request.json()
+    const action = body.action
+
+    if (action === 'regenerate-api-key') {
+      // Generate new API key
+      const randomKey = randomBytes(32).toString('hex')
+      const newApiKey = `pos_${randomKey}`
+
+      const location = await masterPrisma.location.update({
+        where: { locationId },
+        data: {
+          apiKey: newApiKey,
+          updatedOn: new Date()
+        }
+      })
+
+      return NextResponse.json({
+        success: true,
+        apiKey: location.apiKey,
+        message: 'API key regenerated successfully'
+      })
+    }
+
+    return NextResponse.json(
+      { error: 'Invalid action' },
+      { status: 400 }
+    )
+  } catch (error: any) {
+    console.error('Error regenerating API key:', error)
+    return NextResponse.json(
+      { error: error.message || 'Internal server error' },
       { status: 500 }
     )
   }

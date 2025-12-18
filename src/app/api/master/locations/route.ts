@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { masterPrisma } from '@/lib/databaseManager'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { syncMasterDataToLocation } from '@/services/syncService'
+import { randomBytes } from 'crypto'
+
+// Helper function to generate secure API key
+function generateAPIKey(): string {
+  // Generate a 32-byte random key and convert to hex (64 characters)
+  // Prefix with 'pos_' to identify it as a POS API key
+  const randomKey = randomBytes(32).toString('hex')
+  return `pos_${randomKey}`
+}
 
 // Helper function to generate unique store code
 async function generateStoreCode(): Promise<string> {
@@ -202,10 +211,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Generate API key for the location
+    const apiKey = generateAPIKey()
+
     // Create location
     const locationData: any = {
       locationName,
       storeCode: finalStoreCode,
+      apiKey: apiKey,
       addressLine1: addressLine1 || null,
       addressLine2: addressLine2 || null,
       city: city || null,
@@ -244,7 +257,8 @@ export async function POST(request: NextRequest) {
       ...location,
       locationId: location.locationId.toString(),
       companyId: location.companyId?.toString() || null,
-      dealerId: location.dealerId?.toString() || null
+      dealerId: location.dealerId?.toString() || null,
+      apiKey: location.apiKey // Include API key in response for initial setup
     }, { status: 201 })
   } catch (error) {
     console.error('Error creating location:', error)

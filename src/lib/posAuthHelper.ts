@@ -107,57 +107,50 @@ async function verifyPOSJWT(token: string, requestedStoreCode?: string): Promise
 
 /**
  * Verify POS API key
- * For now, we'll use a simple API key stored in environment variables
- * In production, this should be stored in database per location
+ * API keys are stored in the database per location
  */
 async function verifyPOSAPIKey(apiKey: string, requestedStoreCode?: string): Promise<POSAuthResult> {
   try {
-    // Check environment variable for API keys (format: STORE_CODE:API_KEY)
-    const validApiKeys = process.env.POS_API_KEYS?.split(',') || []
-    
-    for (const validKeyPair of validApiKeys) {
-      const [storeCode, key] = validKeyPair.split(':')
-      
-      if (key === apiKey) {
-        // If storeCode is requested, verify it matches
-        if (requestedStoreCode && storeCode !== requestedStoreCode) {
-          continue
-        }
+    // Find location by API key
+    const location = await masterPrisma.location.findUnique({
+      where: { apiKey }
+    })
 
-        // Verify location exists and is active
-        const location = await masterPrisma.location.findUnique({
-          where: { storeCode }
-        })
+    if (!location) {
+      return {
+        isValid: false,
+        error: 'Invalid API key'
+      }
+    }
 
-        if (!location) {
-          continue
-        }
+    // If storeCode is requested, verify it matches
+    if (requestedStoreCode && location.storeCode !== requestedStoreCode) {
+      return {
+        isValid: false,
+        error: 'API key does not match the requested store code'
+      }
+    }
 
-        if (location.isActive !== 1) {
-          return {
-            isValid: false,
-            error: 'Location is not active'
-          }
-        }
+    // Verify location is active
+    if (location.isActive !== 1) {
+      return {
+        isValid: false,
+        error: 'Location is not active'
+      }
+    }
 
-        if (location.syncEnabled !== 1) {
-          return {
-            isValid: false,
-            error: 'Sync is disabled for this location'
-          }
-        }
-
-        return {
-          isValid: true,
-          storeCode: location.storeCode,
-          locationId: location.locationId
-        }
+    // Verify sync is enabled
+    if (location.syncEnabled !== 1) {
+      return {
+        isValid: false,
+        error: 'Sync is disabled for this location'
       }
     }
 
     return {
-      isValid: false,
-      error: 'Invalid API key'
+      isValid: true,
+      storeCode: location.storeCode,
+      locationId: location.locationId
     }
   } catch (error: any) {
     return {

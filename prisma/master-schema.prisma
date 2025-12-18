@@ -57,6 +57,7 @@ model Location {
   companyId        BigInt?   @map("company_id")
   dealerId         BigInt?   @map("dealer_id")
   storeCode        String    @unique @map("store_code") @db.VarChar(100) // Used to filter data in location DB
+  apiKey           String?   @unique @map("api_key") @db.VarChar(255) // API key for POS client authentication
   addressLine1     String?   @map("address_line1") @db.VarChar(500)
   addressLine2     String?   @map("address_line2") @db.VarChar(500)
   city             String?   @map("city") @db.VarChar(100)
@@ -79,6 +80,7 @@ model Location {
   @@index([companyId])
   @@index([dealerId])
   @@index([storeCode])
+  @@index([apiKey])
   @@map("tbl_location")
 }
 

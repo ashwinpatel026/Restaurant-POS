@@ -3,7 +3,12 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import MasterDashboardLayout from "@/components/layouts/MasterDashboardLayout";
-import { ArrowLeftIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowLeftIcon,
+  ClipboardIcon,
+  CheckIcon,
+  ArrowPathIcon,
+} from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { FormSkeleton } from "@/components/ui/SkeletonLoader";
 import {
@@ -13,6 +18,7 @@ import {
   formatZipcode,
 } from "@/lib/utils";
 import StatusToggle from "@/components/forms/StatusToggle";
+import ConfirmationModal from "@/components/modals/ConfirmationModal";
 
 interface Company {
   companyId: string;
@@ -41,6 +47,7 @@ interface Location {
   zipcode?: string;
   phone?: string;
   email?: string;
+  apiKey?: string;
   isActive: number;
   syncEnabled: number;
 }
@@ -54,6 +61,10 @@ export default function EditLocationPage() {
   const [location, setLocation] = useState<Location | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [formData, setFormData] = useState({
     storeCode: "",
     locationName: "",
@@ -106,6 +117,7 @@ export default function EditLocationPage() {
       if (locationRes.ok) {
         const locationData = await locationRes.json();
         setLocation(locationData);
+        setApiKey(locationData.apiKey || null);
         setFormData({
           storeCode: locationData.storeCode || "",
           locationName: locationData.locationName || "",
@@ -215,6 +227,42 @@ export default function EditLocationPage() {
       toast.error("Error updating location");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRegenerateApiKey = () => {
+    setShowRegenerateConfirm(true);
+  };
+
+  const confirmRegenerateApiKey = async () => {
+    setShowRegenerateConfirm(false);
+    setRegenerating(true);
+    try {
+      const token = localStorage.getItem("master_admin_token");
+      const response = await fetch(`/api/master/locations/${locationId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action: "regenerate-api-key" }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setApiKey(data.apiKey);
+        toast.success(
+          "API key regenerated successfully! Please copy the new key."
+        );
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to regenerate API key");
+      }
+    } catch (error) {
+      console.error("Error regenerating API key:", error);
+      toast.error("Error regenerating API key");
+    } finally {
+      setRegenerating(false);
     }
   };
 
@@ -511,6 +559,91 @@ export default function EditLocationPage() {
               </div>
             </div>
 
+            {/* API Key */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b pb-2">
+                API Key
+              </h3>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  POS API Key
+                  <span className="text-gray-500 text-xs ml-2">
+                    (Used for POS client authentication)
+                  </span>
+                </label>
+                {apiKey ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={apiKey}
+                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(apiKey);
+                        setCopied(true);
+                        toast.success("API key copied to clipboard!");
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                    >
+                      {copied ? (
+                        <>
+                          <CheckIcon className="w-5 h-5" />
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <ClipboardIcon className="w-5 h-5" />
+                          Copy
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleRegenerateApiKey}
+                      disabled={regenerating}
+                      className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      <ArrowPathIcon
+                        className={`w-5 h-5 ${
+                          regenerating ? "animate-spin" : ""
+                        }`}
+                      />
+                      {regenerating ? "Regenerating..." : "Regenerate"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value="No API key generated"
+                      className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-400 dark:text-gray-500 font-mono text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRegenerateApiKey}
+                      disabled={regenerating}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      <ArrowPathIcon
+                        className={`w-5 h-5 ${
+                          regenerating ? "animate-spin" : ""
+                        }`}
+                      />
+                      {regenerating ? "Generating..." : "Generate"}
+                    </button>
+                  </div>
+                )}
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Keep this key secure. It's used to authenticate POS clients.
+                </p>
+              </div>
+            </div>
+
             {/* Status */}
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white border-b pb-2">
@@ -563,6 +696,19 @@ export default function EditLocationPage() {
           </form>
         </div>
       </div>
+
+      {/* Regenerate API Key Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showRegenerateConfirm}
+        onClose={() => setShowRegenerateConfirm(false)}
+        onConfirm={confirmRegenerateApiKey}
+        title="Regenerate API Key"
+        message="Are you sure you want to regenerate the API key? The old key will no longer work and any POS clients using it will need to be updated with the new key."
+        confirmText="Regenerate"
+        cancelText="Cancel"
+        confirmButtonColor="orange"
+        isLoading={regenerating}
+      />
     </MasterDashboardLayout>
   );
 }

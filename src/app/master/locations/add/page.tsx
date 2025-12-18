@@ -3,7 +3,11 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import MasterDashboardLayout from "@/components/layouts/MasterDashboardLayout";
-import { ArrowLeftIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowLeftIcon,
+  ClipboardIcon,
+  CheckIcon,
+} from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import {
   formatFederalTaxId,
@@ -30,6 +34,8 @@ export default function AddLocationPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [dealers, setDealers] = useState<Dealer[]>([]);
   const [loading, setLoading] = useState(false);
+  const [createdApiKey, setCreatedApiKey] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [formData, setFormData] = useState({
     storeCode: "",
     locationName: "",
@@ -132,8 +138,16 @@ export default function AddLocationPage() {
       });
 
       if (response.ok) {
-        toast.success("Location created successfully");
-        router.push("/master/locations");
+        const data = await response.json();
+        if (data.apiKey) {
+          setCreatedApiKey(data.apiKey);
+          toast.success(
+            "Location created successfully! Please copy the API key below."
+          );
+        } else {
+          toast.success("Location created successfully");
+          router.push("/master/locations");
+        }
       } else {
         const error = await response.json();
         toast.error(error.error || "Failed to create location");
@@ -452,6 +466,58 @@ export default function AddLocationPage() {
               </div>
             </div>
 
+            {/* API Key Display (shown after creation) */}
+            {createdApiKey && (
+              <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-300 border-b border-blue-200 dark:border-blue-700 pb-2">
+                  API Key Generated
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  This API key is used for POS client authentication. Copy it
+                  now as it won't be shown again.
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={createdApiKey}
+                    className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(createdApiKey);
+                      setCopied(true);
+                      toast.success("API key copied to clipboard!");
+                      setTimeout(() => setCopied(false), 2000);
+                    }}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                  >
+                    {copied ? (
+                      <>
+                        <CheckIcon className="w-5 h-5" />
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <ClipboardIcon className="w-5 h-5" />
+                        Copy
+                      </>
+                    )}
+                  </button>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => router.push("/master/locations")}
+                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                  >
+                    Continue to Locations
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-end space-x-3 pt-4 border-t">
               <button
                 type="button"
@@ -462,10 +528,14 @@ export default function AddLocationPage() {
               </button>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !!createdApiKey}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
-                {loading ? "Creating..." : "Create Location"}
+                {loading
+                  ? "Creating..."
+                  : createdApiKey
+                  ? "Created"
+                  : "Create Location"}
               </button>
             </div>
           </form>
