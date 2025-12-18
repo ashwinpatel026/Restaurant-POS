@@ -238,7 +238,8 @@ export default function MasterDashboardLayout({
   useEffect(() => {
     navigation.forEach((item) => {
       if (item.children) {
-        const hasActiveChild = item.children.some((child) => {
+        const children = item.children; // Store in constant for TypeScript
+        const hasActiveChild = children.some((child) => {
           if (!child.href) return false;
 
           // Exact match
@@ -247,7 +248,7 @@ export default function MasterDashboardLayout({
           // Check if pathname starts with child href + "/"
           if (pathname.startsWith(child.href + "/")) {
             // Get all sibling hrefs (other children at same level)
-            const siblingHrefs = item.children
+            const siblingHrefs = children
               .map((c) => c.href)
               .filter((href) => href && href !== child.href);
 
