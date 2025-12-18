@@ -161,39 +161,76 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     );
   };
 
+  const isChildItemActive = (
+    child: MenuItem,
+    siblings?: MenuItem[]
+  ): boolean => {
+    if (!child.href) return false;
+
+    const childHref = child.href;
+
+    // Exact match
+    if (pathname === childHref) {
+      // Even on exact match, check if a longer sibling also matches exactly
+      // This prevents shorter paths from being active when a longer path matches exactly
+      if (siblings && siblings.length > 0) {
+        const longerMatchingSibling = siblings.find(
+          (sibling) =>
+            sibling.href &&
+            sibling.href.length > childHref.length &&
+            pathname === sibling.href
+        );
+        // If a longer sibling matches exactly, this child should not be active
+        if (longerMatchingSibling) return false;
+      }
+      return true;
+    }
+
+    // Check if pathname starts with child href + "/"
+    if (pathname.startsWith(childHref + "/")) {
+      // If there are siblings, check if any sibling has a longer matching path
+      // This prevents shorter paths from being active when a longer path matches
+      if (siblings && siblings.length > 0) {
+        const longerMatchingSibling = siblings.find(
+          (sibling) =>
+            sibling.href &&
+            sibling.href.length > childHref.length &&
+            (pathname === sibling.href ||
+              pathname.startsWith(sibling.href + "/"))
+        );
+        // If a longer sibling matches, this child should not be active
+        if (longerMatchingSibling) return false;
+      }
+      return true;
+    }
+
+    return false;
+  };
+
   const isMenuActive = (item: MenuItem): boolean => {
+    // Only mark as active if the item itself has an href that matches
+    // Don't mark parent items as active just because their children are active
     if (
       item.href &&
       (pathname === item.href || pathname.startsWith(item.href + "/"))
     )
       return true;
-    if (item.children) {
-      return item.children.some(
-        (child) =>
-          !!child.href &&
-          (pathname === child.href || pathname.startsWith(child.href + "/"))
-      );
-    }
+    // For items with children but no href, don't mark as active
+    // They should only be expanded, not highlighted
     return false;
   };
 
   const isChildActive = (children?: MenuItem[]): boolean => {
     if (!children) return false;
-    return children.some(
-      (child) =>
-        !!child.href &&
-        (pathname === child.href || pathname.startsWith(child.href + "/"))
-    );
+    return children.some((child) => isChildItemActive(child, children));
   };
 
   // Auto-expand menu if any child is active (including nested add/edit pages)
   useEffect(() => {
     navigation.forEach((item) => {
       if (item.children) {
-        const hasActiveChild = item.children.some(
-          (child) =>
-            !!child.href &&
-            (pathname === child.href || pathname.startsWith(child.href + "/"))
+        const hasActiveChild = item.children.some((child) =>
+          isChildItemActive(child, item.children)
         );
         if (hasActiveChild && !expandedMenus.includes(item.name)) {
           setExpandedMenus((prev) => [...prev, item.name]);
@@ -276,7 +313,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                       className={`
                         w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all duration-200 group
                         ${
-                          isActive || isChildActiveState
+                          isActive
                             ? "bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 font-medium"
                             : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                         }
@@ -299,10 +336,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                     {isExpanded && (
                       <div className="ml-4 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-700 pl-4">
                         {item.children?.map((child) => {
-                          const isChildActive =
-                            !!child.href &&
-                            (pathname === child.href ||
-                              pathname.startsWith(child.href + "/"));
+                          const isChildActiveState = isChildItemActive(
+                            child,
+                            item.children
+                          );
                           return (
                             <Link
                               key={child.name}
@@ -310,7 +347,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                               className={`
                                 flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 text-sm
                                 ${
-                                  isChildActive
+                                  isChildActiveState
                                     ? "bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 font-medium"
                                     : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
                                 }

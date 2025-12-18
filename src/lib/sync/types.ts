@@ -97,6 +97,8 @@ export const DEFAULT_SYNC_CONFIG: SyncConfig = {
 // Note: Master tables have "tbl_master_" prefix, location tables don't
 export const SYNC_TABLE_MAP: Record<string, string> = {
   'tbl_master_printer': 'tbl_printer',
+  'tbl_master_department_type': 'tbl_department_type',
+  'tbl_master_department': 'tbl_department',
   'tbl_master_menu_master': 'tbl_menu_master',
   'tbl_master_menu_category': 'tbl_menu_category',
   'tbl_master_menu_item': 'tbl_menu_item',
@@ -129,6 +131,18 @@ export const SYNC_FIELD_MAP: Record<string, Record<string, string>> = {
   'tbl_master_printer': {
     'printer_code': 'printer_code',
     'printer_name': 'printer_name',
+    'is_active': 'is_active',
+  },
+  'tbl_master_department_type': {
+    'dept_type_code': 'dept_type_code',
+    'name': 'name',
+    'is_active': 'is_active',
+  },
+  'tbl_master_department': {
+    'dept_code': 'dept_code',
+    'dept_name': 'dept_name',
+    'dept_taxcode': 'dept_taxcode',
+    'dept_type': 'dept_type',
     'is_active': 'is_active',
   },
   'tbl_master_menu_master': {
@@ -312,6 +326,8 @@ export const SYNC_FIELD_MAP: Record<string, Record<string, string>> = {
 // Column name for ordering records (varies by table)
 export const SYNC_ORDER_BY_COLUMN: Record<string, string> = {
   'tbl_master_printer': 'createdon',
+  'tbl_master_department_type': 'createdon',
+  'tbl_master_department': 'createdon',
   'tbl_master_menu_master': 'createdon',
   'tbl_master_menu_category': 'createdon',
   'tbl_master_menu_item': 'createdon',
@@ -340,6 +356,8 @@ export const SYNC_TABLE_ORDER: string[] = [
   'tbl_master_tax',
   'tbl_master_printer',
   'tbl_master_station',
+  'tbl_master_department_type',
+  'tbl_master_department',
   'tbl_master_time_events',
   'tbl_master_prep_zone',
   
@@ -368,6 +386,7 @@ export const SYNC_TABLE_DEPENDENCIES: Record<string, string[]> = {
   'tbl_master_menu_item': ['tbl_master_menu_master', 'tbl_master_menu_category'],
   'tbl_master_modifier_item': ['tbl_master_modifier_group'],
   'tbl_master_prep_zone': ['tbl_master_station', 'tbl_master_printer'],
+  'tbl_master_department': ['tbl_master_tax', 'tbl_master_department_type'],
   // Relationship/junction tables
   'tbl_master_menu_master_event': ['tbl_master_menu_master', 'tbl_master_time_events'],
   'tbl_master_menu_category_modifier': ['tbl_master_menu_category', 'tbl_master_modifier_group'],

@@ -752,6 +752,8 @@ export class SyncProcessor {
       { pattern: /^(MI\d+)$/, prefix: targetPrefix },
       { pattern: /^(MOD\d+)$/, prefix: targetPrefix },
       { pattern: /^(MOI\d+)$/, prefix: targetPrefix },
+      { pattern: /^(DPT\d+)$/, prefix: targetPrefix },
+      { pattern: /^(DEP\d+)$/, prefix: targetPrefix },
     ];
 
     for (const { pattern, prefix } of masterPatterns) {
@@ -797,7 +799,7 @@ export class SyncProcessor {
       // Skip ID fields
       if (key === 'tbl_tax_id' || key === 'printer_id' || key === 'prep_zone_id' ||
           key === 'menu_master_id' || key === 'menu_category_id' || key === 'menu_item_id' ||
-          key === 'tbl_station_id' || key === 'id') {
+          key === 'tbl_station_id' || key === 'dept_type_id' || key === 'dept_id' || key === 'id') {
         continue;
       }
 
@@ -831,7 +833,8 @@ export class SyncProcessor {
         const codeFields = [
           'tax_code', 'printer_code', 'backup_printer_code', 'station_code',
           'event_code', 'prep_zone_code', 'menu_master_code', 'menu_category_code',
-          'menu_item_code', 'modifier_group_code', 'modifier_item_code'
+          'menu_item_code', 'modifier_group_code', 'modifier_item_code',
+          'dept_type_code', 'dept_code', 'dept_taxcode', 'dept_type'
         ];
 
         // Check if this is a code field (case-insensitive check)
@@ -890,7 +893,7 @@ export class SyncProcessor {
       // Skip ID fields (auto-increment primary keys)
       if (key === 'tbl_tax_id' || key === 'printer_id' || key === 'prep_zone_id' ||
           key === 'menu_master_id' || key === 'menu_category_id' || key === 'menu_item_id' ||
-          key === 'tbl_station_id' || key === 'id') {
+          key === 'tbl_station_id' || key === 'dept_type_id' || key === 'dept_id' || key === 'id') {
         continue;
       }
 
@@ -1052,6 +1055,42 @@ export class SyncProcessor {
                 mappedData[mappedKey] = value;
               }
             }
+            // Transform dept_type_code (in any table)
+            else if (key === 'dept_type_code') {
+              const deptTypeMatch = codeValue.match(/^(DPT\d+)$/);
+              if (deptTypeMatch) {
+                mappedData[mappedKey] = `WM${locationCode}${deptTypeMatch[1]}`;
+              } else {
+                mappedData[mappedKey] = value;
+              }
+            }
+            // Transform dept_code (in any table)
+            else if (key === 'dept_code') {
+              const deptMatch = codeValue.match(/^(DEP\d+)$/);
+              if (deptMatch) {
+                mappedData[mappedKey] = `WM${locationCode}${deptMatch[1]}`;
+              } else {
+                mappedData[mappedKey] = value;
+              }
+            }
+            // Transform dept_taxcode (foreign key reference in department table)
+            else if (key === 'dept_taxcode') {
+              const deptTaxMatch = codeValue.match(/^(TAX\d+)$/);
+              if (deptTaxMatch) {
+                mappedData[mappedKey] = `WM${locationCode}${deptTaxMatch[1]}`;
+              } else {
+                mappedData[mappedKey] = value;
+              }
+            }
+            // Transform dept_type (foreign key reference in department table)
+            else if (key === 'dept_type') {
+              const deptTypeRefMatch = codeValue.match(/^(DPT\d+)$/);
+              if (deptTypeRefMatch) {
+                mappedData[mappedKey] = `WM${locationCode}${deptTypeRefMatch[1]}`;
+              } else {
+                mappedData[mappedKey] = value;
+              }
+            }
             else {
               mappedData[mappedKey] = value;
             }
@@ -1112,6 +1151,12 @@ export class SyncProcessor {
       } else if (parentTable === 'tbl_master_time_events') {
         foreignKeyField = 'Event_code';
         foreignKeyValue = mappedData.event_code;
+      } else if (parentTable === 'tbl_master_tax') {
+        foreignKeyField = 'tax_code';
+        foreignKeyValue = mappedData.dept_taxcode; // For department table, tax is referenced as dept_taxcode
+      } else if (parentTable === 'tbl_master_department_type') {
+        foreignKeyField = 'dept_type_code';
+        foreignKeyValue = mappedData.dept_type; // For department table, department type is referenced as dept_type
       } else if (parentTable === 'tbl_user') {
         // For user_store_access, user_id references users.id (not a code field)
         // We'll validate by checking if user exists by email (since user_id needs to be mapped)
@@ -1234,6 +1279,12 @@ export class SyncProcessor {
       } else if (parentTable === 'tbl_master_time_events') {
         foreignKeyField = 'Event_code';
         foreignKeyValue = mappedData.event_code;
+      } else if (parentTable === 'tbl_master_tax') {
+        foreignKeyField = 'tax_code';
+        foreignKeyValue = mappedData.dept_taxcode; // For department table, tax is referenced as dept_taxcode
+      } else if (parentTable === 'tbl_master_department_type') {
+        foreignKeyField = 'dept_type_code';
+        foreignKeyValue = mappedData.dept_type; // For department table, department type is referenced as dept_type
       } else if (parentTable === 'tbl_user') {
         // For user_store_access, user_id references users.id (not a code field)
         // We'll validate by checking if user exists by sync_id (since user_id needs to be mapped)
@@ -2063,6 +2114,8 @@ export class SyncProcessor {
       'tbl_master_printer': 'printer_code',
       'tbl_master_station': 'station_code',
       'tbl_master_prep_zone': 'prep_zone_code',
+      'tbl_master_department_type': 'dept_type_code',
+      'tbl_master_department': 'dept_code',
       'tbl_master_menu_master': 'menu_master_code',
       'tbl_master_menu_category': 'menu_category_code',
       'tbl_master_menu_item': 'menu_item_code',

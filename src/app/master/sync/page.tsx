@@ -66,6 +66,8 @@ export default function SyncManagementPage() {
   const syncableTables = [
     { value: "", label: "All Tables" },
     { value: "tbl_master_printer", label: "Printer Master" },
+    { value: "tbl_master_department_type", label: "Department Type" },
+    { value: "tbl_master_department", label: "Department" },
     { value: "tbl_master_menu_master", label: "Menu Master" },
     { value: "tbl_master_menu_category", label: "Menu Category" },
     { value: "tbl_master_menu_item", label: "Menu Item" },
