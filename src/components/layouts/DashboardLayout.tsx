@@ -40,6 +40,10 @@ interface MenuItem {
   icon: any;
   iconImage?: string; // For custom image icons
   roles?: string[];
+  // Optional permission codes required to see this item.
+  // If provided, user must have at least one of these permissions
+  // from the location database (synced permissions).
+  permissions?: string[];
   children?: MenuItem[];
 }
 
@@ -49,43 +53,52 @@ const navigation: MenuItem[] = [
   {
     name: "Menu Master",
     icon: CubeIcon,
-    roles: ["SUPER_ADMIN", "ADMIN"],
+    // Any role can use this, but visibility is controlled by permissions below
+    permissions: ["menu.view", "menu.manage", "menu.read", "menu.create", "menu.update"],
     children: [
       {
         name: "Menu Master",
         href: "/dashboard/menu/masters",
         icon: BuildingStorefrontIcon,
         iconImage: "/assets/icon/menu_10154074.png",
+        permissions: ["menu.view", "menu.manage", "menu.read"],
       },
       {
         name: "Menu Category",
         href: "/dashboard/menu/categories",
         icon: FolderIcon,
+        permissions: ["menu.view", "menu.manage", "menu.read"],
       },
       {
         name: "Menu Items",
         href: "/dashboard/menu/items",
         icon: DocumentTextIcon,
+        permissions: ["menu.view", "menu.manage", "menu.read"],
       },
       {
         name: "Modifiers",
         href: "/dashboard/modifiers",
         icon: TagIcon,
+        // You can later add a dedicated modifiers.* permission; for now tie to menu
+        permissions: ["menu.view", "menu.manage", "menu.read"],
       },
       {
         name: "Prep-Zone",
         href: "/dashboard/prep-zone",
         icon: CubeIcon,
+        permissions: ["menu.view", "menu.manage", "menu.read"],
       },
       {
         name: "Time Events",
         href: "/dashboard/events",
         icon: ClockIcon,
+        permissions: ["menu.view", "menu.manage", "menu.read"],
       },
       {
         name: "Printer",
         href: "/dashboard/printer",
         icon: PrinterIcon,
+        permissions: ["menu.view", "menu.manage", "menu.read"],
       },
     ],
   },
@@ -131,8 +144,14 @@ const navigation: MenuItem[] = [
     href: "/dashboard/users",
     icon: UserGroupIcon,
     roles: ["SUPER_ADMIN", "ADMIN"],
+    permissions: ["users.view", "users.manage", "users.read"],
   },
-  { name: "Settings", href: "/dashboard/settings", icon: Cog6ToothIcon },
+  {
+    name: "Settings",
+    href: "/dashboard/settings",
+    icon: Cog6ToothIcon,
+    permissions: ["settings.view", "settings.manage"],
+  },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -141,17 +160,82 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
+  const [userPermissions, setUserPermissions] = useState<string[] | null>(null);
+  const [loadingPermissions, setLoadingPermissions] = useState(false);
   const { theme, toggleTheme } = useTheme();
+
+  // Load permissions for the current user from location database (via API)
+  useEffect(() => {
+    const loadPermissions = async () => {
+      try {
+        if (!session?.user?.role) return;
+        setLoadingPermissions(true);
+        const res = await fetch("/api/dashboard/user-permissions");
+        if (!res.ok) {
+          // If permission API fails, fall back to role-based only
+          console.error("Failed to fetch user permissions");
+          return;
+        }
+        const data = await res.json();
+        if (Array.isArray(data.permissions)) {
+          setUserPermissions(data.permissions);
+        }
+      } catch (err) {
+        console.error("Error fetching user permissions", err);
+      } finally {
+        setLoadingPermissions(false);
+      }
+    };
+
+    loadPermissions();
+  }, [session?.user?.role]);
+
+  const hasAnyPermission = (required?: string[]): boolean => {
+    if (!required || required.length === 0) return true;
+    if (!userPermissions || loadingPermissions) return false;
+    return required.some((code) => userPermissions.includes(code));
+  };
 
   const handleLogout = async () => {
     await signOut({ redirect: false });
     router.push("/login");
   };
 
-  const filteredNavigation = navigation.filter((item) => {
-    if (!item.roles) return true;
-    return item.roles.includes(session?.user?.role || "");
-  });
+  const userRole = session?.user?.role || "";
+
+  const filterMenuItem = (item: MenuItem): MenuItem | null => {
+    // Check role restriction if present
+    if (item.roles && !item.roles.includes(userRole)) {
+      return null;
+    }
+
+    // Check permission requirement if present
+    if (!hasAnyPermission(item.permissions)) {
+      // If this item has children, we still allow it if at least one child is visible
+      // after filtering by permissions/roles
+      if (!item.children || item.children.length === 0) {
+        return null;
+      }
+    }
+
+    // Filter children recursively
+    let children: MenuItem[] | undefined = undefined;
+    if (item.children && item.children.length > 0) {
+      children = item.children
+        .map((child) => filterMenuItem(child))
+        .filter((child): child is MenuItem => child !== null);
+      // If no visible children and no direct href, hide parent
+      if ((!children || children.length === 0) && !item.href) {
+        return null;
+      }
+    }
+
+    return { ...item, children };
+  };
+
+  const filteredNavigation = navigation
+    .map((item) => filterMenuItem(item))
+    .filter((item): item is MenuItem => item !== null);
 
   const toggleMenu = (menuName: string) => {
     setExpandedMenus((prev) =>

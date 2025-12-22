@@ -5,6 +5,8 @@
 
 import { prisma } from '@/lib/database'
 import { masterPrisma } from '@/lib/databaseManager'
+import { hasPermission as hasMasterPermission } from './permissionService'
+import { hasPermission as hasLocationPermission } from './locationPermissionService'
 
 export interface UserAccessInfo {
   userId: number
@@ -174,5 +176,69 @@ export function canAccessStore(
     return true
   }
   return accessInfo.accessibleStoreCodes.includes(storeCode)
+}
+
+/**
+ * Check permission in master database (for master API routes)
+ * @param admin Admin object from verifyMasterAdmin
+ * @param permissionCode Permission code to check (e.g., 'users.create')
+ * @returns Promise<boolean>
+ */
+export async function checkMasterPermission(
+  admin: any,
+  permissionCode: string
+): Promise<boolean> {
+  try {
+    if (!admin || !admin.role) {
+      return false
+    }
+
+    // SUPER_ADMIN always has all permissions
+    if (admin.role === 'SUPER_ADMIN') {
+      return true
+    }
+
+    // If permission tables don't exist yet, allow access (for initial setup)
+    try {
+      return await hasMasterPermission(admin.role, permissionCode)
+    } catch (error: any) {
+      // If tables don't exist (e.g., migrations not run), allow access
+      if (error?.code === 'P2021' || error?.message?.includes('does not exist')) {
+        console.warn('Permission tables not found, allowing access:', error.message)
+        return true
+      }
+      throw error
+    }
+  } catch (error) {
+    console.error('Error checking master permission:', error)
+    return false
+  }
+}
+
+/**
+ * Check permission in location database (for dashboard API routes)
+ * @param userRole User role code
+ * @param permissionCode Permission code to check (e.g., 'menu.create')
+ * @returns Promise<boolean>
+ */
+export async function checkLocationPermission(
+  userRole: string,
+  permissionCode: string
+): Promise<boolean> {
+  try {
+    if (!userRole) {
+      return false
+    }
+
+    // SUPER_ADMIN always has all permissions
+    if (userRole === 'SUPER_ADMIN') {
+      return true
+    }
+
+    return await hasLocationPermission(userRole, permissionCode)
+  } catch (error) {
+    console.error('Error checking location permission:', error)
+    return false
+  }
 }
 

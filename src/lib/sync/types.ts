@@ -110,6 +110,10 @@ export const SYNC_TABLE_MAP: Record<string, string> = {
   'tbl_master_time_events': 'tbl_time_events',
   // User management tables - Individual sync only (not in full sync)
   'tbl_user': 'users',
+  // Permission system tables
+  'tbl_permission': 'permissions',
+  'tbl_role': 'roles',
+  'tbl_role_permission': 'role_permissions',
   // Relationship/junction tables
   'tbl_master_menu_master_event': 'tbl_menu_master_event',
   'tbl_master_menu_category_modifier': 'tbl_menu_category_modifier',
@@ -315,6 +319,26 @@ export const SYNC_FIELD_MAP: Record<string, Record<string, string>> = {
     'min_selection': 'min_selection',
     'max_selection': 'max_selection',
   },
+  // Permission system tables
+  'tbl_permission': {
+    'permission_code': 'permission_code',
+    'permission_name': 'permission_name',
+    'module': 'module',
+    'action': 'action',
+    'description': 'description',
+    'is_active': 'is_active',
+  },
+  'tbl_role': {
+    'role_code': 'role_code',
+    'role_name': 'role_name',
+    'description': 'description',
+    'is_system_role': 'is_system_role',
+    'is_active': 'is_active',
+  },
+  'tbl_role_permission': {
+    'role_code': 'role_code',
+    'permission_code': 'permission_code',
+  },
 };
 
 // Column name for ordering records (varies by table)
@@ -333,6 +357,10 @@ export const SYNC_ORDER_BY_COLUMN: Record<string, string> = {
   'tbl_master_time_events': 'created_date',
   // User management tables - Individual sync only (not in full sync)
   'tbl_user': 'created_on',
+  // Permission system tables
+  'tbl_permission': 'created_on',
+  'tbl_role': 'created_on',
+  'tbl_role_permission': 'created_on',
   // Relationship/junction tables
   'tbl_master_menu_master_event': 'createdon',
   'tbl_master_menu_category_modifier': 'createdon',
@@ -354,6 +382,11 @@ export const SYNC_TABLE_ORDER: string[] = [
   'tbl_master_time_events',
   'tbl_master_prep_zone',
   
+  // Permission system tables (must sync before users)
+  'tbl_permission',              // Independent
+  'tbl_role',                    // Independent
+  'tbl_role_permission',         // Depends on tbl_permission and tbl_role
+  
   // User management - REMOVED: synced separately
   
   // Menu hierarchy (parent -> child)
@@ -374,6 +407,8 @@ export const SYNC_TABLE_ORDER: string[] = [
 // Table dependencies: child table -> parent table(s)
 export const SYNC_TABLE_DEPENDENCIES: Record<string, string[]> = {
   // User management dependencies - REMOVED: synced separately
+  // Permission system dependencies
+  'tbl_role_permission': ['tbl_permission', 'tbl_role'],
   // Menu dependencies
   'tbl_master_menu_category': ['tbl_master_menu_master'],
   'tbl_master_menu_item': ['tbl_master_menu_master', 'tbl_master_menu_category'],

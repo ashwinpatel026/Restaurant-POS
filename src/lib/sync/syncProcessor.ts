@@ -18,6 +18,17 @@ import {
 import { syncValidator } from './syncValidator';
 
 export class SyncProcessor {
+  // Tables that are global (not store-specific) - don't use store_code
+  // These tables are synced once per location database, not per store_code
+  private readonly GLOBAL_TABLES = new Set([
+    'permissions',      // Location table name
+    'tbl_permission',   // Master table name
+    'roles',            // Location table name
+    'tbl_role',         // Master table name
+    'role_permissions', // Location table name
+    'tbl_role_permission', // Master table name
+  ]);
+
   // List of boolean columns that need special handling
   private readonly BOOLEAN_COLUMNS = new Set([
     'inherit_tax_inclusion',
@@ -33,7 +44,12 @@ export class SyncProcessor {
   ]);
 
   // Table-specific boolean columns (columns that are boolean in some tables, integer in others)
+  // Note: Use location table names here (as that's what handleInsert/handleUpdate receive)
   private readonly TABLE_BOOLEAN_COLUMNS: Record<string, Set<string>> = {
+    'permissions': new Set(['is_active']),  // Location table name
+    'tbl_permission': new Set(['is_active']),  // Master table name (for reverse lookup)
+    'roles': new Set(['is_active', 'is_system_role']),  // Location table name
+    'tbl_role': new Set(['is_active', 'is_system_role']),  // Master table name (for reverse lookup)
   };
 
   // Table-specific integer columns (columns that are integer in some tables)
@@ -43,8 +59,8 @@ export class SyncProcessor {
 
   // List of integer columns that might come as boolean but should be converted to integer
   // These columns are integers in the database but might be stored/read as boolean
+  // Note: is_active is NOT here for tbl_permission and tbl_role (they use boolean)
   private readonly INTEGER_COLUMNS = new Set([
-    'is_active',
     'is_required',
     'is_multiselect',
     'is_sync_to_web',
@@ -272,8 +288,9 @@ export class SyncProcessor {
       targetLocationCode
     );
     
-    // Set target store_code (skip for users table - it doesn't have store_code column)
-    if (locationTableName !== 'users') {
+    // Set target store_code (skip for users table and global tables - they don't use store_code)
+    const isGlobalTable = this.GLOBAL_TABLES.has(tableName) || this.GLOBAL_TABLES.has(locationTableName);
+    if (locationTableName !== 'users' && !isGlobalTable) {
       mappedData.store_code = targetLocationCode;
     }
     
@@ -284,7 +301,10 @@ export class SyncProcessor {
     // or will be created as part of the sync process. Don't block on FK validation.
     // Note: This allows cloning even if parent records don't exist yet (they'll be synced in order)
 
-    // Special handling for user tables (they don't have primary code fields)
+    // Special handling for different table types:
+    // 1. User tables: check by email (no store_code)
+    // 2. Global tables: check by code only (no store_code)
+    // 3. Other tables: check by code + store_code
     const isUserTable = tableName === 'tbl_user';
     let existing;
     
@@ -296,6 +316,33 @@ export class SyncProcessor {
         SELECT sync_id FROM ${locationTableName}
         WHERE email = '${escapedEmail}'::VARCHAR
       `);
+    } else if (isGlobalTable) {
+      // For global tables (permissions, roles, role_permissions), check by code only (no store_code)
+      const primaryCodeField = this.getPrimaryCodeField(tableName);
+      if (!primaryCodeField || !mappedData[primaryCodeField]) {
+        throw new Error(`Cannot determine primary code field for table ${tableName}`);
+      }
+
+      const primaryCodeValue = mappedData[primaryCodeField];
+      const escapedCode = String(primaryCodeValue).replace(/'/g, "''");
+
+      // For role_permissions, check by composite key (role_code + permission_code)
+      if (locationTableName === 'role_permissions' && mappedData.role_code && mappedData.permission_code) {
+        const escapedRoleCode = String(mappedData.role_code).replace(/'/g, "''");
+        const escapedPermissionCode = String(mappedData.permission_code).replace(/'/g, "''");
+        
+        existing = await locationPrisma.$queryRawUnsafe(`
+          SELECT sync_id FROM ${locationTableName}
+          WHERE "role_code" = '${escapedRoleCode}'::VARCHAR
+            AND "permission_code" = '${escapedPermissionCode}'::VARCHAR
+        `);
+      } else {
+        // For permissions and roles, check by code only
+        existing = await locationPrisma.$queryRawUnsafe(`
+          SELECT sync_id FROM ${locationTableName}
+          WHERE "${primaryCodeField}" = '${escapedCode}'::VARCHAR
+        `);
+      }
     } else {
       // For other tables, get the primary code field and check by code and store_code
       const primaryCodeField = this.getPrimaryCodeField(tableName);
@@ -380,18 +427,25 @@ export class SyncProcessor {
     const mappedData = this.mapFieldsToLocationTable(tableName, recordData, locationCode);
     
     // Add store_code from locationCode (most location tables have store_code column)
-    // Exception: users table doesn't have store_code
-    if (locationTableName !== 'users') {
+    // Exceptions: 
+    // - users table doesn't have store_code
+    // - Global tables (permissions, roles, role_permissions) don't use store_code
+    const isGlobalTable = this.GLOBAL_TABLES.has(tableName) || this.GLOBAL_TABLES.has(locationTableName);
+    if (locationTableName !== 'users' && !isGlobalTable) {
       mappedData.store_code = locationCode;
     }
     
     console.log(`Mapped data for ${tableName} -> ${locationTableName}:`, Object.keys(mappedData));
 
-    // Validate foreign key references before syncing
-    await this.validateForeignKeyReferences(tableName, locationTableName, mappedData, locationCode);
+    // Validate foreign key references before syncing (skip for global tables as they're synced in order)
+    if (!isGlobalTable) {
+      await this.validateForeignKeyReferences(tableName, locationTableName, mappedData, locationCode);
+    }
 
-    // Special handling for user tables: sync by sync_id only (no code + store_code check)
-    // This allows multiple users to be assigned to the same store_code (location)
+    // Special handling for different table types:
+    // 1. User tables: sync by sync_id only (no code + store_code check)
+    // 2. Global tables (permissions, roles, role_permissions): sync by code only (no store_code)
+    // 3. Other tables: sync by code + store_code
     const isUserTable = tableName === 'tbl_user';
     let existingRecordSyncId: string | null = null;
     
@@ -410,6 +464,57 @@ export class SyncProcessor {
       if (existing && existing.length > 0) {
         existingRecordSyncId = existing[0].sync_id;
         console.log(`Found existing record by sync_id = ${recordId} for ${locationTableName}`);
+      }
+    } else if (isGlobalTable) {
+      // For global tables (permissions, roles, role_permissions), check by code only (no store_code)
+      // These tables are synced once per location database, not per store
+      // Try both master and location table names for getPrimaryCodeField
+      const codeFieldForMaster = this.getPrimaryCodeField(tableName);
+      const codeFieldForLocation = this.getPrimaryCodeField(locationTableName);
+      const primaryCodeField = codeFieldForLocation || codeFieldForMaster;
+      
+      console.log(`[applySyncOperation] Global table check: tableName=${tableName}, locationTableName=${locationTableName}, primaryCodeField=${primaryCodeField}, mappedData keys:`, Object.keys(mappedData));
+      
+      if (primaryCodeField && mappedData[primaryCodeField]) {
+        const primaryCodeValue = mappedData[primaryCodeField];
+        const escapedCode = String(primaryCodeValue).replace(/'/g, "''");
+
+        // For role_permissions, check by composite key (role_code + permission_code)
+        if (locationTableName === 'role_permissions' && mappedData.role_code && mappedData.permission_code) {
+          const escapedRoleCode = String(mappedData.role_code).replace(/'/g, "''");
+          const escapedPermissionCode = String(mappedData.permission_code).replace(/'/g, "''");
+          
+          const existing = await locationPrisma.$queryRawUnsafe<any[]>(`
+            SELECT sync_id FROM ${locationTableName}
+            WHERE "role_code" = '${escapedRoleCode}'::VARCHAR
+              AND "permission_code" = '${escapedPermissionCode}'::VARCHAR
+            LIMIT 1
+          `);
+
+          if (existing && existing.length > 0) {
+            existingRecordSyncId = existing[0].sync_id;
+            console.log(`[applySyncOperation] Found existing role_permission by role_code=${mappedData.role_code} and permission_code=${mappedData.permission_code}, sync_id=${existingRecordSyncId}`);
+          }
+        } else {
+          // For permissions and roles, check by code only
+          console.log(`[applySyncOperation] Checking for existing ${locationTableName} with ${primaryCodeField}='${primaryCodeValue}'`);
+          const existing = await locationPrisma.$queryRawUnsafe<any[]>(`
+            SELECT sync_id FROM ${locationTableName}
+            WHERE "${primaryCodeField}" = '${escapedCode}'::VARCHAR
+            LIMIT 1
+          `);
+
+          console.log(`[applySyncOperation] Query result for ${locationTableName}:`, existing);
+
+          if (existing && existing.length > 0) {
+            existingRecordSyncId = existing[0].sync_id;
+            console.log(`[applySyncOperation] Found existing record with ${primaryCodeField} = ${primaryCodeValue} (global table, no store_code), sync_id = ${existingRecordSyncId}`);
+          } else {
+            console.log(`[applySyncOperation] No existing record found for ${locationTableName} with ${primaryCodeField}='${primaryCodeValue}'`);
+          }
+        }
+      } else {
+        console.log(`[applySyncOperation] Warning: Could not check by code for ${locationTableName}. primaryCodeField=${primaryCodeField}, hasCodeField=${primaryCodeField ? !!mappedData[primaryCodeField] : false}`);
       }
     } else {
       // For other tables, check by primary code + store_code
@@ -501,11 +606,39 @@ export class SyncProcessor {
             locationCode
           );
         } else {
-          // Special handling for tbl_user: sync by sync_id only (no store_code)
+          // Special handling for different table types
           const isUserTable = tableName === 'tbl_user';
+          const isGlobalTable = this.GLOBAL_TABLES.has(tableName) || this.GLOBAL_TABLES.has(locationTableName);
           
           if (isUserTable) {
             // For user tables, check if sync_id exists globally (no store_code check)
+            const syncIdExists = await locationPrisma.$queryRawUnsafe<any[]>(`
+              SELECT sync_id FROM ${locationTableName}
+              WHERE sync_id = '${recordId}'::UUID
+              LIMIT 1
+            `);
+
+            if (syncIdExists && syncIdExists.length > 0) {
+              // Update existing record by sync_id
+              await this.handleUpdate(
+                locationTableName,
+                recordId,
+                mappedData,
+                parsedData.sync_source || 'server',
+                locationCode
+              );
+            } else {
+              // sync_id doesn't exist, insert as new
+              await this.handleInsert(
+                locationTableName,
+                recordId,
+                mappedData,
+                parsedData.sync_source || 'server',
+                locationCode
+              );
+            }
+          } else if (isGlobalTable) {
+            // For global tables (permissions, roles, role_permissions), check by sync_id globally (no store_code)
             const syncIdExists = await locationPrisma.$queryRawUnsafe<any[]>(`
               SELECT sync_id FROM ${locationTableName}
               WHERE sync_id = '${recordId}'::UUID
@@ -584,24 +717,59 @@ export class SyncProcessor {
         break;
 
       case 'DELETE':
-        // For DELETE, find record by code + store_code if sync_id doesn't match
+        // For DELETE, find record by code (and store_code for non-global tables)
+        const isGlobalTableForDelete = this.GLOBAL_TABLES.has(tableName) || this.GLOBAL_TABLES.has(locationTableName);
+        
         if (primaryCodeField && mappedData[primaryCodeField]) {
           const primaryCodeValue = mappedData[primaryCodeField];
           const escapedCode = String(primaryCodeValue).replace(/'/g, "''");
-          const escapedStoreCode = locationCode.replace(/'/g, "''");
 
-          const recordToDelete = await locationPrisma.$queryRawUnsafe<any[]>(`
-            SELECT sync_id FROM ${locationTableName}
-            WHERE "${primaryCodeField}" = '${escapedCode}'::VARCHAR
-              AND store_code = '${escapedStoreCode}'::VARCHAR
-            LIMIT 1
-          `);
+          if (isGlobalTableForDelete) {
+            // For global tables, check by code only (no store_code)
+            // For role_permissions, check by composite key
+            if (locationTableName === 'role_permissions' && mappedData.role_code && mappedData.permission_code) {
+              const escapedRoleCode = String(mappedData.role_code).replace(/'/g, "''");
+              const escapedPermissionCode = String(mappedData.permission_code).replace(/'/g, "''");
+              
+              const recordToDelete = await locationPrisma.$queryRawUnsafe<any[]>(`
+                SELECT sync_id FROM ${locationTableName}
+                WHERE "role_code" = '${escapedRoleCode}'::VARCHAR
+                  AND "permission_code" = '${escapedPermissionCode}'::VARCHAR
+                LIMIT 1
+              `);
 
-          if (recordToDelete && recordToDelete.length > 0) {
-            await this.handleDelete(locationTableName, recordToDelete[0].sync_id, locationCode);
+              if (recordToDelete && recordToDelete.length > 0) {
+                await this.handleDelete(locationTableName, recordToDelete[0].sync_id, locationCode, isGlobalTableForDelete);
+              }
+            } else {
+              // For permissions and roles, check by code only
+              const recordToDelete = await locationPrisma.$queryRawUnsafe<any[]>(`
+                SELECT sync_id FROM ${locationTableName}
+                WHERE "${primaryCodeField}" = '${escapedCode}'::VARCHAR
+                LIMIT 1
+              `);
+
+              if (recordToDelete && recordToDelete.length > 0) {
+                await this.handleDelete(locationTableName, recordToDelete[0].sync_id, locationCode, isGlobalTableForDelete);
+              }
+            }
+          } else {
+            // For other tables, check by code + store_code
+            const escapedStoreCode = locationCode.replace(/'/g, "''");
+
+            const recordToDelete = await locationPrisma.$queryRawUnsafe<any[]>(`
+              SELECT sync_id FROM ${locationTableName}
+              WHERE "${primaryCodeField}" = '${escapedCode}'::VARCHAR
+                AND store_code = '${escapedStoreCode}'::VARCHAR
+              LIMIT 1
+            `);
+
+            if (recordToDelete && recordToDelete.length > 0) {
+              await this.handleDelete(locationTableName, recordToDelete[0].sync_id, locationCode, isGlobalTableForDelete);
+            }
           }
         } else {
-          await this.handleDelete(locationTableName, recordId, locationCode);
+          await this.handleDelete(locationTableName, recordId, locationCode, isGlobalTableForDelete);
         }
         break;
 
@@ -1196,12 +1364,16 @@ export class SyncProcessor {
     locationCode: string
   ): Promise<void> {
     // Check if record already exists
-    // Special handling for user tables: check by sync_id only (no store_code)
+    // Special handling for different table types:
+    // 1. User tables: check by sync_id only (no store_code)
+    // 2. Global tables: check by sync_id only (no store_code)
+    // 3. Other tables: check by sync_id and store_code
     const isUserTable = tableName === 'users';
+    const isGlobalTable = this.GLOBAL_TABLES.has(tableName);
     let existing: any[] = [];
     
-    if (isUserTable) {
-      // For user tables, check by sync_id only
+    if (isUserTable || isGlobalTable) {
+      // For user tables and global tables, check by sync_id only (no store_code)
       existing = await locationPrisma.$queryRawUnsafe(`
         SELECT sync_id FROM ${tableName}
         WHERE sync_id = '${syncId}'::UUID
@@ -1219,6 +1391,59 @@ export class SyncProcessor {
       // Record exists for this store_code, treat as UPDATE instead
       await this.handleUpdate(tableName, syncId, data, syncSource, locationCode);
       return;
+    }
+
+    // For global tables, also check by primary code field (before attempting insert)
+    // This prevents unique constraint violations
+    if (isGlobalTable) {
+      const primaryCodeField = this.getPrimaryCodeField(tableName);
+      if (primaryCodeField && data[primaryCodeField]) {
+        const primaryCodeValue = data[primaryCodeField];
+        const escapedCode = String(primaryCodeValue).replace(/'/g, "''");
+
+        // For role_permissions, check by composite key (role_code + permission_code)
+        if (tableName === 'role_permissions' && data.role_code && data.permission_code) {
+          const escapedRoleCode = String(data.role_code).replace(/'/g, "''");
+          const escapedPermissionCode = String(data.permission_code).replace(/'/g, "''");
+          
+          const existingByCode = await locationPrisma.$queryRawUnsafe<any[]>(`
+            SELECT sync_id FROM ${tableName}
+            WHERE "role_code" = '${escapedRoleCode}'::VARCHAR
+              AND "permission_code" = '${escapedPermissionCode}'::VARCHAR
+            LIMIT 1
+          `);
+
+          if (existingByCode && existingByCode.length > 0) {
+            // Record exists by code, update it instead
+            const existingSyncId = existingByCode[0].sync_id || syncId;
+            console.log(`Found existing role_permission by composite key, updating with sync_id=${existingSyncId}`);
+            await this.handleUpdate(tableName, existingSyncId, data, syncSource, locationCode);
+            return;
+          }
+        } else {
+          // For permissions and roles, check by code only
+          console.log(`[PRE-CHECK] Checking for existing ${tableName} with ${primaryCodeField}='${primaryCodeValue}'`);
+          const existingByCode = await locationPrisma.$queryRawUnsafe<any[]>(`
+            SELECT sync_id FROM ${tableName}
+            WHERE "${primaryCodeField}" = '${escapedCode}'::VARCHAR
+            LIMIT 1
+          `);
+
+          console.log(`[PRE-CHECK] Query result for ${tableName}:`, existingByCode);
+
+          if (existingByCode && existingByCode.length > 0) {
+            // Record exists by code, update it instead
+            const existingSyncId = existingByCode[0].sync_id || syncId;
+            console.log(`[PRE-CHECK] Found existing ${tableName} record by ${primaryCodeField}=${primaryCodeValue}, updating with sync_id=${existingSyncId}`);
+            await this.handleUpdate(tableName, existingSyncId, data, syncSource, locationCode);
+            return;
+          } else {
+            console.log(`[PRE-CHECK] No existing ${tableName} record found by ${primaryCodeField}=${primaryCodeValue}, proceeding with insert`);
+          }
+        }
+      } else {
+        console.log(`Warning: Could not check by code for ${tableName}. primaryCodeField=${primaryCodeField}, hasCodeField=${primaryCodeField ? !!data[primaryCodeField] : false}`);
+      }
     }
 
     // Check if sync_id exists globally (from another location)
@@ -1256,8 +1481,8 @@ export class SyncProcessor {
       // Skip undefined values
       if (value === undefined) continue;
       
-      // Skip store_code for users table (it doesn't have that column)
-      if (tableName === 'users' && (key === 'store_code' || key === 'storecode')) {
+      // Skip store_code for users table and global tables (they don't use store_code)
+      if ((tableName === 'users' || isGlobalTable) && (key === 'store_code' || key === 'storecode')) {
         continue;
       }
       
@@ -1359,38 +1584,148 @@ export class SyncProcessor {
     console.log(`Inserting into ${tableName} with columns:`, columns);
     console.log(`Values count:`, values.length);
 
+    // For global tables, use ON CONFLICT DO UPDATE to handle existing records
+    let conflictClause = '';
+    
+    if (isGlobalTable) {
+      // For role_permissions, use composite unique constraint
+      if (tableName === 'role_permissions' && insertData.role_code && insertData.permission_code) {
+        conflictClause = `
+          ON CONFLICT (role_code, permission_code) DO UPDATE SET
+          sync_id = EXCLUDED.sync_id,
+          sync_source = EXCLUDED.sync_source,
+          created_on = EXCLUDED.created_on
+        `;
+      } else {
+        // For permissions and roles, use role_code or permission_code unique constraint
+        const primaryCodeField = this.getPrimaryCodeField(tableName) || this.getPrimaryCodeField(`tbl_${tableName.replace('s$', '')}`);
+        if (primaryCodeField && insertData[primaryCodeField]) {
+          // Build update clause for all columns except the primary code field and ID fields
+          const updateColumns = columns
+            .map(col => col.replace(/"/g, ''))
+            .filter(colName => 
+              colName !== primaryCodeField && 
+              colName !== 'role_id' && 
+              colName !== 'permission_id' &&
+              colName !== 'role_permission_id'
+            )
+            .map(colName => `"${colName}" = EXCLUDED."${colName}"`)
+            .join(', ');
+          
+          if (updateColumns) {
+            conflictClause = `
+              ON CONFLICT ("${primaryCodeField}") DO UPDATE SET
+              ${updateColumns}
+            `;
+          }
+        }
+      }
+    }
+
     try {
-      await locationPrisma.$executeRawUnsafe(`
-        INSERT INTO ${tableName} (${columnsStr})
-        VALUES (${valuesStr})
-      `);
+      const insertQuery = conflictClause
+        ? `
+          INSERT INTO ${tableName} (${columnsStr})
+          VALUES (${valuesStr})
+          ${conflictClause}
+        `
+        : `
+          INSERT INTO ${tableName} (${columnsStr})
+          VALUES (${valuesStr})
+        `;
+      
+      console.log(`[INSERT] Using ON CONFLICT: ${conflictClause ? 'YES' : 'NO'}`);
+      await locationPrisma.$executeRawUnsafe(insertQuery);
     } catch (error: any) {
+      // Handle foreign key constraint violations (23503) - parent record doesn't exist yet
+      // This can happen if role_permissions syncs before permissions/roles are synced
+      if (error.code === '23503') {
+        console.warn(`[FOREIGN KEY ERROR] ${error.message}`);
+        console.warn(`[FOREIGN KEY ERROR] Skipping ${tableName} sync - parent record doesn't exist yet. Will retry after parent is synced.`);
+        // Don't throw - let it be retried later when parent records are synced
+        return;
+      }
+      
       // Handle unique constraint violations (23505) - record already exists
       // For location-to-location sync, update existing record instead of failing
       if (error.code === '23505') {
-        console.log(`Unique constraint violation for ${tableName}, attempting to update existing record...`);
+        console.log(`[ERROR HANDLER] Unique constraint violation for ${tableName}, attempting to update existing record...`);
+        console.log(`[ERROR HANDLER] Error message: ${error.message}`);
         
         // Try to find existing record by primary code field
-        const primaryCodeField = this.getPrimaryCodeField(tableName);
-        if (primaryCodeField && insertData[primaryCodeField]) {
+        const isGlobalTable = this.GLOBAL_TABLES.has(tableName);
+        console.log(`[ERROR HANDLER] isGlobalTable=${isGlobalTable}, insertData keys:`, Object.keys(insertData));
+        
+        // Try both table name variations for getPrimaryCodeField
+        let primaryCodeField = this.getPrimaryCodeField(tableName);
+        if (!primaryCodeField) {
+          // Try master table name
+          const masterTableName = tableName === 'roles' ? 'tbl_role' : 
+                                  tableName === 'permissions' ? 'tbl_permission' :
+                                  tableName === 'role_permissions' ? 'tbl_role_permission' : null;
+          if (masterTableName) {
+            primaryCodeField = this.getPrimaryCodeField(masterTableName);
+          }
+        }
+        
+        console.log(`[ERROR HANDLER] primaryCodeField=${primaryCodeField}, hasCodeField=${primaryCodeField ? !!insertData[primaryCodeField] : false}`);
+        
+        // For global tables, try to find by code field
+        if (isGlobalTable && primaryCodeField && insertData[primaryCodeField]) {
           const primaryCodeValue = insertData[primaryCodeField];
           const escapedCode = String(primaryCodeValue).replace(/'/g, "''");
-          const escapedStoreCode = locationCode.replace(/'/g, "''");
           
-          // Check if record exists by code + store_code
-          const existing = await locationPrisma.$queryRawUnsafe<any[]>(`
-            SELECT sync_id FROM ${tableName}
-            WHERE "${primaryCodeField}" = '${escapedCode}'::VARCHAR
-              AND store_code = '${escapedStoreCode}'::VARCHAR
-            LIMIT 1
-          `);
-          
-          if (existing && existing.length > 0) {
-            // Update existing record
-            const existingSyncId = existing[0].sync_id || syncId;
-            await this.handleUpdate(tableName, existingSyncId, insertData, syncSource, locationCode);
-            console.log(`Updated existing record for ${tableName} with ${primaryCodeField}=${primaryCodeValue}`);
-            return;
+          // For role_permissions, check by composite key (role_code + permission_code)
+          if (tableName === 'role_permissions' && insertData.role_code && insertData.permission_code) {
+            const escapedRoleCode = String(insertData.role_code).replace(/'/g, "''");
+            const escapedPermissionCode = String(insertData.permission_code).replace(/'/g, "''");
+            
+            console.log(`[ERROR HANDLER] Checking role_permissions with role_code='${insertData.role_code}', permission_code='${insertData.permission_code}'`);
+            const existing = await locationPrisma.$queryRawUnsafe<any[]>(`
+              SELECT sync_id FROM ${tableName}
+              WHERE "role_code" = '${escapedRoleCode}'::VARCHAR
+                AND "permission_code" = '${escapedPermissionCode}'::VARCHAR
+              LIMIT 1
+            `);
+            
+            console.log(`[ERROR HANDLER] Query result:`, existing);
+            
+            if (existing && existing.length > 0) {
+              const existingSyncId = existing[0].sync_id || syncId;
+              console.log(`[ERROR HANDLER] Found existing role_permission, updating with sync_id=${existingSyncId}`);
+              await this.handleUpdate(tableName, existingSyncId, insertData, syncSource, locationCode);
+              console.log(`[ERROR HANDLER] Successfully updated existing role_permission`);
+              return; // Successfully handled, don't re-throw
+            }
+          } else {
+            // For permissions and roles, check by code only
+            console.log(`[ERROR HANDLER] Checking ${tableName} with ${primaryCodeField}='${primaryCodeValue}'`);
+            const existing = await locationPrisma.$queryRawUnsafe<any[]>(`
+              SELECT sync_id FROM ${tableName}
+              WHERE "${primaryCodeField}" = '${escapedCode}'::VARCHAR
+              LIMIT 1
+            `);
+            
+            console.log(`[ERROR HANDLER] Query result:`, existing);
+            
+            if (existing && existing.length > 0) {
+              const existingSyncId = existing[0].sync_id || syncId;
+              console.log(`[ERROR HANDLER] Found existing ${tableName} by ${primaryCodeField}=${primaryCodeValue}, updating with sync_id=${existingSyncId}`);
+              await this.handleUpdate(tableName, existingSyncId, insertData, syncSource, locationCode);
+              console.log(`[ERROR HANDLER] Successfully updated existing record for ${tableName}`);
+              return; // Successfully handled, don't re-throw
+            } else {
+              console.log(`[ERROR HANDLER] WARNING: No existing record found for ${tableName} with ${primaryCodeField}=${primaryCodeValue}, but error says it exists!`);
+              // Even though query didn't find it, the error says it exists, so try to use UPSERT
+              console.log(`[ERROR HANDLER] Attempting UPSERT as fallback...`);
+              try {
+                await this.handleUpsert(tableName, syncId, insertData, syncSource, locationCode, 'merge');
+                console.log(`[ERROR HANDLER] UPSERT succeeded`);
+                return; // Successfully handled
+              } catch (upsertError: any) {
+                console.error(`[ERROR HANDLER] UPSERT also failed:`, upsertError);
+              }
+            }
           }
         }
         
@@ -1406,12 +1741,17 @@ export class SyncProcessor {
           if (existing && existing.length > 0) {
             const existingSyncId = existing[0].sync_id || syncId;
             await this.handleUpdate(tableName, existingSyncId, insertData, syncSource, locationCode);
-            console.log(`Updated existing user record for ${tableName} with email=${insertData.email}`);
-            return;
+            console.log(`[ERROR HANDLER] Successfully updated existing user record`);
+            return; // Successfully handled
           }
         }
+        
+        // If we get here, we couldn't handle the error
+        console.error(`[ERROR HANDLER] Could not resolve unique constraint violation for ${tableName}`);
+        console.error(`[ERROR HANDLER] Error details:`, error);
       }
       
+      // Re-throw error if we couldn't handle it
       console.error(`Failed to insert into ${tableName}:`, error);
       console.error('Columns:', columns);
       console.error('Data keys:', Object.keys(insertData));
@@ -1429,13 +1769,17 @@ export class SyncProcessor {
     syncSource: string,
     locationCode: string
   ): Promise<void> {
-    // Special handling for tbl_user: check by sync_id only (no store_code)
+    // Special handling for different table types:
+    // 1. User tables: check by sync_id only (no store_code)
+    // 2. Global tables: check by sync_id only (no store_code)
+    // 3. Other tables: check by sync_id and store_code
     const isUserTable = tableName === 'users';
+    const isGlobalTable = this.GLOBAL_TABLES.has(tableName);
     
     // Check if record exists
     let existing;
-    if (isUserTable) {
-      // For user tables, check by sync_id only
+    if (isUserTable || isGlobalTable) {
+      // For user tables and global tables, check by sync_id only (no store_code)
       existing = await locationPrisma.$queryRawUnsafe(`
         SELECT sync_id FROM ${tableName}
         WHERE sync_id = '${syncId}'::UUID
@@ -1571,8 +1915,8 @@ export class SyncProcessor {
     const setClause = setParts.join(', ');
 
     try {
-      // Special handling for user tables: update by sync_id only (no store_code)
-      if (isUserTable) {
+      // Special handling for user tables and global tables: update by sync_id only (no store_code)
+      if (isUserTable || isGlobalTable) {
         await locationPrisma.$executeRawUnsafe(`
           UPDATE ${tableName}
           SET ${setClause}
@@ -1600,13 +1944,24 @@ export class SyncProcessor {
   private async handleDelete(
     tableName: string,
     syncId: string,
-    locationCode: string
+    locationCode: string,
+    isGlobalTable: boolean = false
   ): Promise<void> {
-    await locationPrisma.$executeRawUnsafe(`
-      DELETE FROM ${tableName}
-      WHERE sync_id = '${syncId}'::UUID
-        AND store_code = '${locationCode.replace(/'/g, "''")}'::VARCHAR
-    `);
+    // For global tables and user tables, don't use store_code in WHERE clause
+    const isUserTable = tableName === 'users';
+    
+    if (isUserTable || isGlobalTable) {
+      await locationPrisma.$executeRawUnsafe(`
+        DELETE FROM ${tableName}
+        WHERE sync_id = '${syncId}'::UUID
+      `);
+    } else {
+      await locationPrisma.$executeRawUnsafe(`
+        DELETE FROM ${tableName}
+        WHERE sync_id = '${syncId}'::UUID
+          AND store_code = '${locationCode.replace(/'/g, "''")}'::VARCHAR
+      `);
+    }
   }
 
   /**
@@ -2174,6 +2529,13 @@ export class SyncProcessor {
       'tbl_master_modifier_group': 'modifier_group_code',
       'tbl_master_modifier_item': 'modifier_item_code',
       'tbl_master_time_events': 'Event_code',
+      // Permission system tables (global, no store_code)
+      'tbl_permission': 'permission_code',
+      'permissions': 'permission_code',
+      'tbl_role': 'role_code',
+      'roles': 'role_code',
+      'tbl_role_permission': 'role_code', // Composite: role_code + permission_code
+      'role_permissions': 'role_code', // Composite: role_code + permission_code
       // Relationship tables - use composite keys or first code field
       'tbl_master_menu_master_event': 'menu_master_code', // Composite: menu_master_code + event_code
       'tbl_master_menu_category_modifier': 'menu_category_code', // Composite: menu_category_code + modifier_group_code

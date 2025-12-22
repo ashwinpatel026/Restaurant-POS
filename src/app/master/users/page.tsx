@@ -381,6 +381,34 @@ function UserModal({
     isActive: user?.isActive ?? true,
   });
   const [loading, setLoading] = useState(false);
+  const [roles, setRoles] = useState<Array<{ roleCode: string; roleName: string; description?: string }>>([]);
+  const [loadingRoles, setLoadingRoles] = useState(true);
+
+  // Fetch roles from API
+  useEffect(() => {
+    const fetchRoles = async () => {
+      try {
+        setLoadingRoles(true);
+        const token = localStorage.getItem("master_admin_token");
+        const response = await fetch("/api/master/roles", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setRoles(data.filter((r: any) => r.isActive));
+        }
+      } catch (error) {
+        console.error("Error fetching roles:", error);
+      } finally {
+        setLoadingRoles(false);
+      }
+    };
+
+    fetchRoles();
+  }, []);
 
   // Auto-determine accessLevel from role
   const getAccessLevelFromRole = (
@@ -598,16 +626,24 @@ function UserModal({
                           : formData.locationId,
                     });
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  disabled={loadingRoles}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-800"
                 >
-                  <option value="OUTLET_MANAGER">Outlet Manager</option>
-                  <option value="SUPER_ADMIN">Super Admin</option>
-                  <option value="COMPANY_ADMIN">Company Admin</option>
-                  <option value="DEALER_ADMIN">Dealer Admin</option>
-                  <option value="CAPTAIN">Captain</option>
-                  <option value="CASHIER">Cashier</option>
-                  <option value="KITCHEN_STAFF">Kitchen Staff</option>
+                  {loadingRoles ? (
+                    <option>Loading roles...</option>
+                  ) : (
+                    roles.map((role) => (
+                      <option key={role.roleCode} value={role.roleCode}>
+                        {role.roleName}
+                      </option>
+                    ))
+                  )}
                 </select>
+                {!loadingRoles && formData.role && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {roles.find((r) => r.roleCode === formData.role)?.description || ""}
+                  </p>
+                )}
               </div>
               {shouldShowAccessLevel() && (
                 <div>

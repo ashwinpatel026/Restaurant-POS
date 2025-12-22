@@ -26,6 +26,7 @@ import {
   DocumentTextIcon,
   FolderIcon,
   ArrowPathIcon,
+  ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -73,6 +74,12 @@ const navigation: MenuItem[] = [
     href: "/master/users",
     icon: UserGroupIcon,
     roles: ["SUPER_ADMIN", "COMPANY_ADMIN", "DEALER_ADMIN"],
+  },
+  {
+    name: "Roles & Permissions",
+    href: "/master/roles",
+    icon: ShieldCheckIcon,
+    roles: ["SUPER_ADMIN"],
   },
   {
     name: "Station",

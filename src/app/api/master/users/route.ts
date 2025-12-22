@@ -273,7 +273,7 @@ export async function POST(request: NextRequest) {
         companyId: companyId ? BigInt(companyId) : null,
         dealerId: dealerId ? BigInt(dealerId) : null,
         locationId: locationId ? BigInt(locationId) : null,
-        role: role as any,
+        role: role,
         accessLevel: determinedAccessLevel as any,
         defaultStoreCode: defaultStoreCode || null,
         isActive: true,

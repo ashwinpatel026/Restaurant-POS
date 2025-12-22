@@ -18,7 +18,7 @@ model User {
   firstName       String
   lastName        String
   phone           String?
-  role            UserRole
+  role            String      @db.VarChar(100) // Changed from UserRole enum to String to support dynamic roles
   accessLevel     AccessLevel? @map("access_level")
   companyId       BigInt?     @map("company_id")
   dealerId       BigInt?     @map("dealer_id")
@@ -638,5 +638,65 @@ enum AccessLevel {
   COMPANY      // Access all locations in company
   DEALER       // Access all locations in dealer
   LOCATION     // Access only specific location
+}
+
+// Role-Based Permission System Models (Synced from Master)
+
+model Permission {
+  permissionId    BigInt    @id @default(autoincrement()) @map("permission_id")
+  permissionCode  String    @unique @map("permission_code") @db.VarChar(100)
+  permissionName  String    @map("permission_name") @db.VarChar(255)
+  module          String    @map("module") @db.VarChar(100)
+  action          String    @map("action") @db.VarChar(100)
+  description     String?   @map("description") @db.Text
+  isActive        Boolean   @default(true) @map("is_active")
+  syncId          String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource      String?   @default("server") @map("sync_source") @db.VarChar(20)
+  createdOn       DateTime  @default(now()) @map("created_on")
+  updatedOn       DateTime? @map("updated_on")
+
+  rolePermissions RolePermission[]
+
+  @@index([permissionCode])
+  @@index([module])
+  @@index([syncId])
+  @@map("permissions")
+}
+
+model Role {
+  roleId          BigInt    @id @default(autoincrement()) @map("role_id")
+  roleCode        String    @unique @map("role_code") @db.VarChar(100)
+  roleName        String    @map("role_name") @db.VarChar(255)
+  description     String?   @map("description") @db.Text
+  isSystemRole    Boolean   @default(false) @map("is_system_role")
+  isActive        Boolean   @default(true) @map("is_active")
+  syncId          String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource      String?   @default("server") @map("sync_source") @db.VarChar(20)
+  createdOn       DateTime  @default(now()) @map("created_on")
+  updatedOn       DateTime? @map("updated_on")
+
+  rolePermissions RolePermission[]
+
+  @@index([roleCode])
+  @@index([syncId])
+  @@map("roles")
+}
+
+model RolePermission {
+  rolePermissionId BigInt    @id @default(autoincrement()) @map("role_permission_id")
+  roleCode         String    @map("role_code") @db.VarChar(100)
+  permissionCode   String    @map("permission_code") @db.VarChar(100)
+  syncId           String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource       String?   @default("server") @map("sync_source") @db.VarChar(20)
+  createdOn        DateTime  @default(now()) @map("created_on")
+
+  role             Role      @relation(fields: [roleCode], references: [roleCode])
+  permission       Permission @relation(fields: [permissionCode], references: [permissionCode])
+
+  @@unique([roleCode, permissionCode])
+  @@index([roleCode])
+  @@index([permissionCode])
+  @@index([syncId])
+  @@map("role_permissions")
 }
 
