@@ -379,31 +379,6 @@ export async function PUT(
           data: storeAccesses,
           skipDuplicates: true
         })
-
-        // Create sync log entries for store access updates
-        for (const storeAccess of storeAccesses) {
-          try {
-            await masterPrisma.$executeRaw`
-              INSERT INTO sync_log (table_name, record_id, operation, source, data, change_time, sync_status, location_code)
-              VALUES (
-                'tbl_user_store_access',
-                gen_random_uuid(),
-                'INSERT',
-                'server',
-                ${JSON.stringify({
-                  user_id: user.userId.toString(),
-                  store_code: storeAccess.storeCode,
-                  is_default: storeAccess.isDefault
-                })}::jsonb,
-                NOW(),
-                0,
-                ${storeAccess.storeCode}
-              )
-            `
-          } catch (syncError) {
-            console.error('Error creating sync log for store access:', syncError)
-          }
-        }
       }
     } else {
       // If store access wasn't updated, fetch existing store accesses for sync trigger
@@ -428,6 +403,31 @@ export async function PUT(
     // Use sync_id as record identifier
     // Database will handle UUID generation if syncId is missing
     try {
+      // Build sync data object - include password if it was updated
+      const syncData: any = {
+        email: user.email,
+        username: user.username,
+        first_name: user.firstName,
+        last_name: user.lastName,
+        role: user.role,
+        access_level: user.accessLevel,
+        company_id: user.companyId?.toString(),
+        dealer_id: user.dealerId?.toString(),
+        location_id: user.locationId?.toString(),
+        default_store_code: user.defaultStoreCode,
+        is_active: user.isActive
+      }
+
+      // Include password in sync data if it was updated
+      if (password) {
+        syncData.password = user.password  // Use the hashed password from the updated user
+      }
+
+      // Include sync_id in data
+      if (user.syncId) {
+        syncData.sync_id = user.syncId
+      }
+
       if (user.syncId) {
         await masterPrisma.$executeRaw`
           INSERT INTO sync_log (table_name, record_id, operation, source, data, change_time, sync_status, location_code)
@@ -436,20 +436,7 @@ export async function PUT(
             ${user.syncId}::uuid,
             'UPDATE',
             'server',
-            ${JSON.stringify({
-              email: user.email,
-              username: user.username,
-              first_name: user.firstName,
-              last_name: user.lastName,
-              role: user.role,
-              access_level: user.accessLevel,
-              company_id: user.companyId?.toString(),
-              dealer_id: user.dealerId?.toString(),
-              location_id: user.locationId?.toString(),
-              default_store_code: user.defaultStoreCode,
-              is_active: user.isActive,
-              sync_id: user.syncId  // Include sync_id in data
-            })}::jsonb,
+            ${JSON.stringify(syncData)}::jsonb,
             NOW(),
             0,
             NULL
@@ -463,19 +450,7 @@ export async function PUT(
             'tbl_user',
             'UPDATE',
             'server',
-            ${JSON.stringify({
-              email: user.email,
-              username: user.username,
-              first_name: user.firstName,
-              last_name: user.lastName,
-              role: user.role,
-              access_level: user.accessLevel,
-              company_id: user.companyId?.toString(),
-              dealer_id: user.dealerId?.toString(),
-              location_id: user.locationId?.toString(),
-              default_store_code: user.defaultStoreCode,
-              is_active: user.isActive
-            })}::jsonb,
+            ${JSON.stringify(syncData)}::jsonb,
             NOW(),
             0,
             NULL
@@ -498,18 +473,10 @@ export async function PUT(
             // Import sync service
             const { syncService } = await import('@/lib/sync/syncService')
             
-            // Sync user first
+            // Sync user
             await syncService.syncToLocation({
               locationCode: storeCode,
               tableName: 'tbl_user',
-              fullSync: false,
-              forceSync: false
-            })
-            
-            // Then sync store access (will happen automatically due to dependency, but trigger explicitly)
-            await syncService.syncToLocation({
-              locationCode: storeCode,
-              tableName: 'tbl_user_store_access',
               fullSync: false,
               forceSync: false
             })

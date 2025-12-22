@@ -195,8 +195,8 @@ export async function PUT(
       data: {
         ...(storeCode && { storeCode }),
         ...(locationName && { locationName }),
-        ...(companyId !== undefined && { companyId: companyId && companyId !== "" ? BigInt(companyId) : null }),
-        ...(dealerId !== undefined && { dealerId: dealerId && dealerId !== "" ? BigInt(dealerId) : null }),
+        ...(companyId !== undefined && { companyId: companyId && companyId !== '' ? BigInt(companyId) : null }),
+        ...(dealerId !== undefined && { dealerId: dealerId && dealerId !== '' ? BigInt(dealerId) : null }),
         ...(addressLine1 !== undefined && { addressLine1: addressLine1 || null }),
         ...(addressLine2 !== undefined && { addressLine2: addressLine2 || null }),
         ...(city !== undefined && { city: city || null }),
@@ -213,6 +213,144 @@ export async function PUT(
         updatedOn: new Date()
       }
     })
+
+    // ------------------------------------------------------------------------
+    // After updating companyId / dealerId, update user store access accordingly
+    // Logic:
+    // 1. Remove access for old company users if companyId was removed or changed
+    // 2. Remove access for old dealer users if dealerId was removed or changed
+    // 3. Add access for new company users if companyId is set or changed
+    // 4. Add access for new dealer users if dealerId is set or changed
+    // Note: SUPER_ADMIN access is never removed (handled on create)
+    // ------------------------------------------------------------------------
+    try {
+      const newStoreCode = location.storeCode
+      const oldCompanyId = existingLocation.companyId
+      const newCompanyId = location.companyId
+      const oldDealerId = existingLocation.dealerId
+      const newDealerId = location.dealerId
+
+      // Step 1: Remove access for old company users (if companyId was removed or changed)
+      if (oldCompanyId && oldCompanyId !== newCompanyId) {
+        const oldCompanyUsers = await masterPrisma.user.findMany({
+          where: {
+            companyId: oldCompanyId,
+            isActive: true
+          },
+          select: {
+            userId: true
+          }
+        })
+
+        if (oldCompanyUsers.length > 0) {
+          const userIdsToRemove = oldCompanyUsers.map(u => u.userId)
+          const deleteResult = await masterPrisma.userStoreAccess.deleteMany({
+            where: {
+              locationId: location.locationId,
+              userId: { in: userIdsToRemove },
+              storeCode: newStoreCode
+            }
+          })
+          console.log(
+            `Removed ${deleteResult.count} user store access entries for old company ${oldCompanyId} from location ${location.locationId}`
+          )
+        }
+      }
+
+      // Step 2: Remove access for old dealer users (if dealerId was removed or changed)
+      if (oldDealerId && oldDealerId !== newDealerId) {
+        const oldDealerUsers = await masterPrisma.user.findMany({
+          where: {
+            dealerId: oldDealerId,
+            isActive: true
+          },
+          select: {
+            userId: true
+          }
+        })
+
+        if (oldDealerUsers.length > 0) {
+          const userIdsToRemove = oldDealerUsers.map(u => u.userId)
+          const deleteResult = await masterPrisma.userStoreAccess.deleteMany({
+            where: {
+              locationId: location.locationId,
+              userId: { in: userIdsToRemove },
+              storeCode: newStoreCode
+            }
+          })
+          console.log(
+            `Removed ${deleteResult.count} user store access entries for old dealer ${oldDealerId} from location ${location.locationId}`
+          )
+        }
+      }
+
+      // Step 3: Add access for new company users (if companyId is set and changed)
+      const storeAccesses: Array<{
+        userId: bigint
+        locationId: bigint
+        storeCode: string
+        isDefault: boolean
+      }> = []
+
+      if (newCompanyId && newCompanyId !== oldCompanyId) {
+        const companyUsers = await masterPrisma.user.findMany({
+          where: {
+            companyId: newCompanyId,
+            isActive: true
+          },
+          select: {
+            userId: true
+          }
+        })
+
+        for (const u of companyUsers) {
+          storeAccesses.push({
+            userId: u.userId,
+            locationId: location.locationId,
+            storeCode: newStoreCode,
+            isDefault: false
+          })
+        }
+      }
+
+      // Step 4: Add access for new dealer users (if dealerId is set and changed)
+      if (newDealerId && newDealerId !== oldDealerId) {
+        const dealerUsers = await masterPrisma.user.findMany({
+          where: {
+            dealerId: newDealerId,
+            isActive: true
+          },
+          select: {
+            userId: true
+          }
+        })
+
+        for (const u of dealerUsers) {
+          storeAccesses.push({
+            userId: u.userId,
+            locationId: location.locationId,
+            storeCode: newStoreCode,
+            isDefault: false
+          })
+        }
+      }
+
+      // Create new access entries
+      if (storeAccesses.length > 0) {
+        const result = await masterPrisma.userStoreAccess.createMany({
+          data: storeAccesses,
+          skipDuplicates: true
+        })
+        console.log(
+          `Created ${result.count} user store access entries for updated location ${location.locationId} (${newStoreCode})`
+        )
+      }
+    } catch (storeAccessError) {
+      console.error(
+        'Error updating user store access entries for updated location:',
+        storeAccessError
+      )
+    }
 
     return NextResponse.json({
       ...location,
@@ -419,4 +557,3 @@ export async function POST(
     )
   }
 }
-

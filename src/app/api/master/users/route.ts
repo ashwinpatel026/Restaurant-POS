@@ -461,33 +461,6 @@ export async function POST(request: NextRequest) {
       // Continue even if sync log fails
     }
 
-    // Create sync log entries for store access
-    for (const storeAccess of storeAccesses) {
-      const storeAccessSyncId = randomUUID()
-      try {
-        await masterPrisma.$executeRaw`
-          INSERT INTO sync_log (table_name, record_id, operation, source, data, change_time, sync_status, location_code)
-          VALUES (
-            'tbl_user_store_access',
-            ${storeAccessSyncId}::uuid,
-            'INSERT',
-            'server',
-            ${JSON.stringify({
-              user_id: user.userId.toString(),  // Master user_id - will be mapped to location user id during sync
-              store_code: storeAccess.storeCode,
-              is_default: storeAccess.isDefault
-            })}::jsonb,
-            NOW(),
-            0,
-            ${storeAccess.storeCode}
-          )
-        `
-      } catch (syncError) {
-        console.error('Error creating sync log for store access:', syncError)
-        // Continue even if sync log fails
-      }
-    }
-
     // Automatically trigger sync to all locations that this user has access to
     if (storeAccesses.length > 0) {
       try {
@@ -500,18 +473,10 @@ export async function POST(request: NextRequest) {
             // Import sync service
             const { syncService } = await import('@/lib/sync/syncService')
             
-            // Sync user first
+            // Sync user
             await syncService.syncToLocation({
               locationCode: storeCode,
               tableName: 'tbl_user',
-              fullSync: false,
-              forceSync: false
-            })
-            
-            // Then sync store access (will happen automatically due to dependency, but trigger explicitly)
-            await syncService.syncToLocation({
-              locationCode: storeCode,
-              tableName: 'tbl_user_store_access',
               fullSync: false,
               forceSync: false
             })

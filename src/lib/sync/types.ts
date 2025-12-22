@@ -110,7 +110,6 @@ export const SYNC_TABLE_MAP: Record<string, string> = {
   'tbl_master_time_events': 'tbl_time_events',
   // User management tables - Individual sync only (not in full sync)
   'tbl_user': 'users',
-  'tbl_user_store_access': 'tbl_user_store_access',
   // Relationship/junction tables
   'tbl_master_menu_master_event': 'tbl_menu_master_event',
   'tbl_master_menu_category_modifier': 'tbl_menu_category_modifier',
@@ -296,11 +295,6 @@ export const SYNC_FIELD_MAP: Record<string, Record<string, string>> = {
     'is_active': 'isActive',  // Map from master table's is_active (snake_case) to location table's isActive (camelCase)
     'sync_id': 'sync_id',  // Database column name (snake_case) - for sync tracking
   },
-  'tbl_user_store_access': {
-    'user_id': 'user_id',  // Database column name (snake_case)
-    'store_code': 'store_code',  // Database column name (snake_case)
-    'is_default': 'is_default',  // Database column name (snake_case)
-  },
   // Relationship/junction tables
   'tbl_master_menu_master_event': {
     'menu_master_code': 'menu_master_code',
@@ -339,7 +333,6 @@ export const SYNC_ORDER_BY_COLUMN: Record<string, string> = {
   'tbl_master_time_events': 'created_date',
   // User management tables - Individual sync only (not in full sync)
   'tbl_user': 'created_on',
-  'tbl_user_store_access': 'created_on',
   // Relationship/junction tables
   'tbl_master_menu_master_event': 'createdon',
   'tbl_master_menu_category_modifier': 'createdon',

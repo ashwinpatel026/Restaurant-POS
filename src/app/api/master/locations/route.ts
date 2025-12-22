@@ -248,6 +248,110 @@ export async function POST(request: NextRequest) {
       data: locationData
     })
 
+    // ------------------------------------------------------------------------
+    // Automatically create user store access entries for this new location
+    // Logic:
+    // 1) Always give SUPER_ADMIN users access to the new location
+    // 2) If location has companyId, give all users of that company access
+    // 3) If location has dealerId, give all users of that dealer access
+    // 4) If no companyId and no dealerId, only SUPER_ADMIN users get access
+    //
+    // Note: Unique constraint (userId, storeCode) + skipDuplicates avoids dupes
+    // ------------------------------------------------------------------------
+    try {
+      const storeAccesses: Array<{
+        userId: bigint
+        locationId: bigint
+        storeCode: string
+        isDefault: boolean
+      }> = []
+
+      // 1) SUPER_ADMIN users (always)
+      const superAdmins = await masterPrisma.user.findMany({
+        where: {
+          role: 'SUPER_ADMIN',
+          isActive: true
+        },
+        select: {
+          userId: true
+        }
+      })
+
+      for (const u of superAdmins) {
+        storeAccesses.push({
+          userId: u.userId,
+          locationId: location.locationId,
+          storeCode: finalStoreCode,
+          // For auto-created entries, don't force any default store
+          isDefault: false
+        })
+      }
+
+      // 2) Company users (if location has companyId)
+      if (location.companyId) {
+        const companyUsers = await masterPrisma.user.findMany({
+          where: {
+            companyId: location.companyId,
+            isActive: true
+          },
+          select: {
+            userId: true
+          }
+        })
+
+        for (const u of companyUsers) {
+          storeAccesses.push({
+            userId: u.userId,
+            locationId: location.locationId,
+            storeCode: finalStoreCode,
+            isDefault: false
+          })
+        }
+      }
+
+      // 3) Dealer users (if location has dealerId)
+      if (location.dealerId) {
+        const dealerUsers = await masterPrisma.user.findMany({
+          where: {
+            dealerId: location.dealerId,
+            isActive: true
+          },
+          select: {
+            userId: true
+          }
+        })
+
+        for (const u of dealerUsers) {
+          storeAccesses.push({
+            userId: u.userId,
+            locationId: location.locationId,
+            storeCode: finalStoreCode,
+            isDefault: false
+          })
+        }
+      }
+
+      if (storeAccesses.length > 0) {
+        const result = await masterPrisma.userStoreAccess.createMany({
+          data: storeAccesses,
+          skipDuplicates: true
+        })
+        console.log(
+          `Created ${result.count} user store access entries for new location ${location.locationId} (${finalStoreCode})`
+        )
+      } else {
+        console.log(
+          `No user store access entries created for new location ${location.locationId} (${finalStoreCode})`
+        )
+      }
+    } catch (storeAccessError) {
+      // Don't fail location creation if store access creation fails
+      console.error(
+        'Error creating user store access entries for new location:',
+        storeAccessError
+      )
+    }
+
     // Sync master data to location (async, don't wait)
     syncMasterDataToLocation(finalStoreCode, 'FULL').catch(error => {
       console.error(`Failed to sync master data to ${finalStoreCode}:`, error)
