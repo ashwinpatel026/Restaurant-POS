@@ -501,5 +501,3 @@ Update `src/components/layouts/MasterDashboardLayout.tsx`:
 - Update dashboard API routes to use `checkLocationPermission()`
 
 7. **Frontend UI**
-
-- Role management page
