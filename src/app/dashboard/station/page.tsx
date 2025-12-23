@@ -14,6 +14,7 @@ import DeleteConfirmationModal from "@/components/modals/DeleteConfirmationModal
 import DataTable from "@/components/tables/DataTable";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
 import { useApiWithStore } from "@/hooks/useApiWithStore";
+import { usePagePermission } from "@/hooks/usePagePermission";
 
 interface Station {
   tblStationId: string;
@@ -72,6 +73,11 @@ const mapStation = (station: any): Station => ({
 
 export default function StationManagementPage() {
   const { selectedStoreCode, buildApiUrl } = useApiWithStore();
+
+  // Check permission to view stations
+  const { hasPermission, loading: permissionLoading } = usePagePermission({
+    requiredPermissions: ["stations.view"],
+  });
 
   const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(true);
@@ -204,12 +210,18 @@ export default function StationManagementPage() {
   const activeStations = stations.filter((s) => s.isActive === 1).length;
   const inactiveStations = stations.filter((s) => s.isActive === 0).length;
 
-  if (loading) {
+  // Show loading while checking permissions
+  if (permissionLoading || loading) {
     return (
       <DashboardLayout>
         <PageSkeleton />
       </DashboardLayout>
     );
+  }
+
+  // If no permission, the hook will redirect to access denied page
+  if (!hasPermission) {
+    return null;
   }
 
   return (

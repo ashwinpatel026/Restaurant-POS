@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getUserAccessInfo, getSelectedStoreCode, canAccessStore } from '@/lib/auth/accessControl'
+import { getUserAccessInfo, getSelectedStoreCode, canAccessStore, checkLocationPermission } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 import { Prisma } from '@prisma/client'
 
@@ -51,8 +51,13 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session?.user?.id) {
+    if (!session?.user?.id || !session?.user?.role) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check permission to view modifiers
+    if (!(await checkLocationPermission(session.user.role, 'modifiers.view'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
@@ -119,12 +124,13 @@ export async function PUT(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session?.user?.id) {
+    if (!session?.user?.id || !session?.user?.role) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    // Check permission to update modifiers
+    if (!(await checkLocationPermission(session.user.role, 'modifiers.update'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
@@ -220,8 +226,9 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!['SUPER_ADMIN'].includes(session.user.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    // Check permission to delete modifiers
+    if (!(await checkLocationPermission(session.user.role, 'modifiers.delete'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const accessInfo = await getUserAccessInfo(parseInt(session.user.id))

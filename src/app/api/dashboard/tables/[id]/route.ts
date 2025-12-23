@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/database'
+import { checkLocationPermission } from '@/lib/auth/accessControl'
 
 // PUT /api/tables/[id] → update full record
 export async function PUT(
@@ -10,8 +11,13 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || !['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+    if (!session?.user?.role) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check permission to update tables
+    if (!(await checkLocationPermission(session.user.role, 'tables.update'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { id: idParam } = await params
@@ -51,8 +57,13 @@ export async function PATCH(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || !['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+    if (!session?.user?.role) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check permission to update tables
+    if (!(await checkLocationPermission(session.user.role, 'tables.update'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { id: idParam } = await params
@@ -82,8 +93,13 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || !['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+    if (!session?.user?.role) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check permission to delete tables
+    if (!(await checkLocationPermission(session.user.role, 'tables.delete'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { id: idParam } = await params

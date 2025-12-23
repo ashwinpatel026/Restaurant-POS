@@ -16,6 +16,7 @@ import DeleteConfirmationModal from "@/components/modals/DeleteConfirmationModal
 import DataTable from "@/components/tables/DataTable";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
 import { useApiWithStore } from "@/hooks/useApiWithStore";
+import { usePagePermission } from "@/hooks/usePagePermission";
 
 interface Printer {
   printerId: number;
@@ -30,6 +31,11 @@ interface Printer {
 
 export default function PrinterManagementPage() {
   const { selectedStoreCode, buildApiUrl } = useApiWithStore();
+
+  // Check permission to view printers
+  const { hasPermission, loading: permissionLoading } = usePagePermission({
+    requiredPermissions: ["printers.view"],
+  });
 
   const [printers, setPrinters] = useState<Printer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -148,12 +154,18 @@ export default function PrinterManagementPage() {
     setPrinterToDelete(null);
   };
 
-  if (loading) {
+  // Show loading while checking permissions
+  if (permissionLoading || loading) {
     return (
       <DashboardLayout>
         <PageSkeleton />
       </DashboardLayout>
     );
+  }
+
+  // If no permission, the hook will redirect to access denied page
+  if (!hasPermission) {
+    return null;
   }
 
   const activePrinters = printers.filter((p) => p.isActive === 1).length;

@@ -15,11 +15,26 @@ const MODULES = {
   companies: ['create', 'read', 'update', 'delete', 'manage', 'view'],
   dealers: ['create', 'read', 'update', 'delete', 'manage', 'view'],
   menu: ['create', 'read', 'update', 'delete', 'manage', 'view'],
+  stations: ['create', 'read', 'update', 'delete', 'manage', 'view'],
+  tax: ['create', 'read', 'update', 'delete', 'manage', 'view'],
+  printers: ['create', 'read', 'update', 'delete', 'manage', 'view'],
+  events: ['create', 'read', 'update', 'delete', 'manage', 'view'],
+  modifiers: ['create', 'read', 'update', 'delete', 'manage', 'view'],
+  prepzone: ['create', 'read', 'update', 'delete', 'manage', 'view'],
+  departments: ['create', 'read', 'update', 'delete', 'manage', 'view'],
+  department_types: ['create', 'read', 'update', 'delete', 'manage', 'view'],
   reports: ['view', 'export', 'manage'],
   roles: ['create', 'read', 'update', 'delete', 'manage', 'view'],
   permissions: ['view', 'manage'],
   settings: ['view', 'update', 'manage'],
 }
+
+// Additional granular menu permissions
+const ADDITIONAL_PERMISSIONS = [
+  { permissionCode: 'menu.masters.view', permissionName: 'Menu Masters View', module: 'menu', action: 'masters.view' },
+  { permissionCode: 'menu.categories.view', permissionName: 'Menu Categories View', module: 'menu', action: 'categories.view' },
+  { permissionCode: 'menu.items.view', permissionName: 'Menu Items View', module: 'menu', action: 'items.view' },
+]
 
 // Define default role permissions
 const ROLE_PERMISSIONS: Record<string, string[]> = {
@@ -139,6 +154,35 @@ async function seedPermissions() {
         syncId: randomUUID(),
         syncSource: 'server',
       },
+    })
+  }
+
+  // Add additional granular permissions
+  for (const perm of ADDITIONAL_PERMISSIONS) {
+    await masterPrisma.permission.upsert({
+      where: { permissionCode: perm.permissionCode },
+      update: {
+        permissionName: perm.permissionName,
+        module: perm.module,
+        action: perm.action,
+        isActive: true,
+      },
+      create: {
+        permissionCode: perm.permissionCode,
+        permissionName: perm.permissionName,
+        module: perm.module,
+        action: perm.action,
+        description: `Permission to ${perm.action} ${perm.module}`,
+        isActive: true,
+        syncId: randomUUID(),
+        syncSource: 'server',
+      },
+    })
+    permissions.push({
+      permissionCode: perm.permissionCode,
+      permissionName: perm.permissionName,
+      module: perm.module,
+      action: perm.action,
     })
   }
 

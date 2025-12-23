@@ -1950,6 +1950,26 @@ export class SyncProcessor {
     // For global tables and user tables, don't use store_code in WHERE clause
     const isUserTable = tableName === 'users';
     
+    // Explicit dependency cleanup for roles -> role_permissions
+    if (tableName === 'roles') {
+      try {
+        const role = await locationPrisma.role.findUnique({
+          where: { syncId: syncId as any },
+          select: { roleCode: true }
+        });
+
+        if (role?.roleCode) {
+          await locationPrisma.$executeRawUnsafe(`
+            DELETE FROM role_permissions
+            WHERE role_code = '${role.roleCode.replace(/'/g, "''")}'
+          `);
+        }
+      } catch (error: any) {
+        console.error(`Failed to cascade delete role_permissions for role sync_id=${syncId}:`, error);
+        throw error;
+      }
+    }
+
     if (isUserTable || isGlobalTable) {
       await locationPrisma.$executeRawUnsafe(`
         DELETE FROM ${tableName}

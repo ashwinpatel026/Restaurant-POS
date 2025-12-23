@@ -244,14 +244,6 @@ export async function DELETE(
       )
     }
 
-    // Check if role has permissions assigned
-    if (role._count.rolePermissions > 0) {
-      return NextResponse.json(
-        { error: 'Cannot delete role with assigned permissions. Remove permissions first.' },
-        { status: 400 }
-      )
-    }
-
     // Check if any users have this role
     const usersWithRole = await masterPrisma.user.findFirst({
       where: { role: code as any }
@@ -266,6 +258,42 @@ export async function DELETE(
 
     // Get sync_id before deletion for sync log
     const roleSyncId = role.syncId
+
+    // Remove role permissions first, then delete role
+    const rolePermissions = await masterPrisma.rolePermission.findMany({
+      where: { roleCode: code }
+    })
+
+    if (rolePermissions.length > 0) {
+      // Delete role permissions
+      await masterPrisma.rolePermission.deleteMany({
+        where: { roleCode: code }
+      })
+
+      // Log deletions for sync
+      try {
+        for (const rp of rolePermissions) {
+          await masterPrisma.$executeRaw`
+            INSERT INTO sync_log (table_name, record_id, operation, source, data, change_time, sync_status, location_code)
+            VALUES (
+              'tbl_role_permission',
+              ${rp.syncId ?? ''}::uuid,
+              'DELETE',
+              'server',
+              ${JSON.stringify({
+                role_code: rp.roleCode,
+                permission_code: rp.permissionCode,
+              })}::jsonb,
+              NOW(),
+              0,
+              NULL
+            )
+          `
+        }
+      } catch (syncError) {
+        console.error('Error logging role_permission deletions:', syncError)
+      }
+    }
 
     await masterPrisma.role.delete({
       where: { roleCode: code }

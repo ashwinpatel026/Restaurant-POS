@@ -5,6 +5,7 @@ import {
   getUserAccessInfo,
   getSelectedStoreCode,
   buildStoreFilter,
+  checkLocationPermission,
 } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 import { Prisma } from '@prisma/client'
@@ -93,8 +94,13 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session?.user?.id) {
+    if (!session?.user?.id || !session?.user?.role) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check permission to view stations
+    if (!(await checkLocationPermission(session.user.role, 'stations.view'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
@@ -142,12 +148,13 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session?.user?.id) {
+    if (!session?.user?.id || !session?.user?.role) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    // Check permission to create stations
+    if (!(await checkLocationPermission(session.user.role, 'stations.create'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const accessInfo = await getUserAccessInfo(parseInt(session.user.id))

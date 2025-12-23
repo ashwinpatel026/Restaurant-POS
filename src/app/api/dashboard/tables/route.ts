@@ -2,13 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/database'
+import { checkLocationPermission } from '@/lib/auth/accessControl'
 
 // GET /api/tables → list all tables (most recent first)
 export async function GET(_request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) {
+    if (!session?.user?.role) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check permission to view tables
+    if (!(await checkLocationPermission(session.user.role, 'tables.view'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // @ts-ignore - generated client exposes `table` for model `Table`
@@ -32,8 +38,13 @@ export async function GET(_request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || !['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
+    if (!session?.user?.role) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check permission to create tables
+    if (!(await checkLocationPermission(session.user.role, 'tables.create'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const body = await request.json()

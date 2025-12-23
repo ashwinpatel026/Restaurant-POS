@@ -16,6 +16,7 @@ import QRCodeModal from "@/components/tables/QRCodeModal";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
 import CRUDModal from "@/components/modals/CRUDModal";
 import DeleteConfirmationModal from "@/components/modals/DeleteConfirmationModal";
+import { usePagePermission } from "@/hooks/usePagePermission";
 
 interface Table {
   tableId: string | number;
@@ -89,6 +90,11 @@ const getBorderColor = (status: number | null): string => {
 };
 
 export default function TablesPage() {
+  // Check permission to view tables
+  const { hasPermission, loading: permissionLoading } = usePagePermission({
+    requiredPermissions: ["tables.view"],
+  });
+
   const [tables, setTables] = useState<Table[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -189,6 +195,20 @@ export default function TablesPage() {
   const reservedTables = tables.filter(
     (t) => getStatusString(t.status) === "RESERVED"
   ).length;
+
+  // Show loading while checking permissions
+  if (permissionLoading || loading) {
+    return (
+      <DashboardLayout>
+        <PageSkeleton />
+      </DashboardLayout>
+    );
+  }
+
+  // If no permission, the hook will redirect to access denied page
+  if (!hasPermission) {
+    return null;
+  }
 
   return (
     <DashboardLayout>

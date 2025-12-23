@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getUserAccessInfo, getSelectedStoreCode, buildStoreFilter } from '@/lib/auth/accessControl'
+import { getUserAccessInfo, getSelectedStoreCode, buildStoreFilter, checkLocationPermission } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 
 // Helper function to convert BigInt and Decimal fields for JSON serialization
@@ -23,8 +23,13 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session?.user?.id) {
+    if (!session?.user?.id || !session?.user?.role) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check permission to view events
+    if (!(await checkLocationPermission(session.user.role, 'events.view'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
@@ -120,12 +125,13 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 
-    if (!session?.user?.id) {
+    if (!session?.user?.id || !session?.user?.role) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    // Check permission to create events
+    if (!(await checkLocationPermission(session.user.role, 'events.create'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const accessInfo = await getUserAccessInfo(parseInt(session.user.id))

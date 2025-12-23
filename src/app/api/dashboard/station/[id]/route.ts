@@ -5,6 +5,7 @@ import {
   getUserAccessInfo,
   getSelectedStoreCode,
   canAccessStore,
+  checkLocationPermission,
 } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 import { Prisma } from '@prisma/client'
@@ -57,8 +58,13 @@ export async function GET(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session?.user?.id) {
+    if (!session?.user?.id || !session?.user?.role) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check permission to view stations
+    if (!(await checkLocationPermission(session.user.role, 'stations.view'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
@@ -103,12 +109,13 @@ export async function PUT(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session?.user?.id) {
+    if (!session?.user?.id || !session?.user?.role) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    // Check permission to update stations
+    if (!(await checkLocationPermission(session.user.role, 'stations.update'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
@@ -193,12 +200,13 @@ export async function DELETE(
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session?.user?.id) {
+    if (!session?.user?.id || !session?.user?.role) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!['SUPER_ADMIN'].includes(session.user.role)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    // Check permission to delete stations
+    if (!(await checkLocationPermission(session.user.role, 'stations.delete'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const accessInfo = await getUserAccessInfo(parseInt(session.user.id))

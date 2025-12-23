@@ -5,6 +5,7 @@ import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { PlusIcon, PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
+import { usePagePermission } from "@/hooks/usePagePermission";
 
 interface User {
   id: string;
@@ -19,6 +20,11 @@ interface User {
 }
 
 export default function UsersPage() {
+  // Check permission to view users
+  const { hasPermission, loading: permissionLoading } = usePagePermission({
+    requiredPermissions: ["users.view"],
+  });
+
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -56,6 +62,20 @@ export default function UsersPage() {
       toast.error("An error occurred");
     }
   };
+
+  // Show loading while checking permissions
+  if (permissionLoading || loading) {
+    return (
+      <DashboardLayout>
+        <PageSkeleton />
+      </DashboardLayout>
+    );
+  }
+
+  // If no permission, the hook will redirect to access denied page
+  if (!hasPermission) {
+    return null;
+  }
 
   return (
     <DashboardLayout>

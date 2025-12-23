@@ -2,13 +2,19 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/database'
+import { checkLocationPermission } from '@/lib/auth/accessControl'
 
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session) {
+    if (!session?.user?.role) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check permission to view outlets
+    if (!(await checkLocationPermission(session.user.role, 'outlets.view'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const outlets = await (prisma as any).outlet.findMany({
@@ -32,8 +38,13 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session || !['SUPER_ADMIN'].includes(session.user.role)) {
+    if (!session?.user?.role) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Check permission to create outlets (typically only SUPER_ADMIN)
+    if (!(await checkLocationPermission(session.user.role, 'outlets.create'))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const body = await request.json()

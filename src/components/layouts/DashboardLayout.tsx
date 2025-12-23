@@ -49,56 +49,72 @@ interface MenuItem {
 
 const navigation: MenuItem[] = [
   { name: "Dashboard", href: "/dashboard", icon: HomeIcon },
-  { name: "Orders", href: "/dashboard/orders", icon: ShoppingBagIcon },
+  {
+    name: "Orders",
+    href: "/dashboard/orders",
+    icon: ShoppingBagIcon,
+    permissions: [
+      "orders.view",
+      "orders.create",
+      "orders.update",
+      "orders.delete",
+    ],
+  },
   {
     name: "Menu Master",
     icon: CubeIcon,
-    // Any role can use this, but visibility is controlled by permissions below
-    permissions: ["menu.view", "menu.manage", "menu.read", "menu.create", "menu.update"],
+    permissions: [
+      "menu.view",
+      "menu.create",
+      "menu.update",
+      "menu.delete",
+      "menu.masters.view",
+      "menu.categories.view",
+      "menu.items.view",
+    ],
     children: [
       {
         name: "Menu Master",
         href: "/dashboard/menu/masters",
         icon: BuildingStorefrontIcon,
         iconImage: "/assets/icon/menu_10154074.png",
-        permissions: ["menu.view", "menu.manage", "menu.read"],
+        permissions: ["menu.masters.view", "menu.view"], // Allow both granular and general permission
       },
       {
         name: "Menu Category",
         href: "/dashboard/menu/categories",
         icon: FolderIcon,
-        permissions: ["menu.view", "menu.manage", "menu.read"],
+        permissions: ["menu.categories.view", "menu.view"], // Allow both granular and general permission
       },
       {
         name: "Menu Items",
         href: "/dashboard/menu/items",
         icon: DocumentTextIcon,
-        permissions: ["menu.view", "menu.manage", "menu.read"],
+        permissions: ["menu.items.view", "menu.view"], // Allow both granular and general permission
       },
       {
         name: "Modifiers",
         href: "/dashboard/modifiers",
         icon: TagIcon,
-        // You can later add a dedicated modifiers.* permission; for now tie to menu
-        permissions: ["menu.view", "menu.manage", "menu.read"],
+        permissions: ["modifiers.view"],
       },
       {
         name: "Prep-Zone",
         href: "/dashboard/prep-zone",
         icon: CubeIcon,
-        permissions: ["menu.view", "menu.manage", "menu.read"],
+        permissions: ["prepzone.view"], // Separate prep-zone permission
       },
       {
         name: "Time Events",
         href: "/dashboard/events",
         icon: ClockIcon,
-        permissions: ["menu.view", "menu.manage", "menu.read"],
+        permissions: ["events.view"],
       },
       {
         name: "Printer",
         href: "/dashboard/printer",
         icon: PrinterIcon,
-        permissions: ["menu.view", "menu.manage", "menu.read"],
+        permissions: ["printers.view"],
       },
     ],
   },
@@ -106,22 +122,29 @@ const navigation: MenuItem[] = [
     name: "Tax Management",
     href: "/dashboard/tax",
     icon: CalculatorIcon,
-    roles: ["SUPER_ADMIN", "ADMIN", "OUTLET_MANAGER"],
+    permissions: ["tax.view", "tax.create", "tax.update", "tax.delete"],
   },
   {
     name: "Department",
     icon: BuildingOfficeIcon,
-    roles: ["SUPER_ADMIN", "ADMIN", "OUTLET_MANAGER"],
+    permissions: [
+      "departments.view",
+      "departments.create",
+      "departments.update",
+      "departments.delete",
+    ],
     children: [
       {
         name: "Department",
         href: "/dashboard/department",
         icon: BuildingOfficeIcon,
+        permissions: ["departments.view"],
       },
       {
         name: "Department Type",
         href: "/dashboard/department/type",
         icon: FolderIcon,
+        permissions: ["departments.view"],
       },
     ],
   },
@@ -129,22 +152,41 @@ const navigation: MenuItem[] = [
     name: "Station",
     href: "/dashboard/station",
     icon: CubeIcon,
-    roles: ["SUPER_ADMIN", "ADMIN", "OUTLET_MANAGER"],
+    permissions: [
+      "stations.view",
+      "stations.create",
+      "stations.update",
+      "stations.delete",
+    ],
   },
-  { name: "Tables", href: "/dashboard/tables", icon: TableCellsIcon },
-  { name: "QR Ordering", href: "/dashboard/qr-orders", icon: QrCodeIcon },
+  {
+    name: "Tables",
+    href: "/dashboard/tables",
+    icon: TableCellsIcon,
+    permissions: [
+      "tables.view",
+      "tables.create",
+      "tables.update",
+      "tables.delete",
+    ],
+  },
+  {
+    name: "QR Ordering",
+    href: "/dashboard/qr-orders",
+    icon: QrCodeIcon,
+    permissions: ["orders.view", "orders.create"],
+  },
   {
     name: "Reports",
     href: "/dashboard/reports",
     icon: ChartBarIcon,
-    roles: ["SUPER_ADMIN", "ADMIN", "OUTLET_MANAGER"],
+    permissions: ["reports.view"],
   },
   {
     name: "Users",
     href: "/dashboard/users",
     icon: UserGroupIcon,
-    roles: ["SUPER_ADMIN", "ADMIN"],
-    permissions: ["users.view", "users.manage", "users.read"],
+    permissions: ["users.view", "users.create", "users.update", "users.delete"],
   },
   {
     name: "Settings",
@@ -192,7 +234,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   const hasAnyPermission = (required?: string[]): boolean => {
     if (!required || required.length === 0) return true;
-    if (!userPermissions || loadingPermissions) return false;
+    // If permissions are still loading, don't show menu items (prevents flash)
+    if (loadingPermissions) return false;
+    // If userPermissions is null but not loading, it means API failed - fallback to role-based
+    if (!userPermissions) {
+      // For SUPER_ADMIN, allow all (they have all permissions)
+      if (userRole === "SUPER_ADMIN") return true;
+      // Otherwise, don't show items that require permissions
+      return false;
+    }
+    // Check if user has at least one of the required permissions
     return required.some((code) => userPermissions.includes(code));
   };
 
@@ -204,7 +255,23 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const userRole = session?.user?.role || "";
 
   const filterMenuItem = (item: MenuItem): MenuItem | null => {
-    // Check role restriction if present
+    // SUPER_ADMIN always sees everything (they have all permissions)
+    if (userRole === "SUPER_ADMIN") {
+      // Still filter children recursively for consistency
+      let children: MenuItem[] | undefined = undefined;
+      if (item.children && item.children.length > 0) {
+        children = item.children
+          .map((child) => filterMenuItem(child))
+          .filter((child): child is MenuItem => child !== null);
+        // If no visible children and no direct href, hide parent
+        if ((!children || children.length === 0) && !item.href) {
+          return null;
+        }
+      }
+      return { ...item, children };
+    }
+
+    // Check role restriction if present (legacy support)
     if (item.roles && !item.roles.includes(userRole)) {
       return null;
     }

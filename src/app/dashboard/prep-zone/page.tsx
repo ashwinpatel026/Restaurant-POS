@@ -21,6 +21,7 @@ import {
   PageHeaderSkeleton,
 } from "@/components/ui/SkeletonLoader";
 import { useApiWithStore } from "@/hooks/useApiWithStore";
+import { usePagePermission } from "@/hooks/usePagePermission";
 
 interface PrepZone {
   prepZoneId: string; // Changed to string for BigInt serialization
@@ -57,6 +58,10 @@ interface Station {
 
 export default function PrepZonePage() {
   const { selectedStoreCode, buildApiUrl } = useApiWithStore();
+  // Permission check for prep zone
+  const { hasPermission, loading: permissionLoading } = usePagePermission({
+    requiredPermissions: ["prepzone.view"],
+  });
   
   const [prepZones, setPrepZones] = useState<PrepZone[]>([]);
   const [printers, setPrinters] = useState<Printer[]>([]);
@@ -251,6 +256,22 @@ export default function PrepZonePage() {
 
   const activeZones = prepZones.filter((s) => s.isActive === 1).length;
   const inactiveZones = prepZones.filter((s) => s.isActive === 0).length;
+
+  // Show loading while checking permissions
+  if (permissionLoading || loading) {
+    return (
+      <DashboardLayout>
+        <PageHeaderSkeleton />
+        <StatsSkeleton />
+        <TableSkeleton />
+      </DashboardLayout>
+    );
+  }
+
+  // If no permission, the hook will redirect to access denied page
+  if (!hasPermission) {
+    return null;
+  }
 
   return (
     <DashboardLayout>

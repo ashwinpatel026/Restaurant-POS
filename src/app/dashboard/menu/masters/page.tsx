@@ -15,6 +15,7 @@ import toast from "react-hot-toast";
 import CRUDModal from "@/components/modals/CRUDModal";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
 import { useApiWithStore } from "@/hooks/useApiWithStore";
+import { usePagePermission } from "@/hooks/usePagePermission";
 
 interface MenuMaster {
   menuMasterId: string;
@@ -45,6 +46,12 @@ interface Station {
 export default function MenuMastersPage() {
   const router = useRouter();
   const { selectedStoreCode, buildApiUrl } = useApiWithStore();
+  
+  // Check permission to view menu masters
+  const { hasPermission, loading: permissionLoading } = usePagePermission({
+    requiredPermissions: ["menu.view"],
+  });
+
   const [menuMasters, setMenuMasters] = useState<MenuMaster[]>([]);
   const [prepZones, setPrepZones] = useState<PrepZone[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
@@ -270,12 +277,18 @@ export default function MenuMastersPage() {
     }
   };
 
-  if (loading) {
+  // Show loading while checking permissions
+  if (permissionLoading || loading) {
     return (
       <DashboardLayout>
         <PageSkeleton />
       </DashboardLayout>
     );
+  }
+
+  // If no permission, the hook will redirect to access denied page
+  if (!hasPermission) {
+    return null;
   }
 
   return (
