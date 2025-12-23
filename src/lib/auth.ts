@@ -2,6 +2,7 @@ import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from './database'
+import { clearPermissionCache as clearLocationPermissionCache } from './auth/locationPermissionService'
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -99,6 +100,17 @@ export const authOptions: NextAuthOptions = {
       }
       return session
     }
+  },
+  events: {
+    async signOut({ token }) {
+      try {
+        const role = (token as any)?.role as string | undefined
+        // Clear cached permissions so the next login reloads fresh permissions
+        clearLocationPermissionCache(role)
+      } catch (error) {
+        console.error('Failed to clear permission cache on sign out:', error)
+      }
+    },
   },
   pages: {
     signIn: '/login',
