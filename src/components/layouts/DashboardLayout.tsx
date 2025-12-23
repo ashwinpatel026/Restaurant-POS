@@ -92,31 +92,31 @@ const navigation: MenuItem[] = [
         icon: DocumentTextIcon,
         permissions: ["menu.items.view", "menu.view"], // Allow both granular and general permission
       },
-      {
-        name: "Modifiers",
-        href: "/dashboard/modifiers",
-        icon: TagIcon,
-        permissions: ["modifiers.view"],
-      },
-      {
-        name: "Prep-Zone",
-        href: "/dashboard/prep-zone",
-        icon: CubeIcon,
-        permissions: ["prepzone.view"], // Separate prep-zone permission
-      },
-      {
-        name: "Time Events",
-        href: "/dashboard/events",
-        icon: ClockIcon,
-        permissions: ["events.view"],
-      },
-      {
-        name: "Printer",
-        href: "/dashboard/printer",
-        icon: PrinterIcon,
-        permissions: ["printers.view"],
-      },
     ],
+  },
+  {
+    name: "Modifiers",
+    href: "/dashboard/modifiers",
+    icon: TagIcon,
+    permissions: ["modifiers.view"],
+  },
+  {
+    name: "Prep-Zone",
+    href: "/dashboard/prep-zone",
+    icon: CubeIcon,
+    permissions: ["prepzone.view"], // Separate prep-zone permission
+  },
+  {
+    name: "Time Events",
+    href: "/dashboard/events",
+    icon: ClockIcon,
+    permissions: ["events.view"],
+  },
+  {
+    name: "Printer",
+    href: "/dashboard/printer",
+    icon: PrinterIcon,
+    permissions: ["printers.view"],
   },
   {
     name: "Tax Management",

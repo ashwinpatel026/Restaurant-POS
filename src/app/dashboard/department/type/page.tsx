@@ -56,6 +56,11 @@ export default function DepartmentTypePage() {
         cache: "no-store",
       });
 
+      if (response.status === 403) {
+        router.push("/dashboard/access-denied");
+        return;
+      }
+
       if (response.ok) {
         const data = await response.json();
         setDepartmentTypes(Array.isArray(data) ? data : []);

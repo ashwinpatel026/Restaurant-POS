@@ -102,6 +102,15 @@ export const authOptions: NextAuthOptions = {
     }
   },
   events: {
+    async signIn({ user }) {
+      try {
+        const role = (user as any)?.role as string | undefined
+        // Clear cached permissions so the next session fetches fresh data
+        clearLocationPermissionCache(role)
+      } catch (error) {
+        console.error('Failed to clear permission cache on sign in:', error)
+      }
+    },
     async signOut({ token }) {
       try {
         const role = (token as any)?.role as string | undefined

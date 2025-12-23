@@ -79,6 +79,16 @@ export default function DepartmentPage() {
         }),
       ]);
 
+      // Redirect to access denied if any request returns forbidden
+      if (
+        deptsRes.status === 403 ||
+        deptTypesRes.status === 403 ||
+        taxesRes.status === 403
+      ) {
+        router.push("/dashboard/access-denied");
+        return;
+      }
+
       if (deptsRes.ok) {
         const data = await deptsRes.json();
         setDepartments(Array.isArray(data) ? data : []);
