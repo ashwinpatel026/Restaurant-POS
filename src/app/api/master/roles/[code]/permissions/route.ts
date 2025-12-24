@@ -113,41 +113,10 @@ export async function PUT(
       )
     }
 
-    // Get existing role permissions before deletion (for sync log)
-    const existingRolePermissions = await masterPrisma.rolePermission.findMany({
-      where: { roleCode: code }
-    })
-
     // Delete existing permissions for this role
     await masterPrisma.rolePermission.deleteMany({
       where: { roleCode: code }
     })
-
-    // Create sync log entries for deleted role permissions
-    for (const rp of existingRolePermissions) {
-      if (rp.syncId) {
-        try {
-          await masterPrisma.$executeRaw`
-            INSERT INTO sync_log (table_name, record_id, operation, source, data, change_time, sync_status, location_code)
-            VALUES (
-              'tbl_role_permission',
-              ${rp.syncId}::uuid,
-              'DELETE',
-              'server',
-              ${JSON.stringify({
-                role_code: rp.roleCode,
-                permission_code: rp.permissionCode
-              })}::jsonb,
-              NOW(),
-              0,
-              NULL
-            )
-          `
-        } catch (syncError) {
-          console.error('Error creating sync log for role permission deletion:', syncError)
-        }
-      }
-    }
 
     // Create new role-permission mappings
     const newRolePermissions = []
@@ -173,33 +142,30 @@ export async function PUT(
       newRolePermissions.push(...createdRolePermissions)
     }
 
-    // Create sync log entries for new role permissions
-    for (const rp of newRolePermissions) {
-      if (rp.syncId) {
-        try {
-          await masterPrisma.$executeRaw`
-            INSERT INTO sync_log (table_name, record_id, operation, source, data, change_time, sync_status, location_code)
-            VALUES (
-              'tbl_role_permission',
-              ${rp.syncId}::uuid,
-              'INSERT',
-              'server',
-              ${JSON.stringify({
-                role_code: rp.roleCode,
-                permission_code: rp.permissionCode,
-                sync_id: rp.syncId,
-                sync_source: rp.syncSource,
-                created_on: rp.createdOn.toISOString()
-              })}::jsonb,
-              NOW(),
-              0,
-              NULL
-            )
-          `
-        } catch (syncError) {
-          console.error('Error creating sync log for role permission creation:', syncError)
-        }
-      }
+    // Emit a single sync log entry per role change (UPSERT semantics)
+    const syncId = randomUUID()
+    try {
+      await masterPrisma.$executeRaw`
+        INSERT INTO sync_log (table_name, record_id, operation, source, data, change_time, sync_status, location_code)
+        VALUES (
+          'tbl_role_permission',
+          ${syncId}::uuid,
+          'UPDATE',
+          'server',
+          ${JSON.stringify({
+            role_code: code,
+            permissions,
+            sync_id: syncId,
+            sync_source: 'server',
+            change_time: new Date().toISOString()
+          })}::jsonb,
+          NOW(),
+          0,
+          NULL
+        )
+      `
+    } catch (syncError) {
+      console.error('Error creating sync log for role permission update:', syncError)
     }
 
     // Clear permission cache for this role

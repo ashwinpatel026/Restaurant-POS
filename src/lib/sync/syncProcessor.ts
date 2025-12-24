@@ -420,6 +420,51 @@ export class SyncProcessor {
       }
     }
 
+    // Special handling: role_permissions bulk update (single entry with full permission set)
+    if (
+      tableName === 'tbl_role_permission' &&
+      Array.isArray((parsedData as any)?.permissions)
+    ) {
+      const roleCode = (parsedData as any)?.role_code;
+      const permissions: string[] = (parsedData as any)?.permissions || [];
+      const syncSource = (parsedData as any)?.sync_source || 'server';
+
+      if (!roleCode) {
+        throw new Error('role_code missing in tbl_role_permission sync payload');
+      }
+
+      const escape = (val: string) => String(val).replace(/'/g, "''");
+      const escapedRole = escape(roleCode);
+
+      await locationPrisma.$transaction(async tx => {
+        // Replace the entire permission set for this role
+        await tx.$executeRawUnsafe(
+          `DELETE FROM ${locationTableName} WHERE "role_code" = '${escapedRole}'::VARCHAR`
+        );
+
+        if (permissions.length > 0) {
+          const values = permissions
+            .map(code => {
+              const escapedPerm = escape(code);
+              const newSyncId = randomUUID();
+              return `('${escapedRole}'::VARCHAR, '${escapedPerm}'::VARCHAR, '${newSyncId}'::UUID, '${escape(syncSource)}')`;
+            })
+            .join(', ');
+
+          await tx.$executeRawUnsafe(`
+            INSERT INTO ${locationTableName} ("role_code", "permission_code", "sync_id", "sync_source")
+            VALUES ${values}
+            ON CONFLICT ("role_code", "permission_code") DO UPDATE SET
+              "sync_id" = EXCLUDED."sync_id",
+              "sync_source" = EXCLUDED."sync_source"
+          `);
+        }
+      });
+
+      // Nothing else to do for this entry
+      return;
+    }
+
     // Filter out sync fields from data (we'll set them separately)
     const { sync_id, sync_source, ...recordData } = parsedData;
 
