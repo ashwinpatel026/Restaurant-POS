@@ -135,6 +135,7 @@ export async function GET(request: NextRequest) {
         tblMenuCategoryId: Number(category.menuCategoryId),
         name: category.name,
         colorCode: category.colorCode,
+        forColorCode: category.forColorCode,
         isActive: category.isActive,
         menuMasterCode: category.menuMasterCode,
         menuCategoryCode: category.menuCategoryCode,
@@ -193,7 +194,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, colorCode, menuMasterId, modifierGroupCodes = [] } = body
+    const { name, colorCode, forColorCode, menuMasterId, modifierGroupCodes = [] } = body
 
     // Get the menu master to get its code
     const menuMaster = await prisma.menuMaster.findUnique({
@@ -223,6 +224,7 @@ export async function POST(request: NextRequest) {
       data: {
         name,
         colorCode,
+        forColorCode: forColorCode || null,
         menuMasterCode: menuMaster.menuMasterCode,
         menuCategoryCode,
         createdBy: parseInt(session.user.id),

@@ -110,7 +110,7 @@ export async function PUT(
     const categoryId = BigInt(resolvedParams.id)
     const body = await request.json()
 
-    const { name, colorCode, isActive, menuMasterId, modifierGroupCodes = [] } = body
+    const { name, colorCode, forColorCode, isActive, menuMasterId, modifierGroupCodes = [] } = body
 
     // Get the category first to get its code
     const existingCategory = await masterPrisma.masterMenuCategory.findUnique({
@@ -137,6 +137,7 @@ export async function PUT(
       data: {
         name,
         colorCode: colorCode || null,
+        forColorCode: forColorCode || null,
         isActive: isActive ?? 1,
         menuMasterCode: menuMaster.menuMasterCode,
         updatedBy: admin.adminId,

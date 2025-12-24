@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, colorCode, menuMasterId, modifierGroupCodes = [] } = body
+    const { name, colorCode, forColorCode, menuMasterId, modifierGroupCodes = [] } = body
 
     // Get the menu master to get its code
     const menuMaster = await masterPrisma.masterMenuMaster.findUnique({
@@ -184,6 +184,7 @@ export async function POST(request: NextRequest) {
       data: {
         name,
         colorCode: colorCode || null,
+        forColorCode: forColorCode || null,
         menuMasterCode: menuMaster.menuMasterCode,
         menuCategoryCode,
         createdBy: admin.adminId,

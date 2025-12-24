@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import SystemColorPicker, {
   getPrimaryColor,
 } from "@/components/ui/SystemColorPicker";
+import TextColorPicker from "@/components/ui/TextColorPicker";
 import { CheckIcon } from "@heroicons/react/24/solid";
 import StatusToggle from "@/components/forms/StatusToggle";
 import { useApiWithStore } from "@/hooks/useApiWithStore";
@@ -50,6 +51,7 @@ export default function AddMenuMasterPage() {
     name: "",
     labelName: "",
     colorCode: getPrimaryColor(),
+    forColorCode: "#FFFFFF",
     eventCode: "",
     isEventMenu: 0,
     isActive: 1,
@@ -57,7 +59,11 @@ export default function AddMenuMasterPage() {
 
   useEffect(() => {
     // Set default color to primary color on mount
-    setFormData((prev) => ({ ...prev, colorCode: getPrimaryColor() }));
+    setFormData((prev) => ({ 
+      ...prev, 
+      colorCode: getPrimaryColor(),
+      forColorCode: "#FFFFFF"
+    }));
     if (selectedStoreCode) {
       fetchData();
     }
@@ -147,6 +153,7 @@ export default function AddMenuMasterPage() {
           name: formData.name,
           labelName: formData.labelName,
           colorCode: formData.colorCode,
+          forColorCode: formData.forColorCode,
           prepZoneCodes: prepZoneCodes.length > 0 ? prepZoneCodes : null,
           stationCodes: stationCodes.length > 0 ? stationCodes : null,
           eventCode: formData.eventCode || null,
@@ -237,14 +244,45 @@ export default function AddMenuMasterPage() {
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <SystemColorPicker
+                        label="Color Code (Background)"
+                        value={formData.colorCode}
+                        onChange={(color: string) =>
+                          setFormData({ ...formData, colorCode: color })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <TextColorPicker
+                        label="For Color Code (Text Color)"
+                        value={formData.forColorCode}
+                        onChange={(color: string) =>
+                          setFormData({ ...formData, forColorCode: color })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  {/* Sample Button */}
                   <div>
-                    <SystemColorPicker
-                      label="Color Code"
-                      value={formData.colorCode}
-                      onChange={(color: string) =>
-                        setFormData({ ...formData, colorCode: color })
-                      }
-                    />
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Color Preview
+                    </label>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                      Preview how the colors will look together
+                    </p>
+                    <button
+                      type="button"
+                      className="px-6 py-3 rounded-lg font-medium transition-all hover:opacity-90"
+                      style={{
+                        backgroundColor: formData.colorCode || "#3B82F6",
+                        color: formData.forColorCode || "#FFFFFF",
+                      }}
+                    >
+                      Sample Button
+                    </button>
                   </div>
 
                   <div>

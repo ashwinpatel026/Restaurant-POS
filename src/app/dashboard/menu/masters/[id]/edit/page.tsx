@@ -7,6 +7,7 @@ import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
 import SystemColorPicker from "@/components/ui/SystemColorPicker";
+import TextColorPicker from "@/components/ui/TextColorPicker";
 import { CheckIcon } from "@heroicons/react/24/solid";
 import StatusToggle from "@/components/forms/StatusToggle";
 import { useApiWithStore } from "@/hooks/useApiWithStore";
@@ -38,6 +39,7 @@ interface MenuMaster {
   name: string;
   labelName: string | null;
   colorCode: string | null;
+  forColorCode: string | null;
   prepZoneCode: string | string[] | null;
   stationCode: string | string[] | null;
   isEventMenu: number;
@@ -72,6 +74,7 @@ export default function EditMenuMasterPage() {
     name: "",
     labelName: "",
     colorCode: "#3B82F6",
+    forColorCode: "#FFFFFF",
     eventCode: "",
     isEventMenu: 0,
     isActive: 1,
@@ -85,12 +88,17 @@ export default function EditMenuMasterPage() {
 
   const fetchData = async () => {
     try {
-      const [prepZonesRes, stationsRes, eventsRes, masterRes] = await Promise.all([
-        fetch(buildApiUrl("/api/dashboard/menu/prep-zone"), { cache: "no-store" }),
-        fetch(buildApiUrl("/api/dashboard/station"), { cache: "no-store" }),
-        fetch(buildApiUrl("/api/dashboard/events"), { cache: "no-store" }),
-        fetch(buildApiUrl(`/api/dashboard/menu/masters/${masterId}`), { cache: "no-store" }),
-      ]);
+      const [prepZonesRes, stationsRes, eventsRes, masterRes] =
+        await Promise.all([
+          fetch(buildApiUrl("/api/dashboard/menu/prep-zone"), {
+            cache: "no-store",
+          }),
+          fetch(buildApiUrl("/api/dashboard/station"), { cache: "no-store" }),
+          fetch(buildApiUrl("/api/dashboard/events"), { cache: "no-store" }),
+          fetch(buildApiUrl(`/api/dashboard/menu/masters/${masterId}`), {
+            cache: "no-store",
+          }),
+        ]);
 
       if (prepZonesRes.ok) {
         const prepZonesData = await prepZonesRes.json();
@@ -167,6 +175,7 @@ export default function EditMenuMasterPage() {
           name: masterData.name || "",
           labelName: masterData.labelName || "",
           colorCode: masterData.colorCode || "#3B82F6",
+          forColorCode: masterData.forColorCode || "#FFFFFF",
           eventCode: eventCode,
           isEventMenu: masterData.isEventMenu ? 1 : 0,
           isActive:
@@ -226,23 +235,27 @@ export default function EditMenuMasterPage() {
     try {
       const prepZoneCodes = Array.from(selectedPrepZones);
       const stationCodes = Array.from(selectedStations);
-      const response = await fetch(buildApiUrl(`/api/dashboard/menu/masters/${masterId}`), {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          labelName: formData.labelName,
-          colorCode: formData.colorCode,
-          prepZoneCodes: prepZoneCodes.length > 0 ? prepZoneCodes : null,
-          stationCodes: stationCodes.length > 0 ? stationCodes : null,
-          eventCode: formData.eventCode || null,
-          currentEventCode: currentEventCode || null,
-          isEventMenu: formData.eventCode ? 1 : 0,
-          isActive: formData.isActive,
-        }),
-      });
+      const response = await fetch(
+        buildApiUrl(`/api/dashboard/menu/masters/${masterId}`),
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: formData.name,
+            labelName: formData.labelName,
+            colorCode: formData.colorCode,
+            forColorCode: formData.forColorCode,
+            prepZoneCodes: prepZoneCodes.length > 0 ? prepZoneCodes : null,
+            stationCodes: stationCodes.length > 0 ? stationCodes : null,
+            eventCode: formData.eventCode || null,
+            currentEventCode: currentEventCode || null,
+            isEventMenu: formData.eventCode ? 1 : 0,
+            isActive: formData.isActive,
+          }),
+        }
+      );
 
       if (response.ok) {
         toast.success("Menu master updated successfully!");
@@ -344,7 +357,10 @@ export default function EditMenuMasterPage() {
                         type="text"
                         value={formData.labelName}
                         onChange={(e) =>
-                          setFormData({ ...formData, labelName: e.target.value })
+                          setFormData({
+                            ...formData,
+                            labelName: e.target.value,
+                          })
                         }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="Enter display label"
@@ -352,14 +368,45 @@ export default function EditMenuMasterPage() {
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <SystemColorPicker
+                        label="Color Code (Background)"
+                        value={formData.colorCode || ""}
+                        onChange={(color: string) =>
+                          setFormData({ ...formData, colorCode: color })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <TextColorPicker
+                        label="Text Color"
+                        value={formData.forColorCode || "#FFFFFF"}
+                        onChange={(color: string) =>
+                          setFormData({ ...formData, forColorCode: color })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  {/* Sample Button */}
                   <div>
-                    <SystemColorPicker
-                      label="Color Code"
-                      value={formData.colorCode || ""}
-                      onChange={(color: string) =>
-                        setFormData({ ...formData, colorCode: color })
-                      }
-                    />
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Color Preview
+                    </label>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                      Preview how the colors will look together
+                    </p>
+                    <button
+                      type="button"
+                      className="px-6 py-3 rounded-lg font-medium transition-all hover:opacity-90"
+                      style={{
+                        backgroundColor: formData.colorCode || "#3B82F6",
+                        color: formData.forColorCode || "#FFFFFF",
+                      }}
+                    >
+                      Sample Button
+                    </button>
                   </div>
 
                   <div>

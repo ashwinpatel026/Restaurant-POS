@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import SystemColorPicker, {
   getPrimaryColor,
 } from "@/components/ui/SystemColorPicker";
+import TextColorPicker from "@/components/ui/TextColorPicker";
 import { CheckIcon } from "@heroicons/react/24/solid";
 import StatusToggle from "@/components/forms/StatusToggle";
 import { useApiWithStore } from "@/hooks/useApiWithStore";
@@ -36,13 +37,18 @@ export default function AddCategoryPage() {
   const [formData, setFormData] = useState({
     name: "",
     colorCode: getPrimaryColor(),
+    forColorCode: "#FFFFFF",
     menuMasterId: "",
     isActive: 1,
   });
 
   useEffect(() => {
     // Set default color to primary color on mount
-    setFormData((prev) => ({ ...prev, colorCode: getPrimaryColor() }));
+    setFormData((prev) => ({
+      ...prev,
+      colorCode: getPrimaryColor(),
+      forColorCode: "#FFFFFF",
+    }));
     if (selectedStoreCode) {
       fetchData();
     }
@@ -51,8 +57,12 @@ export default function AddCategoryPage() {
   const fetchData = async () => {
     try {
       const [mastersRes, modifierGroupsRes] = await Promise.all([
-        fetch(buildApiUrl("/api/dashboard/menu/masters"), { cache: "no-store" }),
-        fetch(buildApiUrl("/api/dashboard/modifier-groups"), { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/menu/masters"), {
+          cache: "no-store",
+        }),
+        fetch(buildApiUrl("/api/dashboard/modifier-groups"), {
+          cache: "no-store",
+        }),
       ]);
 
       if (mastersRes.ok) {
@@ -102,19 +112,23 @@ export default function AddCategoryPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(buildApiUrl("/api/dashboard/menu/categories"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          colorCode: formData.colorCode,
-          menuMasterId: formData.menuMasterId,
-          isActive: formData.isActive,
-          modifierGroupCodes: Array.from(selectedModifierGroups),
-        }),
-      });
+      const response = await fetch(
+        buildApiUrl("/api/dashboard/menu/categories"),
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: formData.name,
+            colorCode: formData.colorCode,
+            forColorCode: formData.forColorCode,
+            menuMasterId: formData.menuMasterId,
+            isActive: formData.isActive,
+            modifierGroupCodes: Array.from(selectedModifierGroups),
+          }),
+        }
+      );
 
       if (response.ok) {
         toast.success("Category created successfully!");
@@ -236,14 +250,45 @@ export default function AddCategoryPage() {
                     )}
                   </div>
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <SystemColorPicker
+                        label="Color Code (Background)"
+                        value={formData.colorCode}
+                        onChange={(color: string) =>
+                          setFormData({ ...formData, colorCode: color })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <TextColorPicker
+                        label="Text Color"
+                        value={formData.forColorCode}
+                        onChange={(color: string) =>
+                          setFormData({ ...formData, forColorCode: color })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  {/* Sample Button */}
                   <div>
-                    <SystemColorPicker
-                      label="Color Options"
-                      value={formData.colorCode}
-                      onChange={(color: string) =>
-                        setFormData({ ...formData, colorCode: color })
-                      }
-                    />
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Color Preview
+                    </label>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                      Preview how the colors will look together
+                    </p>
+                    <button
+                      type="button"
+                      className="px-6 py-3 rounded-lg font-medium transition-all hover:opacity-90"
+                      style={{
+                        backgroundColor: formData.colorCode || "#3B82F6",
+                        color: formData.forColorCode || "#FFFFFF",
+                      }}
+                    >
+                      Sample Button
+                    </button>
                   </div>
                 </div>
               </div>

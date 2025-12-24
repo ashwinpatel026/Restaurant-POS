@@ -5,6 +5,7 @@ import toast from "react-hot-toast";
 import SystemColorPicker, {
   getPrimaryColor,
 } from "@/components/ui/SystemColorPicker";
+import TextColorPicker from "@/components/ui/TextColorPicker";
 import ModifierSelectionModal from "@/components/modals/ModifierSelectionModal";
 import MenuMasterCategorySelectionModal from "@/components/modals/MenuMasterCategorySelectionModal";
 import { LoadingOverlay } from "@/components/ui/SkeletonLoader";
@@ -31,6 +32,7 @@ export default function MasterMenuItemTabbedForm({
     kitchenName: "",
     labelName: "",
     colorCode: getPrimaryColor(),
+    forColorCode: "#FFFFFF",
     calories: "",
     description: "",
     itemSize: "",
@@ -89,7 +91,8 @@ export default function MasterMenuItemTabbedForm({
   const [loading, setLoading] = useState(false);
   const [imageLoading, setImageLoading] = useState(false);
   const [showModifierModal, setShowModifierModal] = useState(false);
-  const [showMenuMasterCategoryModal, setShowMenuMasterCategoryModal] = useState(false);
+  const [showMenuMasterCategoryModal, setShowMenuMasterCategoryModal] =
+    useState(false);
   const [selectedMenuMaster, setSelectedMenuMaster] = useState<any>(null);
   const [inheritModifiers, setInheritModifiers] = useState(true);
   const [taxes, setTaxes] = useState<any[]>([]);
@@ -145,7 +148,10 @@ export default function MasterMenuItemTabbedForm({
   }, [formData.menuMasterCode, categories]);
 
   // Handle menu master and category selection from modal
-  const handleMenuMasterCategorySelect = (master: any, categoryCodes: string[]) => {
+  const handleMenuMasterCategorySelect = (
+    master: any,
+    categoryCodes: string[]
+  ) => {
     if (master) {
       setFormData({
         ...formData,
@@ -170,6 +176,7 @@ export default function MasterMenuItemTabbedForm({
         kitchenName: menuItem.kitchenName || "",
         labelName: menuItem.labelName || "",
         colorCode: menuItem.colorCode || getPrimaryColor(),
+        forColorCode: menuItem.forColorCode || "#FFFFFF",
         calories: menuItem.calories || "",
         description: menuItem.description || menuItem.descrip || "",
         itemSize: menuItem.itemSize || "",
@@ -622,12 +629,22 @@ export default function MasterMenuItemTabbedForm({
                       className="w-full px-4 py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-left"
                     >
                       {selectedMenuMaster && selectedCategories.size > 0
-                        ? `${selectedMenuMaster.name || selectedMenuMaster.labelName || selectedMenuMaster.menuMasterCode} - ${selectedCategories.size} categor${selectedCategories.size === 1 ? "y" : "ies"} selected`
+                        ? `${
+                            selectedMenuMaster.name ||
+                            selectedMenuMaster.labelName ||
+                            selectedMenuMaster.menuMasterCode
+                          } - ${selectedCategories.size} categor${
+                            selectedCategories.size === 1 ? "y" : "ies"
+                          } selected`
                         : selectedMenuMaster
-                        ? `${selectedMenuMaster.name || selectedMenuMaster.labelName || selectedMenuMaster.menuMasterCode} - No categories selected`
+                        ? `${
+                            selectedMenuMaster.name ||
+                            selectedMenuMaster.labelName ||
+                            selectedMenuMaster.menuMasterCode
+                          } - No categories selected`
                         : "Click to select Menu Master & Categories"}
                     </button>
-                    
+
                     {/* Display Selected Menu Master */}
                     {selectedMenuMaster && (
                       <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
@@ -653,7 +670,9 @@ export default function MasterMenuItemTabbedForm({
                         </div>
                         <button
                           type="button"
-                          onClick={() => handleMenuMasterCategorySelect(null, [])}
+                          onClick={() =>
+                            handleMenuMasterCategorySelect(null, [])
+                          }
                           className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                         >
                           <XMarkIcon className="w-5 h-5" />
@@ -668,46 +687,83 @@ export default function MasterMenuItemTabbedForm({
                           Selected Categories ({selectedCategories.size}):
                         </div>
                         <div className="flex flex-wrap gap-2 p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
-                          {Array.from(selectedCategories).map((categoryCode) => {
-                            const category = categories.find(
-                              (c) =>
-                                c.menuCategoryCode === categoryCode ||
-                                c.menuCategoryId?.toString() === categoryCode
-                            );
-                            if (!category) return null;
-                            return (
-                              <div
-                                key={categoryCode}
-                                className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-lg text-sm font-medium"
-                              >
-                                <span>{category.name}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const updated = new Set(selectedCategories);
-                                    updated.delete(categoryCode);
-                                    setSelectedCategories(updated);
-                                  }}
-                                  className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
+                          {Array.from(selectedCategories).map(
+                            (categoryCode) => {
+                              const category = categories.find(
+                                (c) =>
+                                  c.menuCategoryCode === categoryCode ||
+                                  c.menuCategoryId?.toString() === categoryCode
+                              );
+                              if (!category) return null;
+                              return (
+                                <div
+                                  key={categoryCode}
+                                  className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-lg text-sm font-medium"
                                 >
-                                  <XMarkIcon className="w-4 h-4" />
-                                </button>
-                              </div>
-                            );
-                          })}
+                                  <span>{category.name}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const updated = new Set(
+                                        selectedCategories
+                                      );
+                                      updated.delete(categoryCode);
+                                      setSelectedCategories(updated);
+                                    }}
+                                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
+                                  >
+                                    <XMarkIcon className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              );
+                            }
+                          )}
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
 
-                <SystemColorPicker
-                  label="Color Code"
-                  value={formData.colorCode}
-                  onChange={(color: string) =>
-                    setFormData({ ...formData, colorCode: color })
-                  }
-                />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <SystemColorPicker
+                      label="Color Code (Background)"
+                      value={formData.colorCode}
+                      onChange={(color: string) =>
+                        setFormData({ ...formData, colorCode: color })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <TextColorPicker
+                      label="Text Color"
+                      value={formData.forColorCode}
+                      onChange={(color: string) =>
+                        setFormData({ ...formData, forColorCode: color })
+                      }
+                    />
+                  </div>
+                </div>
+
+                {/* Sample Button */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Color Preview
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    Preview how the colors will look together
+                  </p>
+                  <button
+                    type="button"
+                    className="px-6 py-3 rounded-lg font-medium transition-all hover:opacity-90"
+                    style={{
+                      backgroundColor: formData.colorCode || "#3B82F6",
+                      color: formData.forColorCode || "#FFFFFF",
+                    }}
+                  >
+                    Sample Button
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

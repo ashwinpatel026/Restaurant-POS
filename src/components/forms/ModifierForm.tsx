@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { TrashIcon } from "@heroicons/react/24/outline";
+import { TrashIcon, PencilIcon } from "@heroicons/react/24/outline";
 import { LoadingOverlay } from "@/components/ui/SkeletonLoader";
+import ModifierItemModal from "@/components/modifiers/ModifierItemModal";
+import ToggleIndicator from "@/components/ui/ToggleIndicator";
 
 // Helper function to normalize prefix array
 const normalizePrefix = (value: unknown): string[] => {
@@ -42,6 +44,7 @@ interface ModifierItemState {
   name: string;
   labelName: string;
   colorCode: string;
+  forColorCode: string;
   price: number;
   isDefault: number;
   displayOrder: number;
@@ -74,29 +77,10 @@ export default function ModifierForm({
     prefix: [] as string[],
   });
 
-  const [modifierItems, setModifierItems] = useState<ModifierItemState[]>([
-    {
-      id: undefined,
-      name: "",
-      labelName: "",
-      colorCode: "#3B82F6",
-      price: 0,
-      isDefault: 0,
-      displayOrder: 1,
-      isActive: 1,
-    },
-    {
-      id: undefined,
-      name: "",
-      labelName: "",
-      colorCode: "#3B82F6",
-      price: 0,
-      isDefault: 0,
-      displayOrder: 2,
-      isActive: 1,
-    },
-  ]);
+  const [modifierItems, setModifierItems] = useState<ModifierItemState[]>([]);
   const [removedItemIds, setRemovedItemIds] = useState<string[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
@@ -136,6 +120,7 @@ export default function ModifierForm({
           name: item.name || "",
           labelName: item.labelName || "",
           colorCode: item.colorCode || "#3B82F6",
+          forColorCode: item.forColorCode || "#FFFFFF",
           price:
             typeof item.price === "number"
               ? item.price
@@ -145,47 +130,13 @@ export default function ModifierForm({
             typeof item.displayOrder === "number" ? item.displayOrder : 1,
           isActive: item.isActive ?? 1,
         }));
-        setModifierItems(
-          loadedItems.length > 0
-            ? loadedItems
-            : [
-                {
-                  id: undefined,
-                  name: "",
-                  labelName: "",
-                  colorCode: "#3B82F6",
-                  price: 0,
-                  isDefault: 0,
-                  displayOrder: 1,
-                  isActive: 1,
-                },
-              ]
-        );
+        setModifierItems(loadedItems);
+      } else {
+        setModifierItems([]);
       }
     } else {
-      // Reset to default 2 empty rows for new modifier
-      setModifierItems([
-        {
-          id: undefined,
-          name: "",
-          labelName: "",
-          colorCode: "#3B82F6",
-          price: 0,
-          isDefault: 0,
-          displayOrder: 1,
-          isActive: 1,
-        },
-        {
-          id: undefined,
-          name: "",
-          labelName: "",
-          colorCode: "#3B82F6",
-          price: 0,
-          isDefault: 0,
-          displayOrder: 2,
-          isActive: 1,
-        },
-      ]);
+      // Reset to empty for new modifier
+      setModifierItems([]);
       setRemovedItemIds([]);
     }
   }, [modifier]);
@@ -256,37 +207,43 @@ export default function ModifierForm({
 
   // Removed legacy fetchModifierItems; items are created alongside group on save for add flow
 
-  const addModifierItem = () => {
-    setModifierItems([
-      ...modifierItems,
-      {
-        id: undefined,
-        name: "",
-        labelName: "",
-        colorCode: "#3B82F6",
-        price: 0,
-        isDefault: 0,
-        displayOrder: modifierItems.length + 1,
-        isActive: 1,
-      },
-    ]);
+  const handleAddItem = () => {
+    setEditingItemIndex(null);
+    setIsModalOpen(true);
   };
 
-  const updateModifierItem = (index: number, field: string, value: any) => {
-    const updated = [...modifierItems];
-    updated[index] = { ...updated[index], [field]: value };
-    setModifierItems(updated);
+  const handleEditItem = (index: number) => {
+    setEditingItemIndex(index);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveItem = (item: ModifierItemState) => {
+    if (editingItemIndex !== null && editingItemIndex >= 0) {
+      // Update existing item
+      const updated = [...modifierItems];
+      updated[editingItemIndex] = item;
+      setModifierItems(updated);
+    } else {
+      // Add new item
+      setModifierItems([...modifierItems, item]);
+    }
+    setIsModalOpen(false);
+    setEditingItemIndex(null);
   };
 
   const removeModifierItem = (index: number) => {
-    if (modifierItems.length > 1) {
+    if (index >= 0 && index < modifierItems.length) {
       setShowConfirmModal(true);
       setDeletingIndex(index);
     }
   };
 
   const confirmRemoveModifierItem = () => {
-    if (deletingIndex !== null && modifierItems.length > 1) {
+    if (
+      deletingIndex !== null &&
+      deletingIndex >= 0 &&
+      deletingIndex < modifierItems.length
+    ) {
       const itemToRemove = modifierItems[deletingIndex];
       if (itemToRemove?.id) {
         setRemovedItemIds((prev) =>
@@ -394,6 +351,7 @@ export default function ModifierForm({
             name: item.name,
             labelName: item.labelName || null,
             colorCode: item.colorCode || null,
+            forColorCode: item.forColorCode || null,
             price:
               formData.priceStrategy === 2
                 ? typeof item.price === "number"
@@ -715,11 +673,12 @@ export default function ModifierForm({
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h4 className="text-md font-medium text-gray-900 dark:text-white">
-                  Items
+                  Items{" "}
+                  {modifierItems.length > 0 && `(${modifierItems.length})`}
                 </h4>
                 <button
                   type="button"
-                  onClick={addModifierItem}
+                  onClick={handleAddItem}
                   className="px-4 py-2 text-sm font-medium text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   + Add Item
@@ -757,141 +716,100 @@ export default function ModifierForm({
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
-                    {modifierItems.map((item, index) => (
-                      <tr key={index}>
-                        <td className="px-4 py-3">
-                          <input
-                            type="text"
-                            value={item.name}
-                            onChange={(e) =>
-                              updateModifierItem(index, "name", e.target.value)
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Enter modifier name"
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <input
-                            type="text"
-                            value={item.labelName || ""}
-                            onChange={(e) =>
-                              updateModifierItem(
-                                index,
-                                "labelName",
-                                e.target.value
-                              )
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Enter label"
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="color"
-                              value={item.colorCode || "#3B82F6"}
-                              onChange={(e) =>
-                                updateModifierItem(
-                                  index,
-                                  "colorCode",
-                                  e.target.value
-                                )
-                              }
-                              className="h-10 w-16 border border-gray-300 dark:border-gray-600 rounded"
-                            />
-                            <input
-                              type="text"
-                              value={item.colorCode || "#3B82F6"}
-                              onChange={(e) =>
-                                updateModifierItem(
-                                  index,
-                                  "colorCode",
-                                  e.target.value
-                                )
-                              }
-                              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                              placeholder="#3B82F6"
-                            />
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center">
-                            <span className="text-gray-500 dark:text-gray-400 mr-2">
-                              $
-                            </span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={item.price}
-                              onChange={(e) =>
-                                updateModifierItem(
-                                  index,
-                                  "price",
-                                  parseFloat(e.target.value) || 0
-                                )
-                              }
-                              disabled={formData.priceStrategy !== 2}
-                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                              placeholder="0.00"
-                            />
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={item.isDefault === 1}
-                            onChange={(e) =>
-                              updateModifierItem(
-                                index,
-                                "isDefault",
-                                e.target.checked ? 1 : 0
-                              )
-                            }
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <input
-                            type="number"
-                            min={1}
-                            value={item.displayOrder || index + 1}
-                            onChange={(e) =>
-                              updateModifierItem(
-                                index,
-                                "displayOrder",
-                                parseInt(e.target.value) || index + 1
-                              )
-                            }
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={item.isActive === 1}
-                            onChange={(e) =>
-                              updateModifierItem(
-                                index,
-                                "isActive",
-                                e.target.checked ? 1 : 0
-                              )
-                            }
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          {modifierItems.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => removeModifierItem(index)}
-                              className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-200"
-                              title="Delete modifier item"
-                            >
-                              <TrashIcon className="w-4 h-4" />
-                            </button>
-                          )}
+                    {modifierItems.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={8}
+                          className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
+                        >
+                          No modifier items added yet. Click "+ Add Item" to
+                          start.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      modifierItems.map((item, index) => (
+                        <tr key={item.id || index}>
+                          <td className="px-4 py-3">
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                              {item.name || "Unnamed Item"}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                              {item.labelName || "-"}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center">
+                              <button
+                                type="button"
+                                className="px-4 py-2 rounded-lg text-sm transition-all shadow-md hover:shadow-lg"
+                                style={{
+                                  backgroundColor: item.colorCode || "#3B82F6",
+                                  color: item.forColorCode || "#FFFFFF",
+                                }}
+                                title={`Color: ${
+                                  item.colorCode || "#3B82F6"
+                                }, Text: ${item.forColorCode || "#FFFFFF"}`}
+                              >
+                                {item.name || "Preview"}
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="text-sm text-gray-900 dark:text-white">
+                              {formData.priceStrategy === 2 &&
+                              typeof item.price === "number"
+                                ? `$${item.price.toFixed(2)}`
+                                : "-"}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center">
+                              <ToggleIndicator
+                                value={item.isDefault}
+                                activeColor="blue"
+                                size="md"
+                              />
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="text-sm text-gray-900 dark:text-white">
+                              {item.displayOrder || index + 1}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center">
+                              <ToggleIndicator
+                                value={item.isActive}
+                                activeColor="green"
+                                size="md"
+                              />
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center space-x-2">
+                              <button
+                                type="button"
+                                onClick={() => handleEditItem(index)}
+                                className="p-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                                title="Edit modifier item"
+                              >
+                                <PencilIcon className="w-5 h-5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeModifierItem(index)}
+                                className="p-2 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                                title="Delete modifier item"
+                              >
+                                <TrashIcon className="w-5 h-5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -916,6 +834,28 @@ export default function ModifierForm({
             </button>
           </div>
         </form>
+
+        {/* Modifier Item Modal */}
+        <ModifierItemModal
+          isOpen={isModalOpen}
+          onClose={() => {
+            setIsModalOpen(false);
+            setEditingItemIndex(null);
+          }}
+          onSave={handleSaveItem}
+          item={
+            editingItemIndex !== null && editingItemIndex >= 0
+              ? modifierItems[editingItemIndex]
+              : null
+          }
+          priceStrategy={formData.priceStrategy}
+          nextDisplayOrder={
+            modifierItems.length > 0
+              ? Math.max(...modifierItems.map((i) => i.displayOrder || 0), 0) +
+                1
+              : 1
+          }
+        />
 
         {/* Confirmation Modal */}
         {showConfirmModal && (

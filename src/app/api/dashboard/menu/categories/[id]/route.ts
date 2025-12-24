@@ -118,7 +118,7 @@ export async function PUT(
     const categoryId = BigInt(resolvedParams.id)
     const body = await request.json()
 
-    const { name, colorCode, isActive, menuMasterId, modifierGroupCodes = [] } = body
+    const { name, colorCode, forColorCode, isActive, menuMasterId, modifierGroupCodes = [] } = body
 
     // Get the category first to get its code
     const existingCategory = await prisma.menuCategory.findUnique({
@@ -165,6 +165,7 @@ export async function PUT(
       data: {
         name,
         colorCode,
+        forColorCode: forColorCode || null,
         isActive,
         menuMasterCode: menuMaster.menuMasterCode,
         syncSource: 'location' // Set sync_source to 'location' when updated from dashboard

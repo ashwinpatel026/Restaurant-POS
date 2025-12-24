@@ -38,14 +38,14 @@ export default function EditModifierPage() {
       setLoading(true);
       try {
         const token = localStorage.getItem("master_admin_token");
-        
+
         // Fetch modifier group
         const groupResponse = await fetch(`/api/master/modifier-groups/${id}`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         });
-        
+
         if (!groupResponse.ok) {
           toast.error("Failed to fetch modifier.");
           router.push("/master/modifiers/modifiers");
@@ -65,7 +65,7 @@ export default function EditModifierPage() {
               },
             }
           );
-          
+
           if (itemsResponse.ok) {
             items = await itemsResponse.json();
           }
@@ -128,12 +128,15 @@ export default function EditModifierPage() {
       if (Array.isArray(removedItemIds)) {
         for (const itemId of removedItemIds) {
           if (!itemId) continue;
-          const deleteRes = await fetch(`/api/master/modifier-items/${itemId}`, {
-            method: "DELETE",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
+          const deleteRes = await fetch(
+            `/api/master/modifier-items/${itemId}`,
+            {
+              method: "DELETE",
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
           if (!deleteRes.ok) {
             const err = await deleteRes.json().catch(() => ({}));
             throw new Error(err.error || "Failed to delete modifier item");
@@ -151,6 +154,7 @@ export default function EditModifierPage() {
             name: item.name,
             labelName: item.labelName || null,
             colorCode: item.colorCode || null,
+            forColorCode: item.forColorCode || null,
             price: typeof item.price === "number" ? item.price : null,
             isDefault: item.isDefault ? 1 : 0,
             displayOrder:
@@ -159,14 +163,17 @@ export default function EditModifierPage() {
           };
 
           if (item.id) {
-            const updateRes = await fetch(`/api/master/modifier-items/${item.id}`, {
-              method: "PUT",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify(payload),
-            });
+            const updateRes = await fetch(
+              `/api/master/modifier-items/${item.id}`,
+              {
+                method: "PUT",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(payload),
+              }
+            );
             if (!updateRes.ok) {
               const err = await updateRes.json().catch(() => ({}));
               throw new Error(err.error || "Failed to update modifier item");

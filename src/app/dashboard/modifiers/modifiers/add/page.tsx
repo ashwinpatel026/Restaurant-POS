@@ -56,6 +56,7 @@ export default function AddModifierPage() {
                 name: item.name,
                 labelName: item.labelName || null,
                 colorCode: item.colorCode || null,
+                forColorCode: item.forColorCode || null,
                 price: typeof item.price === "number" ? item.price : null,
                 isDefault: item.isDefault ? 1 : 0,
                 displayOrder:

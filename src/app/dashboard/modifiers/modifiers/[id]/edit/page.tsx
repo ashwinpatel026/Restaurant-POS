@@ -40,7 +40,9 @@ export default function EditModifierPage() {
       if (!id || !selectedStoreCode) return;
       setLoading(true);
       try {
-        const response = await fetch(buildApiUrl(`/api/dashboard/modifier-groups/${id}`));
+        const response = await fetch(
+          buildApiUrl(`/api/dashboard/modifier-groups/${id}`)
+        );
         if (response.ok) {
           const modifierData = await response.json();
           setModifier(modifierData);
@@ -70,14 +72,17 @@ export default function EditModifierPage() {
       } = formData || {};
 
       // 1) Update modifier group
-      const groupResponse = await fetch(buildApiUrl(`/api/dashboard/modifier-groups/${id}`), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...groupData,
-          price: groupData.priceStrategy === 3 ? groupData.price ?? 0 : null,
-        }),
-      });
+      const groupResponse = await fetch(
+        buildApiUrl(`/api/dashboard/modifier-groups/${id}`),
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...groupData,
+            price: groupData.priceStrategy === 3 ? groupData.price ?? 0 : null,
+          }),
+        }
+      );
 
       if (!groupResponse.ok) {
         const errorData = await groupResponse.json();
@@ -96,9 +101,12 @@ export default function EditModifierPage() {
       if (Array.isArray(removedItemIds)) {
         for (const itemId of removedItemIds) {
           if (!itemId) continue;
-          const deleteRes = await fetch(buildApiUrl(`/api/dashboard/modifier-items/${itemId}`), {
-            method: "DELETE",
-          });
+          const deleteRes = await fetch(
+            buildApiUrl(`/api/dashboard/modifier-items/${itemId}`),
+            {
+              method: "DELETE",
+            }
+          );
           if (!deleteRes.ok) {
             const err = await deleteRes.json().catch(() => ({}));
             throw new Error(err.error || "Failed to delete modifier item");
@@ -116,6 +124,7 @@ export default function EditModifierPage() {
             name: item.name,
             labelName: item.labelName || null,
             colorCode: item.colorCode || null,
+            forColorCode: item.forColorCode || null,
             price: typeof item.price === "number" ? item.price : null,
             isDefault: item.isDefault ? 1 : 0,
             displayOrder:
@@ -124,21 +133,27 @@ export default function EditModifierPage() {
           };
 
           if (item.id) {
-            const updateRes = await fetch(buildApiUrl(`/api/dashboard/modifier-items/${item.id}`), {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-            });
+            const updateRes = await fetch(
+              buildApiUrl(`/api/dashboard/modifier-items/${item.id}`),
+              {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              }
+            );
             if (!updateRes.ok) {
               const err = await updateRes.json().catch(() => ({}));
               throw new Error(err.error || "Failed to update modifier item");
             }
           } else {
-            const createRes = await fetch(buildApiUrl("/api/dashboard/modifier-items"), {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-            });
+            const createRes = await fetch(
+              buildApiUrl("/api/dashboard/modifier-items"),
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              }
+            );
             if (!createRes.ok) {
               const err = await createRes.json().catch(() => ({}));
               throw new Error(err.error || "Failed to create modifier item");
