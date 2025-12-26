@@ -26,14 +26,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if admin is active
-    if (!admin.isActive) {
-      return NextResponse.json(
-        { error: 'Account is not active. Please contact administrator.' },
-        { status: 403 }
-      )
-    }
-
     const isPasswordValid = await bcrypt.compare(password, admin.password)
 
     if (!isPasswordValid) {
@@ -60,7 +52,7 @@ export async function POST(request: NextRequest) {
         type: 'master_admin'
       },
       process.env.NEXTAUTH_SECRET || 'fallback-secret',
-      { expiresIn: '7d' }
+      { expiresIn: '1h' }
     )
 
     return NextResponse.json({
