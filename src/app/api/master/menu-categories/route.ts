@@ -165,17 +165,20 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, colorCode, forColorCode, menuMasterId, modifierGroupCodes = [] } = body
+    const { name, colorCode, forColorCode, menuMasterId, modifierGroupCodes = [], deptCode } = body
 
-    // Get the menu master to get its code
+    // Get the menu master to get its code and deptCode
     const menuMaster = await masterPrisma.masterMenuMaster.findUnique({
       where: { menuMasterId: BigInt(menuMasterId) },
-      select: { menuMasterCode: true }
+      select: { menuMasterCode: true, deptCode: true }
     })
 
     if (!menuMaster) {
       return NextResponse.json({ error: 'Menu master not found' }, { status: 404 })
     }
+
+    // Use provided deptCode or fallback to menu master's deptCode
+    const finalDeptCode = deptCode || menuMaster.deptCode || null
 
     // Generate unique menu category code
     const menuCategoryCode = await generateMenuCategoryCode()
@@ -185,6 +188,7 @@ export async function POST(request: NextRequest) {
         name,
         colorCode: colorCode || null,
         forColorCode: forColorCode || null,
+        deptCode: finalDeptCode,
         menuMasterCode: menuMaster.menuMasterCode,
         menuCategoryCode,
         createdBy: admin.adminId,

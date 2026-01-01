@@ -292,7 +292,7 @@ export async function POST(
 
     // Add all other fields from schema if provided
     const allowedFields = [
-      'kitchenName', 'labelName', 'colorCode', 'calories', 'description', 'itemSize',
+      'kitchenName', 'labelName', 'colorCode', 'forColorCode', 'deptCode', 'calories', 'description', 'itemSize',
       'skuPlu', 'barcode', 'isAlcohol', 'menuImg', 'priceStrategy', 'stockinhand',
       'isOutStock', 'itemContainAlcohol', 'isPosVisible', 'isKioskOrderPay',
       'isOnlineOrderByApp', 'isOnlineOrdering', 'isCustomerInvoice'

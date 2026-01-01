@@ -110,7 +110,7 @@ export async function PUT(
     const categoryId = BigInt(resolvedParams.id)
     const body = await request.json()
 
-    const { name, colorCode, forColorCode, isActive, menuMasterId, modifierGroupCodes = [] } = body
+    const { name, colorCode, forColorCode, isActive, menuMasterId, modifierGroupCodes = [], deptCode } = body
 
     // Get the category first to get its code
     const existingCategory = await masterPrisma.masterMenuCategory.findUnique({
@@ -122,15 +122,18 @@ export async function PUT(
       return NextResponse.json({ error: 'Category not found' }, { status: 404 })
     }
 
-    // Get the menu master to get its code
+    // Get the menu master to get its code and deptCode
     const menuMaster = await masterPrisma.masterMenuMaster.findUnique({
       where: { menuMasterId: BigInt(menuMasterId) },
-      select: { menuMasterCode: true }
+      select: { menuMasterCode: true, deptCode: true }
     })
 
     if (!menuMaster) {
       return NextResponse.json({ error: 'Menu master not found' }, { status: 404 })
     }
+
+    // Use provided deptCode or fallback to menu master's deptCode
+    const finalDeptCode = deptCode !== undefined ? (deptCode || null) : (menuMaster.deptCode || null)
 
     const category = await masterPrisma.masterMenuCategory.update({
       where: { menuCategoryId: categoryId },
@@ -138,6 +141,7 @@ export async function PUT(
         name,
         colorCode: colorCode || null,
         forColorCode: forColorCode || null,
+        deptCode: finalDeptCode,
         isActive: isActive ?? 1,
         menuMasterCode: menuMaster.menuMasterCode,
         updatedBy: admin.adminId,

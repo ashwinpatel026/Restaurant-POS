@@ -16,6 +16,7 @@ import { useApiWithStore } from "@/hooks/useApiWithStore";
 interface MenuMaster {
   menuMasterId: string;
   name: string;
+  deptCode: string | null;
 }
 
 interface ModifierGroup {
@@ -25,12 +26,20 @@ interface ModifierGroup {
   labelName: string | null;
 }
 
+interface Department {
+  deptId: string;
+  deptCode: string;
+  deptName: string | null;
+  isActive: number;
+}
+
 export default function AddCategoryPage() {
   const router = useRouter();
   const { selectedStoreCode, buildApiUrl } = useApiWithStore();
   const [loading, setLoading] = useState(false);
   const [menuMasters, setMenuMasters] = useState<MenuMaster[]>([]);
   const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedModifierGroups, setSelectedModifierGroups] = useState<
     Set<string>
   >(new Set());
@@ -39,6 +48,7 @@ export default function AddCategoryPage() {
     colorCode: getPrimaryColor(),
     forColorCode: "#FFFFFF",
     menuMasterId: "",
+    deptCode: "",
     isActive: 1,
   });
 
@@ -56,11 +66,14 @@ export default function AddCategoryPage() {
 
   const fetchData = async () => {
     try {
-      const [mastersRes, modifierGroupsRes] = await Promise.all([
+      const [mastersRes, modifierGroupsRes, departmentsRes] = await Promise.all([
         fetch(buildApiUrl("/api/dashboard/menu/masters"), {
           cache: "no-store",
         }),
         fetch(buildApiUrl("/api/dashboard/modifier-groups"), {
+          cache: "no-store",
+        }),
+        fetch(buildApiUrl("/api/dashboard/department"), {
           cache: "no-store",
         }),
       ]);
@@ -74,10 +87,25 @@ export default function AddCategoryPage() {
         const modifierGroupsData = await modifierGroupsRes.json();
         setModifierGroups(modifierGroupsData);
       }
+
+      if (departmentsRes.ok) {
+        const departmentsData = await departmentsRes.json();
+        setDepartments(departmentsData.filter((d: Department) => d.isActive === 1));
+      }
     } catch (error) {
       toast.error("Error loading data");
       console.error("Error:", error);
     }
+  };
+
+  // Handle menu master selection and auto-select department
+  const handleMenuMasterSelect = (menuMasterId: string) => {
+    const selectedMaster = menuMasters.find((m) => m.menuMasterId === menuMasterId);
+    setFormData({
+      ...formData,
+      menuMasterId: menuMasterId,
+      deptCode: selectedMaster?.deptCode || "",
+    });
   };
 
   const handleModifierGroupToggle = (modifierGroupCode: string) => {
@@ -119,14 +147,15 @@ export default function AddCategoryPage() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            name: formData.name,
-            colorCode: formData.colorCode,
-            forColorCode: formData.forColorCode,
-            menuMasterId: formData.menuMasterId,
-            isActive: formData.isActive,
-            modifierGroupCodes: Array.from(selectedModifierGroups),
-          }),
+        body: JSON.stringify({
+          name: formData.name,
+          colorCode: formData.colorCode,
+          forColorCode: formData.forColorCode,
+          menuMasterId: formData.menuMasterId,
+          deptCode: formData.deptCode || null,
+          isActive: formData.isActive,
+          modifierGroupCodes: Array.from(selectedModifierGroups),
+        }),
         }
       );
 
@@ -213,10 +242,7 @@ export default function AddCategoryPage() {
                                   key={master.menuMasterId}
                                   type="button"
                                   onClick={() =>
-                                    setFormData({
-                                      ...formData,
-                                      menuMasterId: master.menuMasterId,
-                                    })
+                                    handleMenuMasterSelect(master.menuMasterId)
                                   }
                                   className={`relative p-4 rounded-lg border-2 transition-all text-left ${
                                     isSelected
@@ -250,45 +276,75 @@ export default function AddCategoryPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <SystemColorPicker
-                        label="Color Code (Background)"
-                        value={formData.colorCode}
-                        onChange={(color: string) =>
-                          setFormData({ ...formData, colorCode: color })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <TextColorPicker
-                        label="Text Color"
-                        value={formData.forColorCode}
-                        onChange={(color: string) =>
-                          setFormData({ ...formData, forColorCode: color })
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  {/* Sample Button */}
+                  {/* Department Selection - Always visible, enabled after menu master selection */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Color Preview
+                      Department
                     </label>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                      Preview how the colors will look together
-                    </p>
-                    <button
-                      type="button"
-                      className="px-6 py-3 rounded-lg font-medium transition-all hover:opacity-90"
-                      style={{
-                        backgroundColor: formData.colorCode || "#3B82F6",
-                        color: formData.forColorCode || "#FFFFFF",
-                      }}
+                    <select
+                      value={formData.deptCode}
+                      onChange={(e) =>
+                        setFormData({ ...formData, deptCode: e.target.value })
+                      }
+                      disabled={!formData.menuMasterId}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Sample Button
-                    </button>
+                      <option value="">Select Department</option>
+                      {departments.map((dept) => (
+                        <option key={dept.deptId} value={dept.deptCode}>
+                          {dept.deptName}
+                        </option>
+                      ))}
+                    </select>
+                    {!formData.menuMasterId && (
+                      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        Please select a menu master first
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Color Code Section - All three wrapped */}
+                  <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <SystemColorPicker
+                          label="Color Code (Background)"
+                          value={formData.colorCode}
+                          onChange={(color: string) =>
+                            setFormData({ ...formData, colorCode: color })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <TextColorPicker
+                          label="Text Color"
+                          value={formData.forColorCode}
+                          onChange={(color: string) =>
+                            setFormData({ ...formData, forColorCode: color })
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    {/* Sample Button */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Color Preview
+                      </label>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                        Preview how the colors will look together
+                      </p>
+                      <button
+                        type="button"
+                        className="px-6 py-3 rounded-lg font-medium transition-all hover:opacity-90"
+                        style={{
+                          backgroundColor: formData.colorCode || "#3B82F6",
+                          color: formData.forColorCode || "#FFFFFF",
+                        }}
+                      >
+                        Sample Button
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

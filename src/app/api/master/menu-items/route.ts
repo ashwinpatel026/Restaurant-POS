@@ -127,6 +127,7 @@ export async function POST(request: NextRequest) {
       inheritModifiers,
       modifierAssignments,
       prepZoneCodes,
+      deptCode,
     } = body
 
     // Generate unique code for menu item
@@ -151,6 +152,7 @@ export async function POST(request: NextRequest) {
         kitchenName: kitchenName || null,
         labelName: labelName || null,
         colorCode: colorCode || null,
+        deptCode: deptCode || null,
         forColorCode: forColorCode || null,
         calories: calories || null,
         description: description || null,

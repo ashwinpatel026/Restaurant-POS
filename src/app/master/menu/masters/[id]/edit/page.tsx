@@ -32,6 +32,13 @@ interface TimeEvent {
   isActive: number;
 }
 
+interface Department {
+  deptId: string;
+  deptCode: string;
+  deptName: string | null;
+  isActive: number;
+}
+
 interface MenuMaster {
   menuMasterId: string;
   menuMasterCode: string;
@@ -39,6 +46,7 @@ interface MenuMaster {
   labelName: string | null;
   colorCode: string | null;
   forColorCode: string | null;
+  deptCode: string | null;
   prepZoneCode: string | string[] | null;
   stationCode: string | string[] | null;
   isEventMenu: number;
@@ -59,6 +67,7 @@ export default function EditMenuMasterPage() {
   const [prepZones, setPrepZones] = useState<PrepZone[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
   const [timeEvents, setTimeEvents] = useState<TimeEvent[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [menuMaster, setMenuMaster] = useState<MenuMaster | null>(null);
   const [currentEventCode, setCurrentEventCode] = useState<string>("");
   const [selectedPrepZones, setSelectedPrepZones] = useState<Set<string>>(
@@ -73,6 +82,7 @@ export default function EditMenuMasterPage() {
     labelName: "",
     colorCode: "#3B82F6",
     forColorCode: "#FFFFFF",
+    deptCode: "",
     eventCode: "",
     isEventMenu: 0,
     isActive: 1,
@@ -87,7 +97,7 @@ export default function EditMenuMasterPage() {
   const fetchData = async () => {
     try {
       const token = localStorage.getItem("master_admin_token");
-      const [prepZonesRes, stationsRes, eventsRes, masterRes] =
+      const [prepZonesRes, stationsRes, eventsRes, departmentsRes, masterRes] =
         await Promise.all([
           fetch("/api/master/prep-zone", {
             headers: {
@@ -102,6 +112,12 @@ export default function EditMenuMasterPage() {
             cache: "no-store",
           }),
           fetch("/api/master/time-event", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          }),
+          fetch("/api/master/department", {
             headers: {
               Authorization: `Bearer ${token}`,
             },
@@ -128,6 +144,11 @@ export default function EditMenuMasterPage() {
       if (eventsRes.ok) {
         const eventsData = await eventsRes.json();
         setTimeEvents(eventsData.filter((e: TimeEvent) => e.isActive === 1));
+      }
+
+      if (departmentsRes.ok) {
+        const departmentsData = await departmentsRes.json();
+        setDepartments(departmentsData.filter((d: Department) => d.isActive === 1));
       }
 
       if (masterRes.ok) {
@@ -196,6 +217,7 @@ export default function EditMenuMasterPage() {
           labelName: masterData.labelName || "",
           colorCode: masterData.colorCode || "#3B82F6",
           forColorCode: masterData.forColorCode || "#FFFFFF",
+          deptCode: masterData.deptCode || "",
           eventCode: eventCode,
           isEventMenu: masterData.isEventMenu ? 1 : 0,
           isActive:
@@ -267,6 +289,7 @@ export default function EditMenuMasterPage() {
           labelName: formData.labelName,
           colorCode: formData.colorCode,
           forColorCode: formData.forColorCode,
+          deptCode: formData.deptCode || null,
           prepZoneCodes: prepZoneCodes.length > 0 ? prepZoneCodes : null,
           stationCodes: stationCodes.length > 0 ? stationCodes : null,
           eventCode: formData.eventCode || null,
@@ -389,43 +412,71 @@ export default function EditMenuMasterPage() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <SystemColorPicker
-                        label="Color Code (Background)"
-                        value={formData.colorCode || ""}
-                        onChange={(color: string) =>
-                          setFormData({ ...formData, colorCode: color })
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Department
+                      </label>
+                      <select
+                        value={formData.deptCode}
+                        onChange={(e) =>
+                          setFormData({ ...formData, deptCode: e.target.value })
                         }
-                      />
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Select Department</option>
+                        {departments.map((dept) => (
+                          <option key={dept.deptId} value={dept.deptCode}>
+                            {dept.deptName}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div>
-                      <TextColorPicker
-                        label="Text Color"
-                        value={formData.forColorCode || "#FFFFFF"}
-                        onChange={(color: string) =>
-                          setFormData({ ...formData, forColorCode: color })
-                        }
-                      />
+                      {/* Empty div for alignment */}
                     </div>
                   </div>
 
-                  {/* Sample Button */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Color Preview
-                    </label>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                      Preview how the colors will look together
-                    </p>
-                    <button
-                      type="button"
-                      className="px-6 py-3 rounded-lg font-medium transition-all hover:opacity-90"
-                      style={{
-                        backgroundColor: formData.colorCode || "#3B82F6",
-                        color: formData.forColorCode || "#FFFFFF",
-                      }}
-                    >
-                      Sample Button
-                    </button>
+                  {/* Color Code Section - All three wrapped */}
+                  <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <SystemColorPicker
+                          label="Color Code (Background)"
+                          value={formData.colorCode || ""}
+                          onChange={(color: string) =>
+                            setFormData({ ...formData, colorCode: color })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <TextColorPicker
+                          label="Text Color"
+                          value={formData.forColorCode || "#FFFFFF"}
+                          onChange={(color: string) =>
+                            setFormData({ ...formData, forColorCode: color })
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    {/* Sample Button */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Color Preview
+                      </label>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                        Preview how the colors will look together
+                      </p>
+                      <button
+                        type="button"
+                        className="px-6 py-3 rounded-lg font-medium transition-all hover:opacity-90"
+                        style={{
+                          backgroundColor: formData.colorCode || "#3B82F6",
+                          color: formData.forColorCode || "#FFFFFF",
+                        }}
+                      >
+                        Sample Button
+                      </button>
+                    </div>
                   </div>
 
                   <div>

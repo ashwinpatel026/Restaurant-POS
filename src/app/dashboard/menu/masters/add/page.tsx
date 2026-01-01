@@ -34,6 +34,13 @@ interface TimeEvent {
   isActive: number;
 }
 
+interface Department {
+  deptId: string;
+  deptCode: string;
+  deptName: string | null;
+  isActive: number;
+}
+
 export default function AddMenuMasterPage() {
   const router = useRouter();
   const { selectedStoreCode, buildApiUrl } = useApiWithStore();
@@ -41,6 +48,7 @@ export default function AddMenuMasterPage() {
   const [prepZones, setPrepZones] = useState<PrepZone[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
   const [timeEvents, setTimeEvents] = useState<TimeEvent[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedPrepZones, setSelectedPrepZones] = useState<Set<string>>(
     new Set()
   );
@@ -52,6 +60,7 @@ export default function AddMenuMasterPage() {
     labelName: "",
     colorCode: getPrimaryColor(),
     forColorCode: "#FFFFFF",
+    deptCode: "",
     eventCode: "",
     isEventMenu: 0,
     isActive: 1,
@@ -71,12 +80,13 @@ export default function AddMenuMasterPage() {
 
   const fetchData = async () => {
     try {
-      const [prepZonesRes, stationsRes, eventsRes] = await Promise.all([
+      const [prepZonesRes, stationsRes, eventsRes, departmentsRes] = await Promise.all([
         fetch(buildApiUrl("/api/dashboard/menu/prep-zone"), {
           cache: "no-store",
         }),
         fetch(buildApiUrl("/api/dashboard/station"), { cache: "no-store" }),
         fetch(buildApiUrl("/api/dashboard/events"), { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/department"), { cache: "no-store" }),
       ]);
 
       if (prepZonesRes.ok) {
@@ -92,6 +102,11 @@ export default function AddMenuMasterPage() {
       if (eventsRes.ok) {
         const eventsData = await eventsRes.json();
         setTimeEvents(eventsData.filter((e: TimeEvent) => e.isActive === 1));
+      }
+
+      if (departmentsRes.ok) {
+        const departmentsData = await departmentsRes.json();
+        setDepartments(departmentsData.filter((d: Department) => d.isActive === 1));
       }
     } catch (error) {
       toast.error("Error loading data");
@@ -154,6 +169,7 @@ export default function AddMenuMasterPage() {
           labelName: formData.labelName,
           colorCode: formData.colorCode,
           forColorCode: formData.forColorCode,
+          deptCode: formData.deptCode || null,
           prepZoneCodes: prepZoneCodes.length > 0 ? prepZoneCodes : null,
           stationCodes: stationCodes.length > 0 ? stationCodes : null,
           eventCode: formData.eventCode || null,
@@ -246,43 +262,71 @@ export default function AddMenuMasterPage() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <SystemColorPicker
-                        label="Color Code (Background)"
-                        value={formData.colorCode}
-                        onChange={(color: string) =>
-                          setFormData({ ...formData, colorCode: color })
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Department
+                      </label>
+                      <select
+                        value={formData.deptCode}
+                        onChange={(e) =>
+                          setFormData({ ...formData, deptCode: e.target.value })
                         }
-                      />
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="">Select Department</option>
+                        {departments.map((dept) => (
+                          <option key={dept.deptId} value={dept.deptCode}>
+                            {dept.deptName}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div>
-                      <TextColorPicker
-                        label="For Color Code (Text Color)"
-                        value={formData.forColorCode}
-                        onChange={(color: string) =>
-                          setFormData({ ...formData, forColorCode: color })
-                        }
-                      />
+                      {/* Empty div for alignment */}
                     </div>
                   </div>
 
-                  {/* Sample Button */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Color Preview
-                    </label>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                      Preview how the colors will look together
-                    </p>
-                    <button
-                      type="button"
-                      className="px-6 py-3 rounded-lg font-medium transition-all hover:opacity-90"
-                      style={{
-                        backgroundColor: formData.colorCode || "#3B82F6",
-                        color: formData.forColorCode || "#FFFFFF",
-                      }}
-                    >
-                      Sample Button
-                    </button>
+                  {/* Color Code Section - All three wrapped */}
+                  <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <SystemColorPicker
+                          label="Color Code (Background)"
+                          value={formData.colorCode}
+                          onChange={(color: string) =>
+                            setFormData({ ...formData, colorCode: color })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <TextColorPicker
+                          label="Text Color"
+                          value={formData.forColorCode}
+                          onChange={(color: string) =>
+                            setFormData({ ...formData, forColorCode: color })
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    {/* Sample Button */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Color Preview
+                      </label>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                        Preview how the colors will look together
+                      </p>
+                      <button
+                        type="button"
+                        className="px-6 py-3 rounded-lg font-medium transition-all hover:opacity-90"
+                        style={{
+                          backgroundColor: formData.colorCode || "#3B82F6",
+                          color: formData.forColorCode || "#FFFFFF",
+                        }}
+                      >
+                        Sample Button
+                      </button>
+                    </div>
                   </div>
 
                   <div>

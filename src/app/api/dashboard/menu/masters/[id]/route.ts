@@ -101,7 +101,8 @@ export async function PUT(
       eventCode,
       currentEventCode,
       isEventMenu,
-      isActive
+      isActive,
+      deptCode
     } = body
 
     // Get the menu master to get its code
@@ -129,6 +130,7 @@ export async function PUT(
       labelName: labelName || null,
       colorCode: colorCode || null,
       forColorCode: forColorCode || null,
+      deptCode: deptCode || null,
       prepZoneCode: prepZoneCodes && prepZoneCodes.length > 0 ? prepZoneCodes : null,
       stationCode: stationCodes && stationCodes.length > 0 ? stationCodes : null,
       isEventMenu: isEventMenu || 0,

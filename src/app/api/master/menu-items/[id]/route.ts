@@ -18,6 +18,7 @@ function mapMenuItemResponse(item: any) {
     // Handle JSON fields
     prepZoneCode: item.prepZoneCode ? (typeof item.prepZoneCode === 'string' ? JSON.parse(item.prepZoneCode) : item.prepZoneCode) : null,
     menuCategoryCode: item.menuCategoryCode ? (typeof item.menuCategoryCode === 'string' ? JSON.parse(item.menuCategoryCode) : item.menuCategoryCode) : null,
+    deptCode: item.deptCode || null,
   }
 }
 
@@ -148,6 +149,7 @@ export async function PUT(
       inheritModifiers,
       modifierAssignments,
       prepZoneCodes,
+      deptCode,
     } = body
 
     // Check if menuImg is too large
@@ -165,6 +167,7 @@ export async function PUT(
         kitchenName: kitchenName || null,
         labelName: labelName || null,
         colorCode: colorCode || null,
+        deptCode: deptCode || null,
         forColorCode: forColorCode || null,
         calories: calories || null,
         description: description || null,

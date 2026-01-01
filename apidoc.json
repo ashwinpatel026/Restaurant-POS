@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "description": "Restaurant POS System API Documentation - Complete API reference for dashboard, master, and sync endpoints",
   "title": "Restaurant POS API",
-  "url": "https://acute-rpos.vercel.app",
-  "sampleUrl": "https://acute-rpos.vercel.app",
+  "url": "http://localhost:3000/",
+  "sampleUrl": "http://localhost:3000/",
   "input": "src/app/api",
   "output": "public/apidoc",
   "template": {

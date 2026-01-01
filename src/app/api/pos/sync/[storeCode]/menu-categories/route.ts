@@ -170,6 +170,8 @@ export async function POST(
         menuCategoryCode,
         name: body.name || null,
         colorCode: body.colorCode || null,
+        forColorCode: body.forColorCode || null,
+        deptCode: body.deptCode || null,
         isActive: isActive ? 1 : 0,
         createdBy: body.createdBy ? parseInt(body.createdBy) : null,
         createdOn: new Date()

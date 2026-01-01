@@ -136,6 +136,7 @@ export async function GET(request: NextRequest) {
         name: category.name,
         colorCode: category.colorCode,
         forColorCode: category.forColorCode,
+        deptCode: category.deptCode,
         isActive: category.isActive,
         menuMasterCode: category.menuMasterCode,
         menuCategoryCode: category.menuCategoryCode,
@@ -194,12 +195,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, colorCode, forColorCode, menuMasterId, modifierGroupCodes = [] } = body
+    const { name, colorCode, forColorCode, menuMasterId, modifierGroupCodes = [], deptCode } = body
 
-    // Get the menu master to get its code
+    // Get the menu master to get its code and deptCode
     const menuMaster = await prisma.menuMaster.findUnique({
       where: { menuMasterId: BigInt(menuMasterId) },
-      select: { menuMasterCode: true, storeCode: true }
+      select: { menuMasterCode: true, storeCode: true, deptCode: true }
     })
 
     if (!menuMaster) {
@@ -220,11 +221,15 @@ export async function POST(request: NextRequest) {
     // Generate unique menu category code for the selected store
     const menuCategoryCode = await generateMenuCategoryCode(selectedStoreCode)
 
+    // Use provided deptCode or fallback to menu master's deptCode
+    const finalDeptCode = deptCode || menuMaster.deptCode || null
+
     const menuCategory = await prisma.menuCategory.create({
       data: {
         name,
         colorCode,
         forColorCode: forColorCode || null,
+        deptCode: finalDeptCode,
         menuMasterCode: menuMaster.menuMasterCode,
         menuCategoryCode,
         createdBy: parseInt(session.user.id),

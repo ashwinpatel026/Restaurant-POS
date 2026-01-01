@@ -73,6 +73,7 @@ export async function GET(
       menuCategoryId: category.menuCategoryId.toString(),
       tblMenuCategoryId: Number(category.menuCategoryId),
       tblMenuMasterId: Number(category.menuMaster.menuMasterId),
+      deptCode: category.deptCode || null,
       menuMaster: {
         ...category.menuMaster,
         menuMasterId: category.menuMaster.menuMasterId.toString()
@@ -118,7 +119,7 @@ export async function PUT(
     const categoryId = BigInt(resolvedParams.id)
     const body = await request.json()
 
-    const { name, colorCode, forColorCode, isActive, menuMasterId, modifierGroupCodes = [] } = body
+    const { name, colorCode, forColorCode, isActive, menuMasterId, modifierGroupCodes = [], deptCode } = body
 
     // Get the category first to get its code
     const existingCategory = await prisma.menuCategory.findUnique({
@@ -140,10 +141,10 @@ export async function PUT(
       }
     }
 
-    // Get the menu master to get its code
+    // Get the menu master to get its code and deptCode
     const menuMaster = await prisma.menuMaster.findUnique({
       where: { menuMasterId: BigInt(menuMasterId) },
-      select: { menuMasterCode: true, storeCode: true }
+      select: { menuMasterCode: true, storeCode: true, deptCode: true }
     })
 
     if (!menuMaster) {
@@ -160,12 +161,16 @@ export async function PUT(
       }
     }
 
+    // Use provided deptCode or fallback to menu master's deptCode
+    const finalDeptCode = deptCode !== undefined ? (deptCode || null) : (menuMaster.deptCode || null)
+
     const category = await prisma.menuCategory.update({
       where: { menuCategoryId: categoryId },
       data: {
         name,
         colorCode,
         forColorCode: forColorCode || null,
+        deptCode: finalDeptCode,
         isActive,
         menuMasterCode: menuMaster.menuMasterCode,
         syncSource: 'location' // Set sync_source to 'location' when updated from dashboard

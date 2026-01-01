@@ -180,6 +180,8 @@ export async function POST(
         name: name || null,
         labelName: body.labelName || null,
         colorCode: body.colorCode || null,
+        forColorCode: body.forColorCode || null,
+        deptCode: body.deptCode || null,
         prepZoneCode: body.prepZoneCode ?? null,
         stationCode: body.stationCode ?? null,
         isEventMenu: body.isEventMenu ? 1 : 0,

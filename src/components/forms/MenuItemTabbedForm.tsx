@@ -49,6 +49,7 @@ export default function MenuItemTabbedForm({
     isPrice: 1,
     menuMasterCode: "",
     menuCategoryCode: "",
+    deptCode: "",
     isActive: 1,
     stockinhand: "",
     taxCode: "",
@@ -107,12 +108,14 @@ export default function MenuItemTabbedForm({
     new Set()
   );
   const [filteredCategories, setFilteredCategories] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
 
   useEffect(() => {
     if (selectedStoreCode) {
       fetchModifiers();
       fetchTaxes();
       fetchPrepZones();
+      fetchDepartments();
     }
   }, [selectedStoreCode]);
 
@@ -151,15 +154,47 @@ export default function MenuItemTabbedForm({
     }
   }, [formData.menuMasterCode, categories]);
 
+  // Auto-update department when categories change
+  useEffect(() => {
+    if (selectedCategories.size > 0 && formData.menuMasterCode) {
+      // Get department from first selected category or menu master
+      const firstCategoryCode = Array.from(selectedCategories)[0];
+      const firstCategory = categories.find(
+        (cat) => cat.menuCategoryCode === firstCategoryCode
+      );
+      const master = menuMasters.find(
+        (m) => m.menuMasterCode === formData.menuMasterCode
+      );
+      
+      // Only auto-update if current deptCode is empty
+      if (!formData.deptCode) {
+        const newDeptCode = firstCategory?.deptCode || master?.deptCode || "";
+        if (newDeptCode) {
+          setFormData((prev) => ({ ...prev, deptCode: newDeptCode }));
+        }
+      }
+    }
+  }, [selectedCategories, formData.menuMasterCode, categories, menuMasters]);
+
   // Handle menu master and category selection from modal
   const handleMenuMasterCategorySelect = (
     master: any,
     categoryCodes: string[]
   ) => {
     if (master) {
+      // Auto-select department from menu master or first selected category
+      let autoDeptCode = master.deptCode || "";
+      if (!autoDeptCode && categoryCodes.length > 0) {
+        const firstCategory = categories.find(
+          (cat) => cat.menuCategoryCode === categoryCodes[0]
+        );
+        autoDeptCode = firstCategory?.deptCode || "";
+      }
+      
       setFormData({
         ...formData,
         menuMasterCode: master.menuMasterCode,
+        deptCode: autoDeptCode,
       });
       setSelectedMenuMaster(master);
       setSelectedCategories(new Set(categoryCodes));
@@ -167,6 +202,7 @@ export default function MenuItemTabbedForm({
       setFormData({
         ...formData,
         menuMasterCode: "",
+        deptCode: "",
       });
       setSelectedMenuMaster(null);
       setSelectedCategories(new Set());
@@ -206,6 +242,7 @@ export default function MenuItemTabbedForm({
         isPrice: menuItem.isPrice ?? 1,
         menuMasterCode: menuItem.menuMasterCode || "",
         menuCategoryCode: menuItem.menuCategoryCode || "",
+        deptCode: menuItem.deptCode || "",
         isActive: menuItem.isActive ?? 1,
         stockinhand: menuItem.stockinhand?.toString() || "",
         taxCode: menuItem.taxCode || "",
@@ -396,6 +433,18 @@ export default function MenuItemTabbedForm({
       }
     } catch (e) {
       console.error("Error fetching prep zones", e);
+    }
+  };
+
+  const fetchDepartments = async () => {
+    try {
+      const res = await fetch(buildApiUrl("/api/dashboard/department"));
+      if (res.ok) {
+        const data = await res.json();
+        setDepartments(data.filter((d: any) => d.isActive === 1));
+      }
+    } catch (e) {
+      console.error("Error fetching departments", e);
     }
   };
 
@@ -700,45 +749,75 @@ export default function MenuItemTabbedForm({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <SystemColorPicker
-                      label="Color Code (Background)"
-                      value={formData.colorCode}
-                      onChange={(color: string) =>
-                        setFormData({ ...formData, colorCode: color })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <TextColorPicker
-                      label="Text Color"
-                      value={formData.forColorCode}
-                      onChange={(color: string) =>
-                        setFormData({ ...formData, forColorCode: color })
-                      }
-                    />
-                  </div>
-                </div>
-
-                {/* Sample Button */}
+                {/* Department Selection - Always visible, enabled after menu master and category selection */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Color Preview
+                    Department
                   </label>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                    Preview how the colors will look together
-                  </p>
-                  <button
-                    type="button"
-                    className="px-6 py-3 rounded-lg font-medium transition-all hover:opacity-90"
-                    style={{
-                      backgroundColor: formData.colorCode || "#3B82F6",
-                      color: formData.forColorCode || "#FFFFFF",
-                    }}
+                  <select
+                    value={formData.deptCode}
+                    onChange={(e) =>
+                      setFormData({ ...formData, deptCode: e.target.value })
+                    }
+                    disabled={!formData.menuMasterCode || selectedCategories.size === 0}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Sample Button
-                  </button>
+                    <option value="">Select Department</option>
+                    {departments.map((dept) => (
+                      <option key={dept.deptId} value={dept.deptCode}>
+                        {dept.deptName}
+                      </option>
+                    ))}
+                  </select>
+                  {(!formData.menuMasterCode || selectedCategories.size === 0) && (
+                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                      Please select a menu master and category first
+                    </p>
+                  )}
+                </div>
+
+                {/* Color Code Section - All three wrapped */}
+                <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4">
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <SystemColorPicker
+                        label="Color Code (Background)"
+                        value={formData.colorCode}
+                        onChange={(color: string) =>
+                          setFormData({ ...formData, colorCode: color })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <TextColorPicker
+                        label="Text Color"
+                        value={formData.forColorCode}
+                        onChange={(color: string) =>
+                          setFormData({ ...formData, forColorCode: color })
+                        }
+                      />
+                    </div>
+                  </div>
+
+                  {/* Sample Button */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Color Preview
+                    </label>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                      Preview how the colors will look together
+                    </p>
+                    <button
+                      type="button"
+                      className="px-6 py-3 rounded-lg font-medium transition-all hover:opacity-90"
+                      style={{
+                        backgroundColor: formData.colorCode || "#3B82F6",
+                        color: formData.forColorCode || "#FFFFFF",
+                      }}
+                    >
+                      Sample Button
+                    </button>
+                  </div>
                 </div>
               </div>
 

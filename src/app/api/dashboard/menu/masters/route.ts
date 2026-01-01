@@ -212,7 +212,8 @@ export async function POST(request: NextRequest) {
       stationCodes,
       eventCode,
       isEventMenu,
-      isActive
+      isActive,
+      deptCode
     } = body
 
     // Generate unique menu master code for the selected store
@@ -225,6 +226,7 @@ export async function POST(request: NextRequest) {
       labelName: labelName || null,
       colorCode: colorCode || null,
       forColorCode: forColorCode || null,
+      deptCode: deptCode || null,
       prepZoneCode: prepZoneCodes && prepZoneCodes.length > 0 ? prepZoneCodes : null,
       stationCode: stationCodes && stationCodes.length > 0 ? stationCodes : null,
       isEventMenu: isEventMenu || 0,

@@ -147,6 +147,7 @@ export async function GET(
       inheritModifiers: inheritModifiersFlag,
       // Use prepZoneCode from MenuItem if available, otherwise from MenuItemPrepTime
       prepZoneCode: (menuItem as any).prepZoneCode || prepTimeData?.prepZoneCode || null,
+      deptCode: (menuItem as any).deptCode || null,
       ...(prepTimeData || {})
     }
 
@@ -248,8 +249,9 @@ export async function PUT(
     prepZoneCodes,
     dimension,
     weight,
-    prepTimeMinutes
-    } = body
+    prepTimeMinutes,
+    deptCode
+  } = body
 
     // Check if menuImg is too large (base64 string length check)
     if (menuImg && menuImg.length > 2000000) { // ~2MB base64 string for 1MB file
@@ -267,6 +269,7 @@ export async function PUT(
           kitchenName: kitchenName || null,
           labelName: labelName || null,
           colorCode: colorCode || null,
+          deptCode: deptCode || null,
           forColorCode: forColorCode || null,
           calories: calories || null,
           description: description || null,
