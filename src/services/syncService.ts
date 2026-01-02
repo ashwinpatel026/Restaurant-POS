@@ -588,16 +588,17 @@ async function syncPrepZones(storeCode: string): Promise<{ recordsSynced: number
 
   let synced = 0
   for (const zone of zones) {
+    const { stationCode, ...zoneData } = zone
     await (locationPrisma as any).prepZone.upsert({
       where: {
         prepZoneCode: zone.prepZoneCode
       },
       update: {
-        ...zone,
+        ...zoneData,
         storeCode: storeCode
       },
       create: {
-        ...zone,
+        ...zoneData,
         storeCode: storeCode
       }
     })

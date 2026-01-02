@@ -20,6 +20,7 @@ import {
   StatsSkeleton,
   PageHeaderSkeleton,
 } from "@/components/ui/SkeletonLoader";
+import StatusToggle from "@/components/forms/StatusToggle";
 
 interface PrepZone {
   prepZoneId: string;
@@ -44,17 +45,9 @@ interface Printer {
   isActive?: number | null;
 }
 
-interface Station {
-  tblStationId: string;
-  stationCode: string;
-  stationname: string | null;
-  isActive?: number | null;
-}
-
 export default function PrepZonePage() {
   const [prepZones, setPrepZones] = useState<PrepZone[]>([]);
   const [printers, setPrinters] = useState<Printer[]>([]);
-  const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(true);
   const fetchingRef = useRef(false);
 
@@ -78,7 +71,7 @@ export default function PrepZonePage() {
     try {
       setLoading(true);
       const token = localStorage.getItem("master_admin_token");
-      const [zonesRes, printersRes, stationsRes] = await Promise.all([
+      const [zonesRes, printersRes] = await Promise.all([
         fetch("/api/master/prep-zone", {
           cache: "no-store",
           headers: {
@@ -86,12 +79,6 @@ export default function PrepZonePage() {
           },
         }),
         fetch("/api/master/printer", {
-          cache: "no-store",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }),
-        fetch("/api/master/station", {
           cache: "no-store",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -107,11 +94,6 @@ export default function PrepZonePage() {
       if (printersRes.ok) {
         const data = await printersRes.json();
         setPrinters(Array.isArray(data) ? data : []);
-      }
-
-      if (stationsRes.ok) {
-        const data = await stationsRes.json();
-        setStations(Array.isArray(data) ? data : []);
       }
     } catch (error) {
       toast.error("Error loading data");
@@ -197,10 +179,11 @@ export default function PrepZonePage() {
       }
     } catch (error: any) {
       // Only log unexpected errors (network errors, etc.)
-      if (error instanceof TypeError && error.message.includes('fetch')) {
+      if (error instanceof TypeError && error.message.includes("fetch")) {
         toast.error("Network error. Please check your connection.");
       } else {
-        const errorMessage = error instanceof Error ? error.message : "Error saving prep zone";
+        const errorMessage =
+          error instanceof Error ? error.message : "Error saving prep zone";
         toast.error(errorMessage);
       }
     }
@@ -411,25 +394,6 @@ export default function PrepZonePage() {
                   ),
                 },
                 {
-                  header: "Station",
-                  accessor: "stationCode",
-                  cell: (zone: PrepZone) => (
-                    <div className="text-sm text-gray-900 dark:text-white">
-                      {zone.stationCode ? (
-                        <div className="flex items-center">
-                          <span className="text-blue-600 dark:text-blue-400 font-medium">
-                            {stations.find(
-                              (s) => s.stationCode === zone.stationCode
-                            )?.stationname || zone.stationCode}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">Not assigned</span>
-                      )}
-                    </div>
-                  ),
-                },
-                {
                   header: "Printer",
                   accessor: "printerCode",
                   cell: (zone: PrepZone) => (
@@ -544,7 +508,6 @@ export default function PrepZonePage() {
         <PrepZoneForm
           zone={editingZone}
           printers={printers}
-          stations={stations}
           onSave={handleSave}
           onCancel={() => {
             setShowModal(false);
@@ -569,19 +532,16 @@ export default function PrepZonePage() {
 function PrepZoneForm({
   zone,
   printers,
-  stations,
   onSave,
   onCancel,
 }: {
   zone?: PrepZone | null;
   printers: Printer[];
-  stations: Station[];
   onSave: (data: any) => void;
   onCancel: () => void;
 }) {
   const [formData, setFormData] = useState({
     prepZoneName: "",
-    stationCode: "",
     sendToExpediter: false,
     alwaysPrintTicket: false,
     printerCode: "",
@@ -595,7 +555,6 @@ function PrepZoneForm({
     if (zone) {
       setFormData({
         prepZoneName: zone.prepZoneName || "",
-        stationCode: zone.stationCode || "",
         sendToExpediter: zone.sendToExpediter === 1,
         alwaysPrintTicket: zone.alwaysPrintTicket === 1,
         printerCode: zone.printerCode || "",
@@ -634,29 +593,6 @@ function PrepZoneForm({
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           placeholder="Enter zone name (e.g., Grill Zone)"
         />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Station *
-        </label>
-        <select
-          required
-          value={formData.stationCode}
-          onChange={(e) =>
-            setFormData({ ...formData, stationCode: e.target.value })
-          }
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        >
-          <option value="">Select Station</option>
-          {stations
-            .filter((s) => s.isActive === 1 || s.isActive === undefined)
-            .map((station) => (
-              <option key={station.tblStationId} value={station.stationCode}>
-                {station.stationname || station.stationCode}
-              </option>
-            ))}
-        </select>
       </div>
 
       <div>
@@ -703,58 +639,26 @@ function PrepZoneForm({
         </select>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={formData.sendToExpediter}
-              onChange={(e) =>
-                setFormData({ ...formData, sendToExpediter: e.target.checked })
-              }
-              className="w-4 h-4 text-blue-600 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
-            />
-            <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-              Send to Expediter
-            </span>
-          </label>
-        </div>
+      <StatusToggle
+        label="Send to Expediter"
+        description=""
+        value={formData.sendToExpediter}
+        onChange={(val) => setFormData({ ...formData, sendToExpediter: val })}
+      />
 
-        <div>
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={formData.alwaysPrintTicket}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  alwaysPrintTicket: e.target.checked,
-                })
-              }
-              className="w-4 h-4 text-blue-600 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
-            />
-            <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-              Always Print Ticket
-            </span>
-          </label>
-        </div>
-      </div>
+      <StatusToggle
+        label="Always Print Ticket"
+        description=""
+        value={formData.alwaysPrintTicket}
+        onChange={(val) => setFormData({ ...formData, alwaysPrintTicket: val })}
+      />
 
-      <div>
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={formData.isActive}
-            onChange={(e) =>
-              setFormData({ ...formData, isActive: e.target.checked })
-            }
-            className="w-4 h-4 text-blue-600 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
-          />
-          <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-            Active
-          </span>
-        </label>
-      </div>
+      <StatusToggle
+        label="Prep Zone Status"
+        description="Toggle to control whether this prep zone is active."
+        value={formData.isActive}
+        onChange={(val) => setFormData({ ...formData, isActive: val })}
+      />
 
       <div className="flex justify-end space-x-3 pt-4">
         <button
@@ -775,4 +679,3 @@ function PrepZoneForm({
     </form>
   );
 }
-

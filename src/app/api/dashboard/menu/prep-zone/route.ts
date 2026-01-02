@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { prepZoneName, stationCode, sendToExpediter, alwaysPrintTicket, printerCode, backupPrinterCode, isActive } = body
+    const { prepZoneName, sendToExpediter, alwaysPrintTicket, printerCode, backupPrinterCode, isActive } = body
 
     // Validate required fields
     if (!prepZoneName) {
@@ -155,7 +155,6 @@ export async function POST(request: NextRequest) {
       data: {
         prepZoneCode,
         prepZoneName,
-        stationCode: stationCode || null,
         isActive: isActive ? 1 : 0,
         sendToExpediter: sendToExpediter ? 1 : 0,
         alwaysPrintTicket: alwaysPrintTicket ? 1 : 0,

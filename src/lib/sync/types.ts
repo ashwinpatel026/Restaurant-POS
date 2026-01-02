@@ -239,7 +239,6 @@ export const SYNC_FIELD_MAP: Record<string, Record<string, string>> = {
   'tbl_master_prep_zone': {
     'prep_zone_code': 'prep_zone_code',
     'prep_zone_name': 'prep_zone_name',
-    'station_code': 'station_code',
     'is_active': 'is_active',
     'send_to_expediter': 'send_to_expediter',
     'always_print_ticket': 'always_print_ticket',

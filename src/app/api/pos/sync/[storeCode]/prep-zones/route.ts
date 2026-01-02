@@ -94,7 +94,6 @@ export async function GET(
  *
  * @apiBody {String} prepZoneCode Unique prep zone code
  * @apiBody {String} prepZoneName Prep zone name
- * @apiBody {String} [stationCode] Station code
  * @apiBody {Boolean} [isActive=1] Active flag
  * @apiBody {Boolean} [sendToExpediter] Send tickets to expediter
  * @apiBody {Boolean} [alwaysPrintTicket] Always print ticket
@@ -106,7 +105,6 @@ export async function GET(
  * {
  *   "prepZoneCode": "PZ001",
  *   "prepZoneName": "Grill",
- *   "stationCode": "KIT01",
  *   "printerCode": "PRN01",
  *   "sendToExpediter": true
  * }
@@ -175,7 +173,6 @@ export async function POST(
     const prepZoneData = addPOSSyncMetadata({
       prepZoneCode,
       prepZoneName,
-      stationCode: body.stationCode || null,
       isActive: isActive ? 1 : 0,
       sendToExpediter: body.sendToExpediter ? 1 : 0,
       alwaysPrintTicket: body.alwaysPrintTicket ? 1 : 0,

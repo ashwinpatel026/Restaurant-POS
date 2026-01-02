@@ -98,7 +98,6 @@ export async function GET(
  * @apiParam {String} id Prep zone identifier (BigInt `prepZoneId` or `prepZoneCode`)
  *
  * @apiBody {String} [prepZoneName] Prep zone name
- * @apiBody {String} [stationCode] Station code
  * @apiBody {Boolean} [isActive] Active flag
  * @apiBody {Boolean} [sendToExpediter] Send tickets to expediter
  * @apiBody {Boolean} [alwaysPrintTicket] Always print ticket
@@ -189,7 +188,6 @@ export async function PUT(
 
     // Update allowed fields
     if (body.prepZoneName !== undefined) updateData.prepZoneName = body.prepZoneName
-    if (body.stationCode !== undefined) updateData.stationCode = body.stationCode
     if (body.isActive !== undefined) updateData.isActive = body.isActive ? 1 : 0
     if (body.sendToExpediter !== undefined) updateData.sendToExpediter = body.sendToExpediter ? 1 : 0
     if (body.alwaysPrintTicket !== undefined) updateData.alwaysPrintTicket = body.alwaysPrintTicket ? 1 : 0

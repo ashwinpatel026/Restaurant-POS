@@ -109,7 +109,7 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { prepZoneName, stationCode, sendToExpediter, alwaysPrintTicket, printerCode, backupPrinterCode, isActive } = body
+    const { prepZoneName, sendToExpediter, alwaysPrintTicket, printerCode, backupPrinterCode, isActive } = body
 
     if (!prepZoneName) {
       return NextResponse.json(
@@ -122,7 +122,6 @@ export async function PUT(
       where: { prepZoneId },
       data: {
         prepZoneName,
-        stationCode: stationCode || null,
         isActive: isActive ? 1 : 0,
         sendToExpediter: sendToExpediter ? 1 : 0,
         alwaysPrintTicket: alwaysPrintTicket ? 1 : 0,
