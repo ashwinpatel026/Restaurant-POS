@@ -5,6 +5,7 @@ import { TrashIcon, PencilIcon } from "@heroicons/react/24/outline";
 import { LoadingOverlay } from "@/components/ui/SkeletonLoader";
 import ModifierItemModal from "@/components/modifiers/ModifierItemModal";
 import ToggleIndicator from "@/components/ui/ToggleIndicator";
+import StatusToggle from "@/components/forms/StatusToggle";
 
 // Helper function to normalize prefix array
 const normalizePrefix = (value: unknown): string[] => {
@@ -337,6 +338,16 @@ export default function ModifierForm({
         labelName: formData.labelName,
         showDefaultTop: parseInt(String(formData.showDefaultTop)),
         inheritFromMenuGroup: parseInt(String(formData.inheritFromMenuGroup)),
+        isRequired: parseInt(String(formData.isRequired)),
+        isMultiselect: parseInt(String(formData.isMultiselect)),
+        minSelection:
+          formData.isMultiselect === 1 && formData.minSelection
+            ? parseInt(String(formData.minSelection))
+            : null,
+        maxSelection:
+          formData.isMultiselect === 1 && formData.maxSelection
+            ? parseInt(String(formData.maxSelection))
+            : null,
         priceStrategy: parseInt(String(formData.priceStrategy)),
         price:
           formData.priceStrategy === 3
@@ -409,13 +420,13 @@ export default function ModifierForm({
                       setFormData({ ...formData, groupName: e.target.value })
                     }
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter modifier group name"
+                    placeholder="Enter modifiers"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    POS Name (Button Label)
+                    Label Name
                   </label>
                   <input
                     type="text"
@@ -460,57 +471,109 @@ export default function ModifierForm({
                     edit.
                   </p>
                 </div>
-                <div className="flex items-center space-x-6">
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.showDefaultTop === 1}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          showDefaultTop: e.target.checked ? 1 : 0,
-                        })
-                      }
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                      Show Defaults on Top
-                    </span>
-                  </label>
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.inheritFromMenuGroup === 1}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          inheritFromMenuGroup: e.target.checked ? 1 : 0,
-                        })
-                      }
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                      Inherit From Menu Group
-                    </span>
-                  </label>
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={formData.isActive === 1}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          isActive: e.target.checked ? 1 : 0,
-                        })
-                      }
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                      Active
-                    </span>
-                  </label>
-                </div>
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <StatusToggle
+                  label="Show Defaults on Top"
+                  value={formData.showDefaultTop === 1}
+                  onChange={(val) =>
+                    setFormData({
+                      ...formData,
+                      showDefaultTop: val ? 1 : 0,
+                    })
+                  }
+                  trueLabel="Enabled"
+                  falseLabel="Disabled"
+                />
+                <StatusToggle
+                  label="Inherit From Menu Group"
+                  value={formData.inheritFromMenuGroup === 1}
+                  onChange={(val) =>
+                    setFormData({
+                      ...formData,
+                      inheritFromMenuGroup: val ? 1 : 0,
+                    })
+                  }
+                  trueLabel="Enabled"
+                  falseLabel="Disabled"
+                />
+                <StatusToggle
+                  label="Is Required"
+                  value={formData.isRequired === 1}
+                  onChange={(val) =>
+                    setFormData({
+                      ...formData,
+                      isRequired: val ? 1 : 0,
+                    })
+                  }
+                  trueLabel="Required"
+                  falseLabel="Optional"
+                />
+                <StatusToggle
+                  label="Multi Select"
+                  value={formData.isMultiselect === 1}
+                  onChange={(val) =>
+                    setFormData({
+                      ...formData,
+                      isMultiselect: val ? 1 : 0,
+                    })
+                  }
+                  trueLabel="Enabled"
+                  falseLabel="Disabled"
+                />
+                <StatusToggle
+                  label="Active"
+                  value={formData.isActive === 1}
+                  onChange={(val) =>
+                    setFormData({
+                      ...formData,
+                      isActive: val ? 1 : 0,
+                    })
+                  }
+                  trueLabel="Active"
+                  falseLabel="Inactive"
+                />
+              </div>
+              {formData.isMultiselect === 1 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Minimum Selection
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.minSelection}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          minSelection: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Maximum Selection
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.maxSelection}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          maxSelection: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Prefix

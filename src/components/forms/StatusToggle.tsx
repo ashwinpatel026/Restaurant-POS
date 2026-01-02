@@ -21,7 +21,7 @@ export default function StatusToggle({
 }: StatusToggleProps) {
   return (
     <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-gray-900 dark:text-white">
             {label}
@@ -33,15 +33,17 @@ export default function StatusToggle({
           )}
         </div>
         <div className="flex items-center gap-3">
-          <span
-            className={`text-sm font-medium ${
-              value
-                ? "text-green-600 dark:text-green-400"
-                : "text-gray-500 dark:text-gray-400"
-            }`}
-          >
-            {value ? trueLabel : falseLabel}
-          </span>
+          {description && (
+            <span
+              className={`text-sm font-medium ${
+                value
+                  ? "text-green-600 dark:text-green-400"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}
+            >
+              {value ? trueLabel : falseLabel}
+            </span>
+          )}
           <button
             type="button"
             role="switch"
