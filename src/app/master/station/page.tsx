@@ -13,6 +13,7 @@ import CRUDModal from "@/components/modals/CRUDModal";
 import DeleteConfirmationModal from "@/components/modals/DeleteConfirmationModal";
 import DataTable from "@/components/tables/DataTable";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
+import StatusToggle from "@/components/forms/StatusToggle";
 
 interface Station {
   tblStationId: string;
@@ -160,7 +161,7 @@ export default function StationManagementPage() {
       }
     } catch (error) {
       // Only log unexpected errors (network errors, etc.)
-      if (error instanceof TypeError && error.message.includes('fetch')) {
+      if (error instanceof TypeError && error.message.includes("fetch")) {
         toast.error("Network error. Please check your connection.");
       } else {
         toast.error("Error saving station");
@@ -394,21 +395,6 @@ export default function StationManagementPage() {
                   ),
                 },
                 {
-                  header: "Status",
-                  accessor: "isActive",
-                  cell: (station: Station) => (
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        station.isActive === 1
-                          ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
-                          : "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
-                      }`}
-                    >
-                      {station.isActive === 1 ? "Active" : "Inactive"}
-                    </span>
-                  ),
-                },
-                {
                   header: "Kitchen",
                   accessor: "isKitchen",
                   cell: (station: Station) => (
@@ -465,6 +451,21 @@ export default function StationManagementPage() {
                       }`}
                     >
                       {station.isReport ? "Yes" : "No"}
+                    </span>
+                  ),
+                },
+                {
+                  header: "Status",
+                  accessor: "isActive",
+                  cell: (station: Station) => (
+                    <span
+                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        station.isActive === 1
+                          ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
+                          : "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
+                      }`}
+                    >
+                      {station.isActive === 1 ? "Active" : "Inactive"}
                     </span>
                   ),
                 },
@@ -748,71 +749,39 @@ function StationForm({
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Status *
-        </label>
-        <select
-          value={formData.isActive}
-          onChange={(e) =>
-            setFormData({ ...formData, isActive: parseInt(e.target.value) })
-          }
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        >
-          <option value={1}>Active</option>
-          <option value={0}>Inactive</option>
-        </select>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+      {/* Station Type Section */}
+      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800">
+        <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-4">
           Station Type
-        </label>
-        <div className="space-y-3">
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={formData.isKitchen}
-              onChange={(e) =>
-                setFormData({ ...formData, isKitchen: e.target.checked })
-              }
-              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-            />
-            <span className="text-sm text-gray-700 dark:text-gray-300">Kitchen</span>
-          </label>
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={formData.isBar}
-              onChange={(e) =>
-                setFormData({ ...formData, isBar: e.target.checked })
-              }
-              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-            />
-            <span className="text-sm text-gray-700 dark:text-gray-300">Bar</span>
-          </label>
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={formData.isBill}
-              onChange={(e) =>
-                setFormData({ ...formData, isBill: e.target.checked })
-              }
-              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-            />
-            <span className="text-sm text-gray-700 dark:text-gray-300">Bill</span>
-          </label>
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={formData.isReport}
-              onChange={(e) =>
-                setFormData({ ...formData, isReport: e.target.checked })
-              }
-              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-            />
-            <span className="text-sm text-gray-700 dark:text-gray-300">Report</span>
-          </label>
+        </h3>
+        <div className="space-y-4">
+          <StatusToggle
+            label="Kitchen Station"
+            description=""
+            value={formData.isKitchen}
+            onChange={(val) => setFormData({ ...formData, isKitchen: val })}
+          />
+
+          <StatusToggle
+            label="Bar Station"
+            description=""
+            value={formData.isBar}
+            onChange={(val) => setFormData({ ...formData, isBar: val })}
+          />
+
+          <StatusToggle
+            label="Bill Station"
+            description=""
+            value={formData.isBill}
+            onChange={(val) => setFormData({ ...formData, isBill: val })}
+          />
+
+          <StatusToggle
+            label="Report Station"
+            description=""
+            value={formData.isReport}
+            onChange={(val) => setFormData({ ...formData, isReport: val })}
+          />
         </div>
       </div>
 
@@ -875,6 +844,13 @@ function StationForm({
           the × icon to remove a group.
         </p>
       </div>
+
+      <StatusToggle
+        label="Station Status"
+        description="Toggle to control whether this station is active."
+        value={formData.isActive === 1}
+        onChange={(val) => setFormData({ ...formData, isActive: val ? 1 : 0 })}
+      />
 
       <div className="flex justify-end space-x-3 pt-4">
         <button

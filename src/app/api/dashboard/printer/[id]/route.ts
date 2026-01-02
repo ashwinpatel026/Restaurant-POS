@@ -100,7 +100,7 @@ export async function PUT(
     const printerId = BigInt(resolvedParams.id)
     const body = await request.json()
 
-    const { printerName, isActive } = body
+    const { printerName, isActive, isreceipt, isdocument, isKitchen } = body
 
     // Validate required fields
     if (!printerName) {
@@ -132,6 +132,9 @@ export async function PUT(
       data: {
         printerName,
         isActive: isActive ? 1 : 0,
+        isreceipt: isreceipt ?? false,
+        isdocument: isdocument ?? false,
+        isKitchen: isKitchen ?? false,
         // Keep the original storeCode, don't change it; if empty, set to selected store
         storeCode: existingPrinter.storeCode || selectedStoreCode,
         // Mark updates from dashboard/location

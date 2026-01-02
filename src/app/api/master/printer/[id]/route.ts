@@ -61,7 +61,7 @@ export async function PUT(
     const printerId = BigInt(idParam)
     const body = await request.json()
 
-    const { printerName, isActive } = body
+    const { printerName, isActive, isreceipt, isdocument, isKitchen } = body
 
     if (!printerName) {
       return NextResponse.json(
@@ -75,6 +75,9 @@ export async function PUT(
       data: {
         printerName,
         isActive: isActive ? 1 : 0,
+        isreceipt: isreceipt ?? false,
+        isdocument: isdocument ?? false,
+        isKitchen: isKitchen ?? false,
         updatedBy: admin.adminId,
         updatedOn: new Date()
       }

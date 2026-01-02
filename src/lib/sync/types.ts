@@ -135,6 +135,9 @@ export const SYNC_FIELD_MAP: Record<string, Record<string, string>> = {
     'printer_code': 'printer_code',
     'printer_name': 'printer_name',
     'is_active': 'is_active',
+    'isreceipt': 'isreceipt',
+    'isdocument': 'isdocument',
+    'is_kitchen': 'is_kitchen',
   },
   'tbl_master_department_type': {
     'dept_type_code': 'dept_type_code',

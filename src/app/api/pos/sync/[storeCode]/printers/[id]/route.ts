@@ -184,6 +184,9 @@ export async function PUT(
     // Update allowed fields
     if (body.printerName !== undefined) updateData.printerName = body.printerName
     if (body.isActive !== undefined) updateData.isActive = body.isActive ? 1 : 0
+    if (body.isreceipt !== undefined) updateData.isreceipt = body.isreceipt ?? false
+    if (body.isdocument !== undefined) updateData.isdocument = body.isdocument ?? false
+    if (body.isKitchen !== undefined) updateData.isKitchen = body.isKitchen ?? false
 
     // Update printer
     const updatedPrinter = await locationPrisma.printer.update({

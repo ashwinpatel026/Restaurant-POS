@@ -142,7 +142,7 @@ export async function POST(
       )
     }
 
-    const { printerCode, printerName, isActive = 1 } = body
+    const { printerCode, printerName, isActive = 1, isreceipt = false, isdocument = false, isKitchen = false } = body
 
     // Validate required fields
     if (!printerCode || !printerName) {
@@ -169,6 +169,9 @@ export async function POST(
       printerCode,
       printerName,
       isActive: isActive ? 1 : 0,
+      isreceipt: isreceipt ?? false,
+      isdocument: isdocument ?? false,
+      isKitchen: isKitchen ?? false,
       createdBy: body.createdBy ? parseInt(body.createdBy) : null,
       createdOn: new Date()
     }, storeCode)

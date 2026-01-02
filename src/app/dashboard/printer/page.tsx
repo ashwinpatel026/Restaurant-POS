@@ -17,12 +17,16 @@ import DataTable from "@/components/tables/DataTable";
 import { PageSkeleton } from "@/components/ui/SkeletonLoader";
 import { useApiWithStore } from "@/hooks/useApiWithStore";
 import { usePagePermission } from "@/hooks/usePagePermission";
+import StatusToggle from "@/components/forms/StatusToggle";
 
 interface Printer {
   printerId: number;
   printerCode: string;
   printerName: string;
   isActive: number;
+  isreceipt?: boolean;
+  isdocument?: boolean;
+  isKitchen?: boolean;
   createdBy?: number;
   createdOn?: string;
   isSyncMysql?: number;
@@ -117,10 +121,11 @@ export default function PrinterManagementPage() {
       }
     } catch (error: any) {
       // Only log unexpected errors (network errors, etc.)
-      if (error instanceof TypeError && error.message.includes('fetch')) {
+      if (error instanceof TypeError && error.message.includes("fetch")) {
         toast.error("Network error. Please check your connection.");
       } else {
-        const errorMessage = error instanceof Error ? error.message : "Error saving printer";
+        const errorMessage =
+          error instanceof Error ? error.message : "Error saving printer";
         toast.error(errorMessage);
       }
     }
@@ -135,7 +140,9 @@ export default function PrinterManagementPage() {
     if (!printerToDelete) return;
 
     try {
-      const url = buildApiUrl(`/api/dashboard/printer/${printerToDelete.printerId}`);
+      const url = buildApiUrl(
+        `/api/dashboard/printer/${printerToDelete.printerId}`
+      );
 
       const response = await fetch(url, {
         method: "DELETE",
@@ -318,6 +325,81 @@ export default function PrinterManagementPage() {
                   ),
                 },
                 {
+                  header: "Receipt Printer",
+                  accessor: "isreceipt",
+                  cell: (printer: Printer) => (
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        printer.isreceipt
+                          ? "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
+                          : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+                      }`}
+                    >
+                      {printer.isreceipt ? (
+                        <>
+                          <CheckCircleIcon className="w-3 h-3 mr-1" />
+                          Yes
+                        </>
+                      ) : (
+                        <>
+                          <XCircleIcon className="w-3 h-3 mr-1" />
+                          No
+                        </>
+                      )}
+                    </span>
+                  ),
+                },
+                {
+                  header: "Document Printer",
+                  accessor: "isdocument",
+                  cell: (printer: Printer) => (
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        printer.isdocument
+                          ? "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
+                          : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+                      }`}
+                    >
+                      {printer.isdocument ? (
+                        <>
+                          <CheckCircleIcon className="w-3 h-3 mr-1" />
+                          Yes
+                        </>
+                      ) : (
+                        <>
+                          <XCircleIcon className="w-3 h-3 mr-1" />
+                          No
+                        </>
+                      )}
+                    </span>
+                  ),
+                },
+                {
+                  header: "Kitchen Printer",
+                  accessor: "isKitchen",
+                  cell: (printer: Printer) => (
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        printer.isKitchen
+                          ? "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
+                          : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
+                      }`}
+                    >
+                      {printer.isKitchen ? (
+                        <>
+                          <CheckCircleIcon className="w-3 h-3 mr-1" />
+                          Yes
+                        </>
+                      ) : (
+                        <>
+                          <XCircleIcon className="w-3 h-3 mr-1" />
+                          No
+                        </>
+                      )}
+                    </span>
+                  ),
+                },
+                {
                   header: "Status",
                   accessor: "isActive",
                   cell: (printer: Printer) => (
@@ -420,6 +502,9 @@ function PrinterForm({
   const [formData, setFormData] = useState({
     printerName: "",
     isActive: true,
+    isreceipt: false,
+    isdocument: false,
+    isKitchen: false,
   });
 
   const [loading, setLoading] = useState(false);
@@ -429,6 +514,9 @@ function PrinterForm({
       setFormData({
         printerName: printer.printerName || "",
         isActive: printer.isActive === 1,
+        isreceipt: printer.isreceipt ?? false,
+        isdocument: printer.isdocument ?? false,
+        isKitchen: printer.isKitchen ?? false,
       });
     }
   }, [printer]);
@@ -464,21 +552,41 @@ function PrinterForm({
         />
       </div>
 
-      <div>
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={formData.isActive}
-            onChange={(e) =>
-              setFormData({ ...formData, isActive: e.target.checked })
-            }
-            className="w-4 h-4 text-blue-600 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500"
+      {/* Printer Type Section */}
+      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800">
+        <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-4">
+          Printer Type
+        </h3>
+        <div className="space-y-4">
+          <StatusToggle
+            label="Is Receipt Printer"
+            description=""
+            value={formData.isreceipt}
+            onChange={(val) => setFormData({ ...formData, isreceipt: val })}
           />
-          <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-            Active
-          </span>
-        </label>
+
+          <StatusToggle
+            label="Is Document Printer"
+            description=""
+            value={formData.isdocument}
+            onChange={(val) => setFormData({ ...formData, isdocument: val })}
+          />
+
+          <StatusToggle
+            label="Is Kitchen Printer"
+            description=""
+            value={formData.isKitchen}
+            onChange={(val) => setFormData({ ...formData, isKitchen: val })}
+          />
+        </div>
       </div>
+
+      <StatusToggle
+        label="Printer Status"
+        description="Toggle to control whether this printer is active."
+        value={formData.isActive}
+        onChange={(val) => setFormData({ ...formData, isActive: val })}
+      />
 
       <div className="flex justify-end space-x-3 pt-4">
         <button

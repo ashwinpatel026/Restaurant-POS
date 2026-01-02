@@ -40,7 +40,9 @@ export class SyncProcessor {
     'is_bar',
     'is_bill',
     'is_report',
-    'isActive',   // Location database users table column (camelCase)
+    'isreceipt',    // Printer receipt type (boolean)
+    'isdocument',   // Printer document type (boolean)
+    'isActive',     // Location database users table column (camelCase)
   ]);
 
   // Table-specific boolean columns (columns that are boolean in some tables, integer in others)
@@ -50,6 +52,8 @@ export class SyncProcessor {
     'tbl_permission': new Set(['is_active']),  // Master table name (for reverse lookup)
     'roles': new Set(['is_active', 'is_system_role']),  // Location table name
     'tbl_role': new Set(['is_active', 'is_system_role']),  // Master table name (for reverse lookup)
+    'tbl_printer': new Set(['isreceipt', 'isdocument', 'is_kitchen']),  // Location table name
+    'tbl_master_printer': new Set(['isreceipt', 'isdocument', 'is_kitchen']),  // Master table name (for reverse lookup)
   };
 
   // Table-specific integer columns (columns that are integer in some tables)
