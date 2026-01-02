@@ -83,13 +83,22 @@ export default function EditModifierItemPage() {
         toast.success("Modifier item updated successfully!");
         router.push(`/dashboard/modifiers/items?refresh=${Date.now()}`);
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update modifier item");
+        try {
+          const errorData = await response.json();
+          const errorMessage = errorData.error || "Failed to update modifier item";
+          toast.error(errorMessage);
+        } catch (jsonError) {
+          toast.error("Failed to update modifier item");
+        }
       }
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Error updating modifier item"
-      );
+      // Only log unexpected errors (network errors, etc.)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        const errorMessage = error instanceof Error ? error.message : "Error updating modifier item";
+        toast.error(errorMessage);
+      }
       console.error("Error:", error);
     }
   };

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { masterPrisma } from '@/lib/databaseManager'
+import { checkDuplicate } from '@/lib/validation'
 
 // Helper function to generate unique printer code
 async function generatePrinterCode(): Promise<string> {
@@ -74,6 +75,15 @@ export async function POST(request: NextRequest) {
     if (!printerName) {
       return NextResponse.json(
         { error: 'Printer name is required' },
+        { status: 400 }
+      )
+    }
+
+    // Check for duplicate name
+    const isDuplicate = await checkDuplicate('masterPrinter', 'printerName', printerName)
+    if (isDuplicate) {
+      return NextResponse.json(
+        { error: 'Printer with this name already exists' },
         { status: 400 }
       )
     }

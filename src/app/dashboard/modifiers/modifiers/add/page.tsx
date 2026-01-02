@@ -34,8 +34,15 @@ export default function AddModifierPage() {
       );
 
       if (!groupRes.ok) {
-        const errorData = await groupRes.json();
-        throw new Error(errorData.error || "Failed to create modifier group");
+        try {
+          const errorData = await groupRes.json();
+          const errorMessage = errorData.error || "Failed to create modifier group";
+          toast.error(errorMessage);
+          return;
+        } catch (jsonError) {
+          toast.error("Failed to create modifier group");
+          return;
+        }
       }
 
       const createdGroup = await groupRes.json();
@@ -68,8 +75,14 @@ export default function AddModifierPage() {
             }
           );
           if (!itemRes.ok) {
-            const err = await itemRes.json();
-            throw new Error(err.error || "Failed to create modifier item");
+            try {
+              const err = await itemRes.json();
+              toast.error(err.error || "Failed to create modifier item");
+              return;
+            } catch (jsonError) {
+              toast.error("Failed to create modifier item");
+              return;
+            }
           }
         }
       }
@@ -77,10 +90,13 @@ export default function AddModifierPage() {
       toast.success("Modifier group created successfully!");
       router.push("/dashboard/modifiers/modifiers");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Error creating modifier"
-      );
-      console.error("Error:", error);
+      // Only log unexpected errors (network errors, etc.)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        const errorMessage = error instanceof Error ? error.message : "Error creating modifier";
+        toast.error(errorMessage);
+      }
     }
   };
 

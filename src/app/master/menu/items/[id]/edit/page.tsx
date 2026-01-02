@@ -140,13 +140,22 @@ export default function EditMasterMenuItemPage() {
         toast.success("Menu item updated successfully!");
         router.push("/master/menu/items");
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update menu item");
+        try {
+          const errorData = await response.json();
+          const errorMessage = errorData.error || "Failed to update menu item";
+          toast.error(errorMessage);
+        } catch (jsonError) {
+          toast.error("Failed to update menu item");
+        }
       }
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Error updating menu item"
-      );
+      // Only log unexpected errors (network errors, etc.)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        const errorMessage = error instanceof Error ? error.message : "Error updating menu item";
+        toast.error(errorMessage);
+      }
       console.error("Error:", error);
     }
   };

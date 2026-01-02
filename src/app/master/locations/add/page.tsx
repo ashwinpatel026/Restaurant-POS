@@ -149,12 +149,21 @@ export default function AddLocationPage() {
           router.push("/master/locations");
         }
       } else {
-        const error = await response.json();
-        toast.error(error.error || "Failed to create location");
+        try {
+          const errorData = await response.json();
+          const errorMessage = errorData.error || "Failed to create location";
+          toast.error(errorMessage);
+        } catch (jsonError) {
+          toast.error("Failed to create location");
+        }
       }
     } catch (error) {
-      console.error("Error saving location:", error);
-      toast.error("Error saving location");
+      // Only log unexpected errors (network errors, etc.)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        toast.error("Error saving location");
+      }
     } finally {
       setLoading(false);
     }

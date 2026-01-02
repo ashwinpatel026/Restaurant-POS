@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { masterPrisma } from '@/lib/databaseManager'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
+import { checkDuplicate } from '@/lib/validation'
 
 // Helper function to generate unique company code
 async function generateCompanyCode(): Promise<string> {
@@ -131,6 +132,20 @@ export async function POST(request: NextRequest) {
 
     // Generate unique company code
     const companyCode = await generateCompanyCode()
+
+    // Check for duplicate company name
+    if (companyName) {
+      const isDuplicate = await checkDuplicate('company', 'companyName', companyName, {
+        db: masterPrisma
+      });
+
+      if (isDuplicate) {
+        return NextResponse.json(
+          { error: 'Company with this name already exists' },
+          { status: 409 }
+        );
+      }
+    }
 
     const company = await masterPrisma.company.create({
       data: {

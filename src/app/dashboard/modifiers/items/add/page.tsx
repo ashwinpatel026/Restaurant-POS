@@ -49,14 +49,22 @@ export default function AddModifierItemPage() {
         toast.success("Modifier item created successfully!");
         router.push("/dashboard/modifiers/items");
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create modifier item");
+        try {
+          const errorData = await response.json();
+          const errorMessage = errorData.error || "Failed to create modifier item";
+          toast.error(errorMessage);
+        } catch (jsonError) {
+          toast.error("Failed to create modifier item");
+        }
       }
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Error creating modifier item"
-      );
-      console.error("Error:", error);
+      // Only log unexpected errors (network errors, etc.)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        const errorMessage = error instanceof Error ? error.message : "Error creating modifier item";
+        toast.error(errorMessage);
+      }
     }
   };
 

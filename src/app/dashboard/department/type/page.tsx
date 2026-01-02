@@ -111,12 +111,22 @@ export default function DepartmentTypePage() {
         setShowDeleteModal(false);
         setDeptTypeToDelete(null);
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to delete department type");
+        try {
+          const errorData = await response.json();
+          const errorMessage = errorData.error || "Failed to delete department type";
+          toast.error(errorMessage);
+        } catch (jsonError) {
+          toast.error("Failed to delete department type");
+        }
       }
     } catch (error: any) {
-      toast.error(error.message || "Error deleting department type");
-      console.error("Error:", error);
+      // Only log unexpected errors (network errors, etc.)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        const errorMessage = error instanceof Error ? error.message : "Error deleting department type";
+        toast.error(errorMessage);
+      }
     }
   };
 

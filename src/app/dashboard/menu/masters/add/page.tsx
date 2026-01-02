@@ -68,10 +68,10 @@ export default function AddMenuMasterPage() {
 
   useEffect(() => {
     // Set default color to primary color on mount
-    setFormData((prev) => ({ 
-      ...prev, 
+    setFormData((prev) => ({
+      ...prev,
       colorCode: getPrimaryColor(),
-      forColorCode: "#FFFFFF"
+      forColorCode: "#FFFFFF",
     }));
     if (selectedStoreCode) {
       fetchData();
@@ -80,14 +80,17 @@ export default function AddMenuMasterPage() {
 
   const fetchData = async () => {
     try {
-      const [prepZonesRes, stationsRes, eventsRes, departmentsRes] = await Promise.all([
-        fetch(buildApiUrl("/api/dashboard/menu/prep-zone"), {
-          cache: "no-store",
-        }),
-        fetch(buildApiUrl("/api/dashboard/station"), { cache: "no-store" }),
-        fetch(buildApiUrl("/api/dashboard/events"), { cache: "no-store" }),
-        fetch(buildApiUrl("/api/dashboard/department"), { cache: "no-store" }),
-      ]);
+      const [prepZonesRes, stationsRes, eventsRes, departmentsRes] =
+        await Promise.all([
+          fetch(buildApiUrl("/api/dashboard/menu/prep-zone"), {
+            cache: "no-store",
+          }),
+          fetch(buildApiUrl("/api/dashboard/station"), { cache: "no-store" }),
+          fetch(buildApiUrl("/api/dashboard/events"), { cache: "no-store" }),
+          fetch(buildApiUrl("/api/dashboard/department"), {
+            cache: "no-store",
+          }),
+        ]);
 
       if (prepZonesRes.ok) {
         const prepZonesData = await prepZonesRes.json();
@@ -106,7 +109,9 @@ export default function AddMenuMasterPage() {
 
       if (departmentsRes.ok) {
         const departmentsData = await departmentsRes.json();
-        setDepartments(departmentsData.filter((d: Department) => d.isActive === 1));
+        setDepartments(
+          departmentsData.filter((d: Department) => d.isActive === 1)
+        );
       }
     } catch (error) {
       toast.error("Error loading data");
@@ -182,12 +187,24 @@ export default function AddMenuMasterPage() {
         toast.success("Menu master created successfully!");
         router.push("/dashboard/menu/masters");
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create menu master");
+        try {
+          const errorData = await response.json();
+          const errorMessage =
+            errorData.error || "Failed to create menu master";
+          toast.error(errorMessage);
+        } catch (jsonError) {
+          toast.error("Failed to create menu master");
+        }
       }
     } catch (error: any) {
-      toast.error(error.message || "Error creating menu master");
-      console.error("Error:", error);
+      // Only log unexpected errors (network errors, etc.)
+      if (error instanceof TypeError && error.message.includes("fetch")) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        const errorMessage =
+          error instanceof Error ? error.message : "Error creating menu master";
+        toast.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -280,9 +297,7 @@ export default function AddMenuMasterPage() {
                         ))}
                       </select>
                     </div>
-                    <div>
-                      {/* Empty div for alignment */}
-                    </div>
+                    <div>{/* Empty div for alignment */}</div>
                   </div>
 
                   {/* Color Code Section - All three wrapped */}

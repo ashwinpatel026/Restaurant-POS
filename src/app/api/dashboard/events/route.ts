@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getUserAccessInfo, getSelectedStoreCode, buildStoreFilter, checkLocationPermission } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
+import { checkDuplicate } from '@/lib/validation'
 
 // Helper function to convert BigInt and Decimal fields for JSON serialization
 function convertEventForJson(event: any): any {
@@ -149,6 +150,20 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
+    
+    // Check for duplicate event name
+    if (body.eventName) {
+      const isDuplicate = await checkDuplicate('timeEvent', 'eventName', body.eventName, {
+        storeCode: selectedStoreCode
+      });
+
+      if (isDuplicate) {
+        return NextResponse.json(
+          { error: 'Event with this name already exists' },
+          { status: 409 }
+        );
+      }
+    }
     
     // Auto-generate event code for the selected store
     const eventCode = await generateEventCode(selectedStoreCode)

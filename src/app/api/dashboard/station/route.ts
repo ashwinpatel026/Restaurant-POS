@@ -9,6 +9,7 @@ import {
 } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 import { Prisma } from '@prisma/client'
+import { checkDuplicate } from '@/lib/validation'
 
 // Helper function to generate unique station code
 async function generateStationCode(storeCode: string): Promise<string> {
@@ -175,6 +176,19 @@ export async function POST(request: NextRequest) {
     const { stationname, isActive, stationGroups, isKitchen, isBar, isBill, isReport, ipAddress } = body
 
     const groups = sanitizeStationGroups(stationGroups)
+
+    // Check for duplicate name
+    if (stationname) {
+      const isDuplicate = await checkDuplicate('station', 'stationname', stationname, {
+        storeCode: selectedStoreCode
+      })
+      if (isDuplicate) {
+        return NextResponse.json(
+          { error: 'Station with this name already exists' },
+          { status: 400 }
+        )
+      }
+    }
 
     // Generate unique station code for the selected store
     const stationCode = await generateStationCode(selectedStoreCode)

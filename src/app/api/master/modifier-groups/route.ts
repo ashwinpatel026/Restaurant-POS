@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { masterPrisma } from '@/lib/databaseManager'
 import { Prisma } from '@prisma/master-client'
+import { checkDuplicate } from '@/lib/validation'
 
 // Helper function to sanitize prefix array
 function sanitizePrefix(input: unknown): string[] {
@@ -162,6 +163,17 @@ export async function POST(request: NextRequest) {
       prefix,
       isActive = 1,
     } = body
+
+    // Check for duplicate name
+    if (groupName) {
+      const isDuplicate = await checkDuplicate('masterModifierGroup', 'groupName', groupName)
+      if (isDuplicate) {
+        return NextResponse.json(
+          { error: 'Modifier group with this name already exists' },
+          { status: 400 }
+        )
+      }
+    }
 
     const modifierGroupCode = await generateModifierGroupCode()
     const prefixes = sanitizePrefix(prefix)

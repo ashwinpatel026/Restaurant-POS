@@ -185,12 +185,22 @@ export default function PrepZonePage() {
           fetchData();
         }
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to save prep zone");
+        try {
+          const errorData = await response.json();
+          const errorMessage = errorData.error || "Failed to save prep zone";
+          toast.error(errorMessage);
+        } catch (jsonError) {
+          toast.error("Failed to save prep zone");
+        }
       }
     } catch (error: any) {
-      toast.error(error.message || "Error saving prep zone");
-      console.error("Error:", error);
+      // Only log unexpected errors (network errors, etc.)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        const errorMessage = error instanceof Error ? error.message : "Error saving prep zone";
+        toast.error(errorMessage);
+      }
     }
   };
 

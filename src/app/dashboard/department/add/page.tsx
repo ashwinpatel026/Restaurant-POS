@@ -89,12 +89,22 @@ export default function AddDepartmentPage() {
         toast.success("Department created successfully!");
         router.push("/dashboard/department");
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create department");
+        try {
+          const errorData = await response.json();
+          const errorMessage = errorData.error || "Failed to create department";
+          toast.error(errorMessage);
+        } catch (jsonError) {
+          toast.error("Failed to create department");
+        }
       }
     } catch (error: any) {
-      toast.error(error.message || "Error creating department");
-      console.error("Error:", error);
+      // Only log unexpected errors (network errors, etc.)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        const errorMessage = error instanceof Error ? error.message : "Error creating department";
+        toast.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }

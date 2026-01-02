@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getUserAccessInfo, getSelectedStoreCode, buildStoreFilter, checkLocationPermission } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
+import { checkDuplicate } from '@/lib/validation'
 
 // Helper function to generate unique menu category code
 async function generateMenuCategoryCode(storeCode: string): Promise<string> {
@@ -214,6 +215,19 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { error: 'Access denied to this store' },
           { status: 403 }
+        )
+      }
+    }
+
+    // Check for duplicate name
+    if (name) {
+      const isDuplicate = await checkDuplicate('menuCategory', 'name', name, {
+        storeCode: selectedStoreCode
+      })
+      if (isDuplicate) {
+        return NextResponse.json(
+          { error: 'Menu category with this name already exists' },
+          { status: 400 }
         )
       }
     }

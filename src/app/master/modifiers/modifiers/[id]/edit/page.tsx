@@ -112,8 +112,15 @@ export default function EditModifierPage() {
       });
 
       if (!groupResponse.ok) {
-        const errorData = await groupResponse.json();
-        throw new Error(errorData.error || "Failed to update modifier group");
+        try {
+          const errorData = await groupResponse.json();
+          const errorMessage = errorData.error || "Failed to update modifier group";
+          toast.error(errorMessage);
+          return;
+        } catch (jsonError) {
+          toast.error("Failed to update modifier group");
+          return;
+        }
       }
 
       const updatedGroup = await groupResponse.json();

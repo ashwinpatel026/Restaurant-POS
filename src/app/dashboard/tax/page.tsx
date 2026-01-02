@@ -106,12 +106,21 @@ export default function TaxManagementPage() {
         setEditingTax(null);
         fetchData(); // Refresh data
       } else {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to save tax");
+        try {
+          const errorData = await response.json();
+          const errorMessage = errorData.error || "Failed to save tax";
+          toast.error(errorMessage);
+        } catch (jsonError) {
+          toast.error("Failed to save tax");
+        }
       }
     } catch (error) {
-      toast.error("Error saving tax");
-      console.error("Error:", error);
+      // Only log unexpected errors (network errors, etc.)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        toast.error("Error saving tax");
+      }
     }
   };
 

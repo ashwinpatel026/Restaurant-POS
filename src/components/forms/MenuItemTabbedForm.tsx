@@ -514,7 +514,8 @@ export default function MenuItemTabbedForm({
 
       await onSave(submitData);
     } catch (error) {
-      console.error("Error:", error);
+      // Error is already handled in onSave, just prevent it from propagating
+      // No need to log here as it's already handled upstream
     } finally {
       setLoading(false);
     }

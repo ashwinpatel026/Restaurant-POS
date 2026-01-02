@@ -49,12 +49,21 @@ export default function AddRolePage() {
         toast.success("Role created successfully");
         router.push(`/master/roles/${data.roleCode}`);
       } else {
-        const error = await response.json();
-        toast.error(error.error || "Failed to create role");
+        try {
+          const errorData = await response.json();
+          const errorMessage = errorData.error || "Failed to create role";
+          toast.error(errorMessage);
+        } catch (jsonError) {
+          toast.error("Failed to create role");
+        }
       }
     } catch (error) {
-      console.error("Error creating role:", error);
-      toast.error("Error creating role");
+      // Only log unexpected errors (network errors, etc.)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        toast.error("Error creating role");
+      }
     } finally {
       setSaving(false);
     }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { masterPrisma } from '@/lib/databaseManager'
+import { checkDuplicate } from '@/lib/validation'
 
 // Helper function to generate unique tax code
 async function generateTaxCode(): Promise<string> {
@@ -65,6 +66,18 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { taxname, taxrate } = body
+
+    // Check for duplicate tax name
+    if (taxname) {
+      const isDuplicate = await checkDuplicate('masterTax', 'taxname', taxname);
+
+      if (isDuplicate) {
+        return NextResponse.json(
+          { error: 'Tax with this name already exists' },
+          { status: 409 }
+        );
+      }
+    }
 
     // Generate unique tax code
     const taxCode = await generateTaxCode()

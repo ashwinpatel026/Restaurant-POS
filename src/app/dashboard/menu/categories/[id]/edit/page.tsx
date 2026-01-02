@@ -229,12 +229,22 @@ export default function EditCategoryPage() {
         toast.success("Category updated successfully!");
         router.push(`/dashboard/menu/categories`);
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update category");
+        try {
+          const errorData = await response.json();
+          const errorMessage = errorData.error || "Failed to update category";
+          toast.error(errorMessage);
+        } catch (jsonError) {
+          toast.error("Failed to update category");
+        }
       }
     } catch (error: any) {
-      toast.error(error.message || "Error updating category");
-      console.error("Error:", error);
+      // Only log unexpected errors (network errors, etc.)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        const errorMessage = error instanceof Error ? error.message : "Error updating category";
+        toast.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }

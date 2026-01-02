@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getUserAccessInfo, getSelectedStoreCode, buildStoreFilter, checkLocationPermission } from '@/lib/auth/accessControl'
 import { prisma, checkConnection } from '@/lib/database'
+import { checkDuplicate } from '@/lib/validation'
 
 // Helper function to generate unique menu item code
 async function generateMenuItemCode(storeCode: string): Promise<string> {
@@ -208,6 +209,19 @@ export async function POST(request: NextRequest) {
       prepTimeMinutes,
       deptCode
     } = body
+
+    // Check for duplicate name
+    if (name) {
+      const isDuplicate = await checkDuplicate('menuItem', 'name', name, {
+        storeCode: selectedStoreCode
+      })
+      if (isDuplicate) {
+        return NextResponse.json(
+          { error: 'Menu item with this name already exists' },
+          { status: 400 }
+        )
+      }
+    }
 
     // Generate unique code for menu item for the selected store
     const menuItemCode = await generateMenuItemCode(selectedStoreCode)

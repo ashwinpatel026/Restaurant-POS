@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { masterPrisma } from '@/lib/databaseManager'
+import { checkDuplicate } from '@/lib/validation'
 
 // Helper function to generate unique department type code
 async function generateDepartmentTypeCode(): Promise<string> {
@@ -75,6 +76,15 @@ export async function POST(request: NextRequest) {
     if (!name) {
       return NextResponse.json(
         { error: 'Department type name is required' },
+        { status: 400 }
+      )
+    }
+
+    // Check for duplicate name
+    const isDuplicate = await checkDuplicate('masterDepartmentType', 'name', name)
+    if (isDuplicate) {
+      return NextResponse.json(
+        { error: 'Department type with this name already exists' },
         { status: 400 }
       )
     }

@@ -8,6 +8,7 @@ import {
   checkLocationPermission,
 } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
+import { checkDuplicate } from '@/lib/validation'
 
 // Helper function to generate unique printer code
 async function generatePrinterCode(storeCode: string): Promise<string> {
@@ -132,6 +133,17 @@ export async function POST(request: NextRequest) {
     if (!printerName) {
       return NextResponse.json(
         { error: 'Printer name is required' },
+        { status: 400 }
+      )
+    }
+
+    // Check for duplicate name
+    const isDuplicate = await checkDuplicate('printer', 'printerName', printerName, {
+      storeCode: selectedStoreCode
+    })
+    if (isDuplicate) {
+      return NextResponse.json(
+        { error: 'Printer with this name already exists' },
         { status: 400 }
       )
     }

@@ -77,12 +77,22 @@ export default function EditDepartmentTypePage() {
         toast.success("Department type updated successfully!");
         router.push("/dashboard/department/type");
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to update department type");
+        try {
+          const errorData = await response.json();
+          const errorMessage = errorData.error || "Failed to update department type";
+          toast.error(errorMessage);
+        } catch (jsonError) {
+          toast.error("Failed to update department type");
+        }
       }
     } catch (error: any) {
-      toast.error(error.message || "Error updating department type");
-      console.error("Error:", error);
+      // Only log unexpected errors (network errors, etc.)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        const errorMessage = error instanceof Error ? error.message : "Error updating department type";
+        toast.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }

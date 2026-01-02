@@ -265,12 +265,22 @@ export default function MenuMastersPage() {
         );
         toast.success("Menu master deleted successfully");
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to delete menu master");
+        try {
+          const errorData = await response.json();
+          const errorMessage = errorData.error || "Failed to delete menu master";
+          toast.error(errorMessage);
+        } catch (jsonError) {
+          toast.error("Failed to delete menu master");
+        }
       }
     } catch (error: any) {
-      toast.error(error.message || "Error deleting menu master");
-      console.error("Error:", error);
+      // Only log unexpected errors (network errors, etc.)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        const errorMessage = error instanceof Error ? error.message : "Error deleting menu master";
+        toast.error(errorMessage);
+      }
     } finally {
       setShowConfirmModal(false);
       setDeletingId(null);

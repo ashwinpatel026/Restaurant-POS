@@ -166,12 +166,22 @@ export default function ModifierItemsPage() {
         );
         toast.success("Modifier item deleted successfully");
       } else {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to delete modifier item");
+        try {
+          const errorData = await response.json();
+          const errorMessage = errorData.error || "Failed to delete modifier item";
+          toast.error(errorMessage);
+        } catch (jsonError) {
+          toast.error("Failed to delete modifier item");
+        }
       }
     } catch (error: any) {
-      toast.error(error.message || "Error deleting modifier item");
-      console.error("Error:", error);
+      // Only log unexpected errors (network errors, etc.)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        const errorMessage = error instanceof Error ? error.message : "Error deleting modifier item";
+        toast.error(errorMessage);
+      }
     } finally {
       setShowConfirmModal(false);
       setDeletingId(null);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { masterPrisma } from '@/lib/databaseManager'
+import { checkDuplicate } from '@/lib/validation'
 
 // Helper function to generate unique event code
 async function generateEventCode(): Promise<string> {
@@ -88,13 +89,42 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     
+    // Validate required fields
+    const eventName = body.eventName ? body.eventName.trim() : '';
+    if (!eventName) {
+      return NextResponse.json(
+        { error: 'Event name is required' },
+        { status: 400 }
+      )
+    }
+    
+    // Check for duplicate event name (case-insensitive)
+    // Get all events and check case-insensitively
+    const allEvents = await masterPrisma.masterTimeEvent.findMany({
+      select: {
+        id: true,
+        eventName: true
+      }
+    });
+
+    const duplicateEvent = allEvents.find(
+      (e) => e.eventName && e.eventName.toLowerCase().trim() === eventName.toLowerCase().trim()
+    );
+
+    if (duplicateEvent) {
+      return NextResponse.json(
+        { error: 'Event with this name already exists' },
+        { status: 409 }
+      );
+    }
+    
     // Auto-generate event code
     const eventCode = await generateEventCode()
     
     const event = await masterPrisma.masterTimeEvent.create({
       data: {
         eventCode: eventCode,
-        eventName: body.eventName,
+        eventName: eventName,
         globalPriceAmountAdd: body.globalPriceAmountAdd ? parseFloat(body.globalPriceAmountAdd) : null,
         globalPriceAmountDisc: body.globalPriceAmountDisc ? parseFloat(body.globalPriceAmountDisc) : null,
         globalPricePerAdd: body.globalPricePerAdd ? parseFloat(body.globalPricePerAdd) : null,

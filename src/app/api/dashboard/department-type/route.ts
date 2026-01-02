@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getUserAccessInfo, getSelectedStoreCode, buildStoreFilter, checkLocationPermission } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
+import { checkDuplicate } from '@/lib/validation'
 
 // Helper function to generate unique department type code
 async function generateDepartmentTypeCode(storeCode: string): Promise<string> {
@@ -135,6 +136,17 @@ export async function POST(request: NextRequest) {
     if (!name) {
       return NextResponse.json(
         { error: 'Department type name is required' },
+        { status: 400 }
+      )
+    }
+
+    // Check for duplicate name
+    const isDuplicate = await checkDuplicate('departmentType', 'name', name, {
+      storeCode: selectedStoreCode
+    })
+    if (isDuplicate) {
+      return NextResponse.json(
+        { error: 'Department type with this name already exists' },
         { status: 400 }
       )
     }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { masterPrisma } from '@/lib/databaseManager'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
+import { checkDuplicate } from '@/lib/validation'
 
 // Helper function to generate unique dealer code
 async function generateDealerCode(): Promise<string> {
@@ -130,6 +131,20 @@ export async function POST(request: NextRequest) {
         { error: 'Dealer code already exists' },
         { status: 400 }
       )
+    }
+
+    // Check for duplicate dealer name
+    if (dealerName) {
+      const isDuplicate = await checkDuplicate('dealer', 'dealerName', dealerName, {
+        db: masterPrisma
+      });
+
+      if (isDuplicate) {
+        return NextResponse.json(
+          { error: 'Dealer with this name already exists' },
+          { status: 409 }
+        );
+      }
     }
 
     // Verify company exists if provided

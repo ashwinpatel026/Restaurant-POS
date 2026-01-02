@@ -62,12 +62,22 @@ export default function ModifiersPage() {
         const modifiersData = await modifiersRes.json();
         setModifiers(modifiersData);
       } else {
-        const error = await modifiersRes.json();
-        throw new Error(error.error || "Failed to fetch modifiers");
+        try {
+          const errorData = await modifiersRes.json();
+          const errorMessage = errorData.error || "Failed to fetch modifiers";
+          toast.error(errorMessage);
+        } catch (jsonError) {
+          toast.error("Failed to fetch modifiers");
+        }
       }
     } catch (error: any) {
-      toast.error(error.message || "Error loading data");
-      console.error("Error:", error);
+      // Only log unexpected errors (network errors, etc.)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        const errorMessage = error instanceof Error ? error.message : "Error loading data";
+        toast.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -102,12 +112,22 @@ export default function ModifiersPage() {
         setModifiers(modifiers.filter((mod) => mod.id !== String(deletingId)));
         toast.success("Modifier deleted successfully");
       } else {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to delete modifier");
+        try {
+          const errorData = await response.json();
+          const errorMessage = errorData.error || "Failed to delete modifier";
+          toast.error(errorMessage);
+        } catch (jsonError) {
+          toast.error("Failed to delete modifier");
+        }
       }
     } catch (error: any) {
-      toast.error(error.message || "Error deleting modifier");
-      console.error("Error:", error);
+      // Only log unexpected errors (network errors, etc.)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        const errorMessage = error instanceof Error ? error.message : "Error deleting modifier";
+        toast.error(errorMessage);
+      }
     } finally {
       setShowConfirmModal(false);
       setDeletingId(null);

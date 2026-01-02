@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { masterPrisma } from '@/lib/databaseManager'
+import { checkDuplicate } from '@/lib/validation'
 
 // Helper function to generate unique menu item code
 async function generateMenuItemCode(): Promise<string> {
@@ -129,6 +130,17 @@ export async function POST(request: NextRequest) {
       prepZoneCodes,
       deptCode,
     } = body
+
+    // Check for duplicate name
+    if (name) {
+      const isDuplicate = await checkDuplicate('masterMenuItem', 'name', name)
+      if (isDuplicate) {
+        return NextResponse.json(
+          { error: 'Menu item with this name already exists' },
+          { status: 400 }
+        )
+      }
+    }
 
     // Generate unique code for menu item
     const menuItemCode = await generateMenuItemCode()

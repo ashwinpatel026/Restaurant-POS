@@ -161,11 +161,21 @@ export default function StationManagementPage() {
             : [...prev, mappedStation]
         );
       } else {
-        throw new Error("Failed to save station");
+        try {
+          const errorData = await response.json();
+          const errorMessage = errorData.error || "Failed to save station";
+          toast.error(errorMessage);
+        } catch (jsonError) {
+          toast.error("Failed to save station");
+        }
       }
     } catch (error) {
-      toast.error("Error saving station");
-      console.error("Error:", error);
+      // Only log unexpected errors (network errors, etc.)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        toast.error("Error saving station");
+      }
     }
   };
 

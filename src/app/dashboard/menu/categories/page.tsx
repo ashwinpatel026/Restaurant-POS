@@ -147,14 +147,22 @@ export default function MenuCategoriesPage() {
         );
         toast.success("Category deleted successfully");
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to delete category");
+        try {
+          const errorData = await response.json();
+          const errorMessage = errorData.error || "Failed to delete category";
+          toast.error(errorMessage);
+        } catch (jsonError) {
+          toast.error("Failed to delete category");
+        }
       }
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Error deleting category"
-      );
-      console.error("Error:", error);
+      // Only log unexpected errors (network errors, etc.)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        const errorMessage = error instanceof Error ? error.message : "Error deleting category";
+        toast.error(errorMessage);
+      }
     } finally {
       setShowConfirmModal(false);
       setDeletingId(null);

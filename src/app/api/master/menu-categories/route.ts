@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { masterPrisma } from '@/lib/databaseManager'
+import { checkDuplicate } from '@/lib/validation'
 
 // Helper function to generate unique menu category code
 async function generateMenuCategoryCode(): Promise<string> {
@@ -175,6 +176,17 @@ export async function POST(request: NextRequest) {
 
     if (!menuMaster) {
       return NextResponse.json({ error: 'Menu master not found' }, { status: 404 })
+    }
+
+    // Check for duplicate name
+    if (name) {
+      const isDuplicate = await checkDuplicate('masterMenuCategory', 'name', name)
+      if (isDuplicate) {
+        return NextResponse.json(
+          { error: 'Menu category with this name already exists' },
+          { status: 400 }
+        )
+      }
     }
 
     // Use provided deptCode or fallback to menu master's deptCode

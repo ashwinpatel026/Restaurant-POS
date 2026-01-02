@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { masterPrisma } from '@/lib/databaseManager'
+import { checkDuplicate } from '@/lib/validation'
 import { Prisma } from '@prisma/master-client'
 
 // Helper function to generate unique station code
@@ -102,6 +103,17 @@ export async function POST(request: NextRequest) {
     const { stationname, isActive, stationGroups, isKitchen, isBar, isBill, isReport } = body
 
     const groups = sanitizeStationGroups(stationGroups)
+
+    // Check for duplicate name
+    if (stationname) {
+      const isDuplicate = await checkDuplicate('masterStation', 'stationname', stationname)
+      if (isDuplicate) {
+        return NextResponse.json(
+          { error: 'Station with this name already exists' },
+          { status: 400 }
+        )
+      }
+    }
 
     // Generate unique station code
     const stationCode = await generateStationCode()

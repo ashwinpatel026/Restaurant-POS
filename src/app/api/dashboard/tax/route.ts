@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getUserAccessInfo, getSelectedStoreCode, buildStoreFilter, checkLocationPermission } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
+import { checkDuplicate } from '@/lib/validation'
 
 // Helper function to generate unique tax code
 async function generateTaxCode(storeCode: string): Promise<string> {
@@ -116,6 +117,20 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const { taxname, taxrate } = body
+
+    // Check for duplicate tax name
+    if (taxname) {
+      const isDuplicate = await checkDuplicate('tax', 'taxname', taxname, {
+        storeCode: selectedStoreCode
+      });
+
+      if (isDuplicate) {
+        return NextResponse.json(
+          { error: 'Tax with this name already exists' },
+          { status: 409 }
+        );
+      }
+    }
 
     // Generate unique tax code for the selected store
     const taxCode = await generateTaxCode(selectedStoreCode)

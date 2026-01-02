@@ -96,8 +96,13 @@ export default function AddDealerPage() {
         });
 
         if (!companyResponse.ok) {
-          const error = await companyResponse.json();
-          toast.error(error.error || "Failed to create company");
+          try {
+            const errorData = await companyResponse.json();
+            const errorMessage = errorData.error || "Failed to create company";
+            toast.error(errorMessage);
+          } catch (jsonError) {
+            toast.error("Failed to create company");
+          }
           setLoading(false);
           return;
         }
@@ -140,12 +145,21 @@ export default function AddDealerPage() {
         toast.success("Dealer created successfully");
         router.push("/master/dealers");
       } else {
-        const error = await response.json();
-        toast.error(error.error || "Failed to create dealer");
+        try {
+          const errorData = await response.json();
+          const errorMessage = errorData.error || "Failed to create dealer";
+          toast.error(errorMessage);
+        } catch (jsonError) {
+          toast.error("Failed to create dealer");
+        }
       }
     } catch (error) {
-      console.error("Error saving dealer:", error);
-      toast.error("Error saving dealer");
+      // Only log unexpected errors (network errors, etc.)
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        toast.error("Error saving dealer");
+      }
     } finally {
       setLoading(false);
     }

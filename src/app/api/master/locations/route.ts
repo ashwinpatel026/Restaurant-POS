@@ -3,6 +3,7 @@ import { masterPrisma } from '@/lib/databaseManager'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { syncMasterDataToLocation } from '@/services/syncService'
 import { randomBytes } from 'crypto'
+import { checkDuplicate } from '@/lib/validation'
 
 // Helper function to generate secure API key
 function generateAPIKey(): string {
@@ -181,6 +182,20 @@ export async function POST(request: NextRequest) {
         { error: 'Store code already exists' },
         { status: 400 }
       )
+    }
+
+    // Check for duplicate location name
+    if (locationName) {
+      const isDuplicate = await checkDuplicate('location', 'locationName', locationName, {
+        db: masterPrisma
+      });
+
+      if (isDuplicate) {
+        return NextResponse.json(
+          { error: 'Location with this name already exists' },
+          { status: 409 }
+        );
+      }
     }
 
     // Verify company exists if provided
