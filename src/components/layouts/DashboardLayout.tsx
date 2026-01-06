@@ -125,6 +125,12 @@ const navigation: MenuItem[] = [
     permissions: ["tax.view", "tax.create", "tax.update", "tax.delete"],
   },
   {
+    name: "Discount",
+    href: "/dashboard/discount",
+    icon: TagIcon,
+    permissions: ["discount.view", "discount.create", "discount.update", "discount.delete"],
+  },
+  {
     name: "Department",
     icon: BuildingOfficeIcon,
     permissions: [

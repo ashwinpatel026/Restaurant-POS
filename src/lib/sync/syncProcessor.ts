@@ -54,6 +54,8 @@ export class SyncProcessor {
     'tbl_role': new Set(['is_active', 'is_system_role']),  // Master table name (for reverse lookup)
     'tbl_printer': new Set(['isreceipt', 'isdocument', 'is_kitchen']),  // Location table name
     'tbl_master_printer': new Set(['isreceipt', 'isdocument', 'is_kitchen']),  // Master table name (for reverse lookup)
+    'tbl_discount_master': new Set(['is_item_level', 'is_bill_level', 'requires_manager_approval', 'is_open_discount', 'is_delete', 'is_active']),  // Location table name
+    'tbl_master_discount_master': new Set(['is_item_level', 'is_bill_level', 'requires_manager_approval', 'is_open_discount', 'is_delete', 'is_active']),  // Master table name (for reverse lookup)
   };
 
   // Table-specific integer columns (columns that are integer in some tables)
@@ -440,33 +442,77 @@ export class SyncProcessor {
       const escape = (val: string) => String(val).replace(/'/g, "''");
       const escapedRole = escape(roleCode);
 
-      await locationPrisma.$transaction(async tx => {
-        // Replace the entire permission set for this role
-        await tx.$executeRawUnsafe(
-          `DELETE FROM ${locationTableName} WHERE "role_code" = '${escapedRole}'::VARCHAR`
-        );
+      // Use advisory lock to prevent concurrent updates to the same role
+      // Hash the role_code to get a lock ID (PostgreSQL advisory locks use bigint)
+      const lockId = this.hashStringToBigInt(roleCode);
 
-        if (permissions.length > 0) {
-          const values = permissions
-            .map(code => {
-              const escapedPerm = escape(code);
-              const newSyncId = randomUUID();
-              return `('${escapedRole}'::VARCHAR, '${escapedPerm}'::VARCHAR, '${newSyncId}'::UUID, '${escape(syncSource)}')`;
-            })
-            .join(', ');
+      // Retry logic for deadlocks
+      const maxRetries = 5;
+      let retryCount = 0;
+      let lastError: any = null;
 
-          await tx.$executeRawUnsafe(`
-            INSERT INTO ${locationTableName} ("role_code", "permission_code", "sync_id", "sync_source")
-            VALUES ${values}
-            ON CONFLICT ("role_code", "permission_code") DO UPDATE SET
-              "sync_id" = EXCLUDED."sync_id",
-              "sync_source" = EXCLUDED."sync_source"
-          `);
+      while (retryCount < maxRetries) {
+        try {
+          await locationPrisma.$transaction(async tx => {
+            // Acquire advisory lock for this role to prevent concurrent updates
+            await tx.$executeRawUnsafe(
+              `SELECT pg_advisory_xact_lock(${lockId})`
+            );
+
+            // Replace the entire permission set for this role
+            await tx.$executeRawUnsafe(
+              `DELETE FROM ${locationTableName} WHERE "role_code" = '${escapedRole}'::VARCHAR`
+            );
+
+            if (permissions.length > 0) {
+              const values = permissions
+                .map(code => {
+                  const escapedPerm = escape(code);
+                  const newSyncId = randomUUID();
+                  return `('${escapedRole}'::VARCHAR, '${escapedPerm}'::VARCHAR, '${newSyncId}'::UUID, '${escape(syncSource)}')`;
+                })
+                .join(', ');
+
+              await tx.$executeRawUnsafe(`
+                INSERT INTO ${locationTableName} ("role_code", "permission_code", "sync_id", "sync_source")
+                VALUES ${values}
+                ON CONFLICT ("role_code", "permission_code") DO UPDATE SET
+                  "sync_id" = EXCLUDED."sync_id",
+                  "sync_source" = EXCLUDED."sync_source"
+              `);
+            }
+          }, {
+            timeout: 30000, // 30 seconds timeout for bulk permission updates
+          });
+
+          // Success - break out of retry loop
+          return;
+        } catch (error: any) {
+          lastError = error;
+          
+          // Check if it's a deadlock error (PostgreSQL error code 40P01 or Prisma error P2010 with deadlock message)
+          const isDeadlock = error.code === 'P2010' || error.code === '40P01' || 
+              (error.message && (error.message.includes('deadlock') || error.message.includes('40P01'))) ||
+              (error.meta && error.meta.code === '40P01');
+          
+          if (isDeadlock) {
+            retryCount++;
+            if (retryCount < maxRetries) {
+              // Exponential backoff: wait 100ms, 200ms, 400ms, 800ms, 1600ms
+              const waitTime = Math.min(100 * Math.pow(2, retryCount - 1), 2000);
+              console.log(`Deadlock detected for role ${roleCode}, retrying in ${waitTime}ms (attempt ${retryCount}/${maxRetries})`);
+              await new Promise(resolve => setTimeout(resolve, waitTime));
+              continue;
+            }
+          }
+          
+          // Not a deadlock or max retries reached - throw the error
+          throw error;
         }
-      });
+      }
 
-      // Nothing else to do for this entry
-      return;
+      // If we get here, all retries failed
+      throw lastError || new Error('Failed to sync role permissions after retries');
     }
 
     // Filter out sync fields from data (we'll set them separately)
@@ -870,6 +916,7 @@ export class SyncProcessor {
       { pattern: /^(MOI\d+)$/, prefix: targetPrefix },
       { pattern: /^(DPT\d+)$/, prefix: targetPrefix },
       { pattern: /^(DEP\d+)$/, prefix: targetPrefix },
+      { pattern: /^(DISC\d+)$/, prefix: targetPrefix },
     ];
 
     for (const { pattern, prefix } of masterPatterns) {
@@ -915,7 +962,8 @@ export class SyncProcessor {
       // Skip ID fields
       if (key === 'tbl_tax_id' || key === 'printer_id' || key === 'prep_zone_id' ||
           key === 'menu_master_id' || key === 'menu_category_id' || key === 'menu_item_id' ||
-          key === 'tbl_station_id' || key === 'dept_type_id' || key === 'dept_id' || key === 'id') {
+          key === 'tbl_station_id' || key === 'dept_type_id' || key === 'dept_id' || 
+          key === 'discount_id' || key === 'id') {
         continue;
       }
 
@@ -950,7 +998,8 @@ export class SyncProcessor {
           'tax_code', 'printer_code', 'backup_printer_code', 'station_code',
           'event_code', 'prep_zone_code', 'menu_master_code', 'menu_category_code',
           'menu_item_code', 'modifier_group_code', 'modifier_item_code',
-          'dept_type_code', 'dept_code', 'dept_taxcode', 'dept_type'
+          'dept_type_code', 'dept_code', 'dept_taxcode', 'dept_type',
+          'discount_code'
         ];
 
         // Check if this is a code field (case-insensitive check)
@@ -1009,7 +1058,8 @@ export class SyncProcessor {
       // Skip ID fields (auto-increment primary keys)
       if (key === 'tbl_tax_id' || key === 'printer_id' || key === 'prep_zone_id' ||
           key === 'menu_master_id' || key === 'menu_category_id' || key === 'menu_item_id' ||
-          key === 'tbl_station_id' || key === 'dept_type_id' || key === 'dept_id' || key === 'id') {
+          key === 'tbl_station_id' || key === 'dept_type_id' || key === 'dept_id' || 
+          key === 'discount_id' || key === 'id') {
         continue;
       }
 
@@ -1140,6 +1190,15 @@ export class SyncProcessor {
               const menuMasterMatch = codeValue.match(/^(MM\d+)$/);
               if (menuMasterMatch) {
                 mappedData[mappedKey] = `WM${locationCode}${menuMasterMatch[1]}`;
+              } else {
+                mappedData[mappedKey] = value;
+              }
+            }
+            // Transform discount_code (in any table)
+            else if (key === 'discount_code') {
+              const discountMatch = codeValue.match(/^(DISC\d+)$/);
+              if (discountMatch) {
+                mappedData[mappedKey] = `WM${locationCode}${discountMatch[1]}`;
               } else {
                 mappedData[mappedKey] = value;
               }
@@ -2581,6 +2640,22 @@ export class SyncProcessor {
   }
 
   /**
+   * Hash a string to a bigint for PostgreSQL advisory locks
+   * Uses a simple hash function to convert string to number
+   */
+  private hashStringToBigInt(str: string): number {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    // Convert to positive number and use modulo to fit in safe integer range
+    // PostgreSQL advisory locks use bigint, but we'll use a safe range
+    return Math.abs(hash) % Number.MAX_SAFE_INTEGER;
+  }
+
+  /**
    * Get the primary unique code field for a table
    * Used to check for existing records by code instead of sync_id
    */
@@ -2598,6 +2673,7 @@ export class SyncProcessor {
       'tbl_master_modifier_group': 'modifier_group_code',
       'tbl_master_modifier_item': 'modifier_item_code',
       'tbl_master_time_events': 'Event_code',
+      'tbl_master_discount_master': 'discount_code',
       // Permission system tables (global, no store_code)
       'tbl_permission': 'permission_code',
       'permissions': 'permission_code',

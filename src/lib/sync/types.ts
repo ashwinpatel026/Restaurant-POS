@@ -108,6 +108,7 @@ export const SYNC_TABLE_MAP: Record<string, string> = {
   'tbl_master_station': 'tbl_station',
   'tbl_master_tax': 'tbl_tax',
   'tbl_master_time_events': 'tbl_time_events',
+  'tbl_master_discount_master': 'tbl_discount_master',
   // User management tables - Individual sync only (not in full sync)
   'tbl_user': 'users',
   // Permission system tables
@@ -287,6 +288,27 @@ export const SYNC_FIELD_MAP: Record<string, Record<string, string>> = {
     'Event_End_Date': 'Event_End_Date',
     'is_active': 'is_active',
   },
+  'tbl_master_discount_master': {
+    'discount_code': 'discount_code',
+    'promo_code': 'promo_code',
+    'discount_name': 'discount_name',
+    'discount_type': 'discount_type',
+    'discount_mode': 'discount_mode',
+    'discount_value': 'discount_value',
+    'max_discount_amount': 'max_discount_amount',
+    'is_item_level': 'is_item_level',
+    'is_bill_level': 'is_bill_level',
+    'requires_manager_approval': 'requires_manager_approval',
+    'allowed_roles': 'allowed_roles',
+    'valid_from': 'valid_from',
+    'valid_to': 'valid_to',
+    'menu_category': 'menu_category',
+    'dept_code': 'dept_code',
+    'discount_note': 'discount_note',
+    'is_delete': 'is_delete',
+    'is_open_discount': 'is_open_discount',
+    'is_active': 'is_active',
+  },
   // User management tables - Individual sync only (synced on create/update, not in full sync)
   'tbl_user': {
     'email': 'email',
@@ -360,6 +382,7 @@ export const SYNC_ORDER_BY_COLUMN: Record<string, string> = {
   'tbl_master_station': 'station_code', // Station table doesn't have createdon/created_date
   'tbl_master_tax': 'created_date',
   'tbl_master_time_events': 'created_date',
+  'tbl_master_discount_master': 'created_date',
   // User management tables - Individual sync only (not in full sync)
   'tbl_user': 'created_on',
   // Permission system tables
@@ -386,6 +409,7 @@ export const SYNC_TABLE_ORDER: string[] = [
   'tbl_master_department',
   'tbl_master_time_events',
   'tbl_master_prep_zone',
+  'tbl_master_discount_master',
   
   // Permission system tables (must sync before users)
   'tbl_permission',              // Independent

@@ -710,3 +710,37 @@ model RolePermission {
   @@map("role_permissions")
 }
 
+model DiscountMaster {
+  discountId                BigInt    @id @default(autoincrement()) @map("discount_id")
+  discountCode              String    @unique @map("discount_code") @db.VarChar(50)
+  promoCode                 String?   @map("promo_code") @db.VarChar(30)
+  discountName              String    @map("discount_name") @db.VarChar(100)
+  discountType              String    @map("discount_type") @db.VarChar(30)
+  discountMode              String    @map("discount_mode") @db.VarChar(10)
+  discountValue             Decimal   @map("discount_value") @db.Decimal(10, 2)
+  maxDiscountAmount         Decimal?  @map("max_discount_amount") @db.Decimal(10, 2)
+  isItemLevel               Boolean   @default(false) @map("is_item_level")
+  isBillLevel               Boolean   @default(false) @map("is_bill_level")
+  requiresManagerApproval   Boolean   @default(false) @map("requires_manager_approval")
+  allowedRoles              Json?     @map("allowed_roles")
+  validFrom                 DateTime? @map("valid_from") @db.Date
+  validTo                   DateTime? @map("valid_to") @db.Date
+  menuCategory              Json?     @map("menu_category")
+  deptCode                  String?   @map("dept_code") @db.VarChar(100)
+  discountNote              String?   @map("discount_note") @db.VarChar(100)
+  isDelete                  Boolean   @default(false) @map("is_delete")
+  isOpenDiscount            Boolean   @default(false) @map("is_open_discount")
+  isActive                  Boolean   @default(true) @map("is_active")
+  createdBy                 BigInt?   @map("created_by")
+  createdDate               DateTime  @default(now()) @map("created_date")
+  updatedBy                 BigInt?   @map("updated_by")
+  updatedOn                 DateTime  @default(now()) @updatedAt @map("updated_on")
+  storeCode                 String?   @map("store_code") @db.VarChar(100)
+  syncId                    String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource                String?   @default("server") @map("sync_source") @db.VarChar(20)
+
+  @@index([discountCode])
+  @@index([syncId])
+  @@map("tbl_discount_master")
+}
+
