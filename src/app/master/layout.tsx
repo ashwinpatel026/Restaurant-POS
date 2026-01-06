@@ -2,21 +2,49 @@
 
 import { ReactNode, useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { MasterAuthProvider, useMasterAuth } from "@/contexts/MasterAuthContext";
+import {
+  MasterAuthProvider,
+  useMasterAuth,
+} from "@/contexts/MasterAuthContext";
+import { setupMasterApiInterceptor } from "@/lib/masterApiInterceptor";
 
 function MasterLayoutContent({ children }: { children: ReactNode }) {
-  const { isAuthenticated, loading } = useMasterAuth();
+  const { isAuthenticated, loading, refreshToken } = useMasterAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    // Set up global API interceptor for automatic 401 handling
+    setupMasterApiInterceptor();
+
+    // Listen for token refresh events to update admin state
+    const handleTokenRefreshed = (_event: Event) => {
+      // Admin state will be updated by the context when it detects the new token
+      // This is just for notification purposes if needed
+    };
+
+    const handleTokenExpired = () => {
+      // Token expired, will redirect via interceptor
+      router.push("/master/login");
+    };
+
+    window.addEventListener("master_token_refreshed", handleTokenRefreshed);
+    window.addEventListener("master_token_expired", handleTokenExpired);
+
+    return () => {
+      window.removeEventListener(
+        "master_token_refreshed",
+        handleTokenRefreshed
+      );
+      window.removeEventListener("master_token_expired", handleTokenExpired);
+    };
+  }, [router]);
 
   useEffect(() => {
     if (!mounted) return;
-    
+
     // Don't redirect if already on login page
     if (pathname === "/master/login") {
       return;
@@ -62,4 +90,3 @@ export default function MasterLayout({ children }: { children: ReactNode }) {
     </MasterAuthProvider>
   );
 }
-

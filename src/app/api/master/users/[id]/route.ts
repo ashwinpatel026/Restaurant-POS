@@ -309,12 +309,24 @@ export async function PUT(
             }
           })
 
+          // If only one store is assigned, automatically set it as default
+          const effectiveDefaultStore = defaultStoreCode || 
+            (locations.length === 1 ? locations[0].storeCode : user.defaultStoreCode) ||
+            (locations.length > 0 ? locations[0].storeCode : null)
+
+          // Update user's defaultStoreCode if not explicitly provided and only one store
+          if (!defaultStoreCode && locations.length === 1 && effectiveDefaultStore) {
+            updateData.defaultStoreCode = effectiveDefaultStore
+          } else if (defaultStoreCode) {
+            updateData.defaultStoreCode = defaultStoreCode
+          }
+
           for (const loc of locations) {
             storeAccesses.push({
               userId: user.userId,
               locationId: loc.locationId,
               storeCode: loc.storeCode,
-              isDefault: loc.storeCode === (defaultStoreCode || user.defaultStoreCode)
+              isDefault: loc.storeCode === effectiveDefaultStore
             })
           }
         } else if (user.locationId) {

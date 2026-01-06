@@ -23,12 +23,30 @@ export interface UserAccessInfo {
  * Get user access information including accessible stores
  */
 export async function getUserAccessInfo(userId: number): Promise<UserAccessInfo> {
+  // Get user from location database
   const user = await prisma.user.findUnique({
     where: { id: userId }
   })
 
   if (!user) {
     throw new Error('User not found')
+  }
+
+  // Find master user by sync_id (location DB id != master DB user_id)
+  let masterUserId: bigint | null = null
+  if (user.syncId) {
+    const masterUser = await masterPrisma.user.findUnique({
+      where: { syncId: user.syncId },
+      select: { userId: true }
+    })
+    if (masterUser) {
+      masterUserId = masterUser.userId
+      // console.log(`[getUserAccessInfo] Found master user: userId=${masterUserId} for location user id=${userId}, syncId=${user.syncId}`)
+    } else {
+      // console.warn(`[getUserAccessInfo] Master user not found for syncId=${user.syncId}`)
+    }
+  } else {
+    // console.warn(`[getUserAccessInfo] Location user id=${userId} has no syncId`)
   }
 
   let accessibleStoreCodes: string[] = []
@@ -93,14 +111,20 @@ export async function getUserAccessInfo(userId: number): Promise<UserAccessInfo>
         .filter(Boolean) as string[]
 
     } else if (user.accessLevel === 'LOCATION') {
-      // Get stores from user store access table - query directly since relation is removed
-      const storeAccesses = await masterPrisma.userStoreAccess.findMany({
-        where: { userId: userId },
-        select: { storeCode: true }
-      })
-      accessibleStoreCodes = storeAccesses
-        .map(sa => sa.storeCode)
-        .filter(Boolean) as string[]
+      // Get stores from user store access table in MASTER database
+      // Use masterUserId (from sync_id lookup) not location userId
+      if (masterUserId) {
+        const storeAccesses = await masterPrisma.userStoreAccess.findMany({
+          where: { userId: masterUserId },
+          select: { storeCode: true }
+        })
+        accessibleStoreCodes = storeAccesses
+          .map(sa => sa.storeCode)
+          .filter(Boolean) as string[]
+        // console.log(`[getUserAccessInfo] Found ${accessibleStoreCodes.length} store accesses for master userId=${masterUserId}:`, accessibleStoreCodes)
+      } else {
+        // console.error(`[getUserAccessInfo] Cannot get store access - master userId not found for location user id=${userId}`)
+      }
     }
   }
 
@@ -110,7 +134,7 @@ export async function getUserAccessInfo(userId: number): Promise<UserAccessInfo>
     ? user.accessLevel
     : null
 
-  return {
+  const accessInfo = {
     userId: user.id,
     role: user.role,
     accessLevel: accessLevel as 'COMPANY' | 'DEALER' | 'LOCATION' | null,
@@ -120,6 +144,14 @@ export async function getUserAccessInfo(userId: number): Promise<UserAccessInfo>
     dealerId: user.dealerId ? Number(user.dealerId) : undefined,
     locationId: user.locationId ? Number(user.locationId) : undefined
   }
+
+  // Debug logging (commented out - uncomment if needed for debugging)
+  // console.log(`[getUserAccessInfo] User ID: ${user.id}, Role: ${user.role}, AccessLevel: ${accessLevel}`)
+  // console.log(`[getUserAccessInfo] Accessible stores:`, accessibleStoreCodes)
+  // console.log(`[getUserAccessInfo] Default store: ${user.defaultStoreCode}`)
+  // console.log(`[getUserAccessInfo] User defaultStoreCode from DB: ${user.defaultStoreCode}`)
+
+  return accessInfo
 }
 
 /**
@@ -129,21 +161,31 @@ export function getSelectedStoreCode(
   accessInfo: UserAccessInfo,
   queryStoreCode?: string | null
 ): string | null {
+  // Debug logging (commented out - uncomment if needed for debugging)
+  // console.log(`[getSelectedStoreCode] Query storeCode: ${queryStoreCode}`)
+  // console.log(`[getSelectedStoreCode] Accessible stores:`, accessInfo.accessibleStoreCodes)
+  // console.log(`[getSelectedStoreCode] Default store: ${accessInfo.defaultStoreCode}`)
+
   // If query param provided and user has access, use it
   if (queryStoreCode && accessInfo.accessibleStoreCodes.includes(queryStoreCode)) {
+    // console.log(`[getSelectedStoreCode] Using query param: ${queryStoreCode}`)
     return queryStoreCode
   }
   
   // Otherwise use default store
   if (accessInfo.defaultStoreCode && accessInfo.accessibleStoreCodes.includes(accessInfo.defaultStoreCode)) {
+    // console.log(`[getSelectedStoreCode] Using default store: ${accessInfo.defaultStoreCode}`)
     return accessInfo.defaultStoreCode
   }
   
   // Fallback to first accessible store
   if (accessInfo.accessibleStoreCodes.length > 0) {
-    return accessInfo.accessibleStoreCodes[0]
+    const firstStore = accessInfo.accessibleStoreCodes[0]
+    // console.log(`[getSelectedStoreCode] Using first accessible store: ${firstStore}`)
+    return firstStore
   }
   
+  // console.log(`[getSelectedStoreCode] No store available`)
   return null
 }
 

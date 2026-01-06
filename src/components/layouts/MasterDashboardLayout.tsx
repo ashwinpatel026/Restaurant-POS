@@ -27,6 +27,7 @@ import {
   FolderIcon,
   ArrowPathIcon,
   ShieldCheckIcon,
+  TagIcon,
 } from "@heroicons/react/24/outline";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -115,6 +116,12 @@ const navigation: MenuItem[] = [
     name: "Modifiers",
     href: "/master/modifiers",
     icon: CogIcon,
+    roles: ["SUPER_ADMIN", "COMPANY_ADMIN", "DEALER_ADMIN"],
+  },
+  {
+    name: "Discount",
+    href: "/master/discount",
+    icon: TagIcon,
     roles: ["SUPER_ADMIN", "COMPANY_ADMIN", "DEALER_ADMIN"],
   },
   {

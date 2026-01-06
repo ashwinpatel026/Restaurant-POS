@@ -208,22 +208,41 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   // Load permissions for the current user from location database (via API)
   useEffect(() => {
-    const loadPermissions = async () => {
+    const loadPermissions = async (forceRefresh = false) => {
       try {
         if (!session?.user?.role) return;
         setLoadingPermissions(true);
-        const res = await fetch("/api/dashboard/user-permissions");
+        // Add cache-busting to ensure fresh permissions
+        const url = forceRefresh
+          ? "/api/dashboard/user-permissions?refresh=true"
+          : "/api/dashboard/user-permissions";
+        const res = await fetch(url, {
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache",
+          },
+        });
         if (!res.ok) {
-          // If permission API fails, fall back to role-based only
+          // If permission API fails, don't show any items that require permissions
           console.error("Failed to fetch user permissions");
+          setUserPermissions([]);
           return;
         }
         const data = await res.json();
         if (Array.isArray(data.permissions)) {
+          // Debug logging (commented out - uncomment if needed for debugging)
+          // console.log(
+          //   `[DashboardLayout] Loaded ${data.permissions.length} permissions for role: ${session?.user?.role}`
+          // );
+          // console.log(`[DashboardLayout] Permissions:`, data.permissions);
           setUserPermissions(data.permissions);
+        } else {
+          // console.warn(`[DashboardLayout] Invalid permissions format:`, data);
+          setUserPermissions([]);
         }
       } catch (err) {
         console.error("Error fetching user permissions", err);
+        setUserPermissions([]);
       } finally {
         setLoadingPermissions(false);
       }
@@ -236,8 +255,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     if (!required || required.length === 0) return true;
     // If permissions are still loading, don't show menu items (prevents flash)
     if (loadingPermissions) return false;
-    // If userPermissions is null but not loading, it means API failed - fallback to role-based
-    if (!userPermissions) {
+    // If userPermissions is null or empty, don't show items that require permissions
+    if (!userPermissions || userPermissions.length === 0) {
       // For SUPER_ADMIN, allow all (they have all permissions)
       if (userRole === "SUPER_ADMIN") return true;
       // Otherwise, don't show items that require permissions

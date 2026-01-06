@@ -178,22 +178,33 @@ export async function PUT(
         select: { storeCode: true }
       })
 
-      // Sync to all locations in parallel (don't wait for completion)
+      // Debug logging (commented out - uncomment if needed for debugging)
+      // console.log(`[role-permissions] Triggering sync for role ${code} to ${locations.length} locations`)
+      // console.log(`[role-permissions] Permissions to sync:`, permissions)
+
+      // Sync to all locations in parallel (don't wait for completion, but log results)
       Promise.all(
-        locations.map(location =>
-          syncService.syncToLocation({
-            locationCode: location.storeCode,
-            tableName: 'tbl_role_permission',
-            fullSync: false
-          }).catch(err => {
-            console.error(`Failed to sync role permissions to ${location.storeCode}:`, err)
-          })
-        )
-      ).catch(err => {
-        console.error('Error during parallel sync:', err)
+        locations.map(async location => {
+          try {
+            const result = await syncService.syncToLocation({
+              locationCode: location.storeCode,
+              tableName: 'tbl_role_permission',
+              fullSync: false
+            })
+            // console.log(`[role-permissions] Successfully synced to ${location.storeCode}`)
+            return result
+          } catch (err) {
+            console.error(`[role-permissions] Failed to sync role permissions to ${location.storeCode}:`, err)
+            throw err
+          }
+        })
+      ).then(() => {
+        // console.log(`[role-permissions] All syncs completed for role ${code}`)
+      }).catch(err => {
+        console.error(`[role-permissions] Error during parallel sync for role ${code}:`, err)
       })
     } catch (syncError) {
-      console.error('Error triggering immediate sync for role permissions:', syncError)
+      console.error(`[role-permissions] Error triggering immediate sync for role ${code}:`, syncError)
       // Don't fail the request if immediate sync fails
     }
 

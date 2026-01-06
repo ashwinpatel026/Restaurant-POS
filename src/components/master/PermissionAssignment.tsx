@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { CheckIcon } from "@heroicons/react/24/outline";
 
 interface Permission {
   permissionId: string;
@@ -31,7 +30,9 @@ export default function PermissionAssignment({
     new Set(currentPermissions)
   );
   const [loading, setLoading] = useState(true);
-  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(
+    new Set()
+  );
 
   useEffect(() => {
     fetchPermissions();
@@ -53,9 +54,16 @@ export default function PermissionAssignment({
 
       if (response.ok) {
         const data = await response.json();
-        setPermissions(data.permissions);
+        // Filter to only show Create, Delete, Update, View operations
+        const allowedActions = ["create", "delete", "update", "view"];
+        const filteredPermissions = data.permissions.filter((p: Permission) =>
+          allowedActions.includes(p.action)
+        );
+        setPermissions(filteredPermissions);
         // Expand all modules by default
-        const modules = new Set<string>(data.permissions.map((p: Permission) => p.module));
+        const modules = new Set<string>(
+          filteredPermissions.map((p: Permission) => p.module)
+        );
         setExpandedModules(modules);
       } else {
         toast.error("Failed to fetch permissions");
@@ -114,7 +122,8 @@ export default function PermissionAssignment({
     await onSave(Array.from(selectedPermissions));
   };
 
-  // Group permissions by module
+  // Group permissions by module and sort by action order (Create, Delete, Update, View)
+  const actionOrder = ["create", "update", "delete", "view"];
   const groupedPermissions = permissions.reduce((acc, perm) => {
     if (!acc[perm.module]) {
       acc[perm.module] = [];
@@ -122,6 +131,15 @@ export default function PermissionAssignment({
     acc[perm.module].push(perm);
     return acc;
   }, {} as Record<string, Permission[]>);
+
+  // Sort permissions within each module by action order
+  Object.keys(groupedPermissions).forEach((module) => {
+    groupedPermissions[module].sort((a, b) => {
+      const indexA = actionOrder.indexOf(a.action);
+      const indexB = actionOrder.indexOf(b.action);
+      return indexA - indexB;
+    });
+  });
 
   const modules = Object.keys(groupedPermissions).sort();
 
@@ -138,7 +156,8 @@ export default function PermissionAssignment({
       <div className="mb-4 flex justify-between items-center">
         <div>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Selected: {selectedPermissions.size} of {permissions.length} permissions
+            Selected: {selectedPermissions.size} of {permissions.length}{" "}
+            permissions
           </p>
         </div>
         {!readOnly && (
@@ -158,11 +177,15 @@ export default function PermissionAssignment({
           const moduleSelected = modulePermissions.filter((p) =>
             selectedPermissions.has(p.permissionCode)
           );
-          const allSelected = moduleSelected.length === modulePermissions.length;
+          const allSelected =
+            moduleSelected.length === modulePermissions.length;
           const isExpanded = expandedModules.has(module);
 
           return (
-            <div key={module} className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            <div
+              key={module}
+              className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden"
+            >
               <div
                 className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                 onClick={() => toggleModule(module)}
@@ -189,7 +212,7 @@ export default function PermissionAssignment({
               </div>
 
               {isExpanded && (
-                <div className="p-4 space-y-2 bg-white dark:bg-gray-800">
+                <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 bg-white dark:bg-gray-800">
                   {modulePermissions.map((permission) => {
                     const isSelected = selectedPermissions.has(
                       permission.permissionCode
@@ -197,30 +220,24 @@ export default function PermissionAssignment({
                     return (
                       <label
                         key={permission.permissionCode}
-                        className={`flex items-center gap-3 p-2 rounded cursor-pointer border transition-colors ${
-                          isSelected
-                            ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
-                            : "hover:bg-gray-50 dark:hover:bg-gray-700 border-transparent"
-                        } ${readOnly ? "cursor-not-allowed opacity-60" : ""}`}
+                        className={`flex items-center gap-3 p-3 rounded cursor-pointer transition-colors ${
+                          readOnly
+                            ? "cursor-not-allowed opacity-60"
+                            : "hover:bg-gray-50 dark:hover:bg-gray-700"
+                        }`}
                       >
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          onChange={() => togglePermission(permission.permissionCode)}
+                          onChange={() =>
+                            togglePermission(permission.permissionCode)
+                          }
                           disabled={readOnly}
                           className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
                         />
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900 dark:text-white">
-                            {permission.permissionName}
-                          </div>
-                          <div className="text-sm text-gray-600 dark:text-gray-400">
-                            {permission.permissionCode}
-                          </div>
-                        </div>
-                        {isSelected && (
-                          <CheckIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                        )}
+                        <span className="font-medium text-gray-900 dark:text-white capitalize">
+                          {permission.action}
+                        </span>
                       </label>
                     );
                   })}
@@ -233,4 +250,3 @@ export default function PermissionAssignment({
     </div>
   );
 }
-

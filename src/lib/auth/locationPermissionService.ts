@@ -116,6 +116,12 @@ export async function getUserPermissions(roleCode: string): Promise<string[]> {
 
   const permissions = rolePermissions.map(rp => rp.permissionCode)
 
+  // Debug logging (commented out - uncomment if needed for debugging)
+  // console.log(`[locationPermissionService] Role: ${roleCode}, Found ${permissions.length} permissions in location DB`)
+  // if (permissions.length > 0) {
+  //   console.log(`[locationPermissionService] Sample permissions:`, permissions.slice(0, 5).join(', '))
+  // }
+
   // Update cache
   const permissionSet = new Set(permissions)
   permissionCache.set(cacheKey, permissionSet)

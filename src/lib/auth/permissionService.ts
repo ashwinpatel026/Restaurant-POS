@@ -9,7 +9,7 @@ import { masterPrisma } from '@/lib/databaseManager'
 // Cache for permission lookups (in-memory cache)
 const permissionCache = new Map<string, Set<string>>()
 const cacheExpiry = new Map<string, number>()
-const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+const CACHE_TTL = 60 * 60 * 1000 // 1 hour
 
 /**
  * Check if a role has a specific permission

@@ -79,6 +79,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const savedStore = localStorage.getItem("selectedStoreCode");
         if (savedStore && accessibleCodes.includes(savedStore)) {
           selectedStore = savedStore;
+        } else if (savedStore && !accessibleCodes.includes(savedStore)) {
+          // Clear localStorage if saved store is no longer accessible
+          localStorage.removeItem("selectedStoreCode");
         }
       }
 

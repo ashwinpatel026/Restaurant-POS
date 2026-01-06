@@ -79,12 +79,9 @@ export default function DepartmentPage() {
         }),
       ]);
 
-      // Redirect to access denied if any request returns forbidden
-      if (
-        deptsRes.status === 403 ||
-        deptTypesRes.status === 403 ||
-        taxesRes.status === 403
-      ) {
+      // Redirect to access denied only if critical requests (departments, department-types) return forbidden
+      // Tax is optional - if user doesn't have tax permission, just skip loading taxes
+      if (deptsRes.status === 403 || deptTypesRes.status === 403) {
         router.push("/dashboard/access-denied");
         return;
       }
@@ -101,9 +98,14 @@ export default function DepartmentPage() {
         setDepartmentTypes(Array.isArray(deptTypesData) ? deptTypesData : []);
       }
 
+      // Tax is optional - only load if user has permission
       if (taxesRes.ok) {
         const taxesData = await taxesRes.json();
         setTaxes(Array.isArray(taxesData) ? taxesData : []);
+      } else if (taxesRes.status === 403) {
+        // User doesn't have tax permission - that's okay, just skip taxes
+        console.log("Tax access denied - skipping tax data");
+        setTaxes([]);
       }
     } catch (error) {
       toast.error("Error loading data");
@@ -172,10 +174,11 @@ export default function DepartmentPage() {
       }
     } catch (error: any) {
       // Only log unexpected errors (network errors, etc.)
-      if (error instanceof TypeError && error.message.includes('fetch')) {
+      if (error instanceof TypeError && error.message.includes("fetch")) {
         toast.error("Network error. Please check your connection.");
       } else {
-        const errorMessage = error instanceof Error ? error.message : "Error deleting department";
+        const errorMessage =
+          error instanceof Error ? error.message : "Error deleting department";
         toast.error(errorMessage);
       }
     }
