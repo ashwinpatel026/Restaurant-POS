@@ -30,6 +30,7 @@ import {
   DocumentTextIcon,
   BuildingStorefrontIcon,
   BuildingOfficeIcon,
+  UserIcon,
 } from "@heroicons/react/24/outline";
 import { useTheme } from "@/contexts/ThemeContext";
 import StoreSelector from "@/components/store/StoreSelector";
@@ -151,6 +152,30 @@ const navigation: MenuItem[] = [
         href: "/dashboard/department/type",
         icon: FolderIcon,
         permissions: ["departments.view"],
+      },
+    ],
+  },
+  {
+    name: "Employee",
+    icon: UserIcon,
+    permissions: [
+      "employees.view",
+      "employees.create",
+      "employees.update",
+      "employees.delete",
+    ],
+    children: [
+      {
+        name: "Employee",
+        href: "/dashboard/employee",
+        icon: UserIcon,
+        permissions: ["employees.view"],
+      },
+      {
+        name: "Employee Type",
+        href: "/dashboard/employee/type",
+        icon: FolderIcon,
+        permissions: ["employee_types.view"],
       },
     ],
   },

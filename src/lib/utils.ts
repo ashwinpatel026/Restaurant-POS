@@ -181,3 +181,49 @@ export function formatZipcode(value: string): string {
   return `${cleaned.slice(0, 5)}-${cleaned.slice(5, 9)}`;
 }
 
+/**
+ * Formats phone number for display in USA style: (212) 555-1234
+ * @param phone - Phone number string (can contain formatting)
+ * @returns Formatted phone string or empty string if invalid
+ */
+export function formatPhoneDisplay(phone: string | null | undefined): string {
+  if (!phone) return "";
+  const cleaned = phone.replace(/\D/g, "");
+  if (cleaned.length === 0) return "";
+  if (cleaned.length <= 3) {
+    return `(${cleaned}`;
+  } else if (cleaned.length <= 6) {
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+  } else if (cleaned.length <= 10) {
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+  }
+  // If more than 10 digits, format as (XXX) XXX-XXXX and ignore extra
+  return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+}
+
+/**
+ * Creates a mailto: link URL for an email address
+ * @param email - Email address string
+ * @returns mailto: URL or empty string if invalid
+ */
+export function createEmailLink(email: string | null | undefined): string {
+  if (!email || !email.trim()) return "";
+  // Basic email validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email.trim())) return "";
+  return `mailto:${email.trim()}`;
+}
+
+/**
+ * Creates a tel: link URL for a phone number
+ * @param phone - Phone number string (can contain formatting)
+ * @returns tel: URL with cleaned phone number or empty string if invalid
+ */
+export function createPhoneLink(phone: string | null | undefined): string {
+  if (!phone) return "";
+  const cleaned = phone.replace(/\D/g, "");
+  if (cleaned.length === 0) return "";
+  // Return tel: link with cleaned number (digits only)
+  return `tel:${cleaned}`;
+}
+

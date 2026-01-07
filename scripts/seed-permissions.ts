@@ -23,6 +23,8 @@ const MODULES = {
   prepzone: ['create', 'update', 'delete', 'view'],
   departments: ['create', 'update', 'delete', 'view'],
   department_types: ['create', 'update', 'delete', 'view'],
+  employees: ['create', 'update', 'delete', 'view'],
+  employee_types: ['create', 'update', 'delete', 'view'],
   discount: ['create', 'update', 'delete', 'view'],
   reports: ['view', 'export'],
   roles: ['create', 'update', 'delete', 'view'],

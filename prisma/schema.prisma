@@ -744,3 +744,59 @@ model DiscountMaster {
   @@map("tbl_discount_master")
 }
 
+model EmployeeType {
+  employeeTypeId  BigInt    @id @default(autoincrement()) @map("employee_type_id")
+  typeCode        String    @map("type_code") @db.VarChar(30)
+  typeName        String    @map("type_name") @db.VarChar(100)
+  description     String?   @map("description")
+  isActive        Boolean   @default(true) @map("is_active")
+  isDelete        Boolean   @default(false) @map("is_delete")
+  createdBy       BigInt?   @map("createdby")
+  createdOn       DateTime  @default(now()) @map("createdon")
+  updatedBy       BigInt?   @map("updatedby")
+  updatedOn       DateTime? @map("updatedon")
+  isSyncToWeb     Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal   Int       @default(0) @map("is_sync_to_local")
+  storeCode       String?   @map("store_code") @db.VarChar(100)
+  syncId          String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource      String?   @default("location") @map("sync_source") @db.VarChar(20)
+
+  @@index([typeCode])
+  @@index([syncId])
+  @@map("tbl_employee_type")
+}
+
+model Employee {
+  employeeId                BigInt    @id @default(autoincrement()) @map("employee_id")
+  employeeType              String?   @map("employee_type") @db.VarChar(100)
+  businessName              String?   @map("business_name") @db.VarChar(100)
+  firstName                 String?   @map("first_name") @db.VarChar(100)
+  lastName                  String?   @map("last_name") @db.VarChar(100)
+  address                   String?   @map("address") @db.VarChar(500)
+  email                     String?   @map("email") @db.VarChar(100)
+  phoneno                   String?   @map("phoneno") @db.VarChar(30)
+  posAccessThisLocation     Int?      @map("pos_access_this_location")
+  posAccessCode             String?   @map("pos_access_code") @db.VarChar(30)
+  allowPosAllLocation       Int?      @map("allow_pos_all_location")
+  employeeCode              String    @map("employee_code") @db.VarChar(30)
+  isUpdateEmpidAllLocation  Int?      @map("is_update_empid_all_location")
+  isActive                  Int?      @map("is_active")
+  roleCode                  String?   @map("role_code") @db.VarChar(100)
+  isDelete                  Boolean   @default(false) @map("is_delete")
+  alternateId               String?   @map("alternate_id") @db.VarChar(100)
+  createdBy                 BigInt?   @map("createdby")
+  createdOn                 DateTime  @default(now()) @map("createdon")
+  updatedBy                 BigInt?   @map("updatedby")
+  updatedOn                 DateTime? @map("updatedon")
+  isSyncToWeb               Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal             Int       @default(0) @map("is_sync_to_local")
+  storeCode                 String?   @map("store_code") @db.VarChar(100)
+  syncId                    String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource                String?   @default("location") @map("sync_source") @db.VarChar(20)
+  
+  @@index([employeeCode])
+  @@index([employeeType])
+  @@index([roleCode])
+  @@map("tbl_employee")
+}
+
