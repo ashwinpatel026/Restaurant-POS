@@ -178,6 +178,21 @@ export async function POST(request: NextRequest) {
     const modifierGroupCode = await generateModifierGroupCode()
     const prefixes = sanitizePrefix(prefix)
 
+    // Handle price based on priceStrategy
+    // If priceStrategy is 1 or 2, set price to null
+    // If priceStrategy is 3, save the price value (even if it's 0)
+    let finalPrice: number | null = null
+    if (priceStrategy === 3) {
+      if (typeof price === 'number') {
+        finalPrice = parseFloat(price.toString())
+      } else if (price !== undefined && price !== null) {
+        const parsedPrice = parseFloat(String(price))
+        finalPrice = isNaN(parsedPrice) ? null : parsedPrice
+      } else {
+        finalPrice = null
+      }
+    }
+
     const groupData: Record<string, unknown> = {
       modifierGroupCode,
       groupName: groupName || null,
@@ -189,7 +204,7 @@ export async function POST(request: NextRequest) {
       showDefaultTop,
       inheritFromMenuGroup,
       priceStrategy,
-      price: typeof price === 'number' && price > 0 ? parseFloat(price.toString()) : null,
+      price: finalPrice,
       isActive,
       createdBy: admin.adminId,
     }

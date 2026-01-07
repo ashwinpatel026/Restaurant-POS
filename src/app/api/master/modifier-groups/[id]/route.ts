@@ -112,6 +112,8 @@ export async function PUT(
       maxSelection,
       showDefaultTop,
       inheritFromMenuGroup,
+      priceStrategy,
+      price,
       prefix,
       isActive,
     } = body
@@ -130,6 +132,30 @@ export async function PUT(
       isActive: typeof isActive === 'number' ? isActive : undefined,
       updatedBy: admin.adminId,
       updatedOn: new Date(),
+    }
+
+    // Handle priceStrategy and price
+    if (typeof priceStrategy === 'number') {
+      updateData.priceStrategy = priceStrategy
+      
+      // If priceStrategy is 1 or 2, set price to null
+      // If priceStrategy is 3, save the price value (even if it's 0)
+      if (priceStrategy === 1 || priceStrategy === 2) {
+        updateData.price = null
+      } else if (priceStrategy === 3) {
+        // Save price for strategy 3 (even if it's 0)
+        if (typeof price === 'number') {
+          updateData.price = parseFloat(price.toString())
+        } else if (price !== undefined && price !== null) {
+          const parsedPrice = parseFloat(String(price))
+          updateData.price = isNaN(parsedPrice) ? null : parsedPrice
+        } else {
+          updateData.price = null
+        }
+      } else {
+        // For any other strategy, set to null
+        updateData.price = null
+      }
     }
 
     if (prefixes.length > 0) {

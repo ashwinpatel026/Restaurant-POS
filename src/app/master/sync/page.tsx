@@ -77,6 +77,7 @@ export default function SyncManagementPage() {
     { value: "tbl_master_station", label: "Station" },
     { value: "tbl_master_tax", label: "Tax" },
     { value: "tbl_master_time_events", label: "Time Events" },
+    { value: "tbl_master_discount_master", label: "Discount Master" },
     { value: "tbl_master_menu_master_event", label: "Menu Master Event" },
     {
       value: "tbl_master_menu_category_modifier",
