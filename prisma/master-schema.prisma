@@ -317,6 +317,7 @@ model MasterTimeEvent {
   id                     BigInt    @id @default(autoincrement()) @map("id")
   eventCode              String    @unique @map("Event_code") @db.VarChar(100)
   eventName              String    @map("EventName") @db.VarChar(100)
+  deptCode               String?   @map("dept_code") @db.VarChar(100)
   globalPriceAmountAdd   Decimal?  @map("GlobalPrice_Amount_Add") @db.Decimal(18, 2)
   globalPriceAmountDisc  Decimal?  @map("GlobalPrice_Amount_Disc") @db.Decimal(18, 2)
   globalPricePerAdd      Decimal?  @map("GlobalPrice_Per_Add") @db.Decimal(18, 2)

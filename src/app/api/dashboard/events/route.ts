@@ -172,6 +172,7 @@ export async function POST(request: NextRequest) {
       data: {
         eventCode: eventCode,
         eventName: body.eventName,
+        deptCode: body.deptCode || null,
         globalPriceAmountAdd: body.globalPriceAmountAdd || null,
         globalPriceAmountDisc: body.globalPriceAmountDisc || null,
         globalPricePerAdd: body.globalPricePerAdd || null,

@@ -86,6 +86,7 @@ export async function PUT(
       where: { id },
       data: {
         eventName: body.eventName,
+        deptCode: body.deptCode || null,
         globalPriceAmountAdd: body.globalPriceAmountAdd ? parseFloat(body.globalPriceAmountAdd) : null,
         globalPriceAmountDisc: body.globalPriceAmountDisc ? parseFloat(body.globalPriceAmountDisc) : null,
         globalPricePerAdd: body.globalPricePerAdd ? parseFloat(body.globalPricePerAdd) : null,

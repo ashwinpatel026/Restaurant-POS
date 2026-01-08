@@ -125,6 +125,7 @@ export async function POST(request: NextRequest) {
       data: {
         eventCode: eventCode,
         eventName: eventName,
+        deptCode: body.deptCode || null,
         globalPriceAmountAdd: body.globalPriceAmountAdd ? parseFloat(body.globalPriceAmountAdd) : null,
         globalPriceAmountDisc: body.globalPriceAmountDisc ? parseFloat(body.globalPriceAmountDisc) : null,
         globalPricePerAdd: body.globalPricePerAdd ? parseFloat(body.globalPricePerAdd) : null,

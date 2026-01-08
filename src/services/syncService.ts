@@ -68,6 +68,7 @@ export async function syncMasterDataToLocation(
     { name: 'Modifier Groups', fn: syncModifierGroups },
     { name: 'Modifier Items', fn: syncModifierItems },
     { name: 'Prep Zones', fn: syncPrepZones },
+    { name: 'Departments', fn: syncDepartments },
     { name: 'Time Events', fn: syncTimeEvents },
     { name: 'Tax', fn: syncTax },
     { name: 'Stations', fn: syncStations },
@@ -600,6 +601,55 @@ async function syncPrepZones(storeCode: string): Promise<{ recordsSynced: number
       create: {
         ...zoneData,
         storeCode: storeCode
+      }
+    })
+    synced++
+  }
+
+  return { recordsSynced: synced }
+}
+
+/**
+ * Sync Departments
+ */
+async function syncDepartments(storeCode: string): Promise<{ recordsSynced: number }> {
+  const departments = await masterPrisma.masterDepartment.findMany({
+    where: { isActive: 1 }
+  })
+
+  let synced = 0
+  for (const dept of departments) {
+    await (locationPrisma as any).department.upsert({
+      where: {
+        deptCode: dept.deptCode
+      },
+      update: {
+        deptCode: dept.deptCode,
+        deptName: dept.deptName,
+        deptTaxCode: dept.deptTaxCode,
+        deptTypeCode: dept.deptTypeCode,
+        isActive: dept.isActive,
+        createdBy: dept.createdBy,
+        createdOn: dept.createdOn,
+        updatedBy: dept.updatedBy,
+        updatedOn: dept.updatedOn,
+        storeCode: storeCode,
+        syncId: dept.syncId,
+        syncSource: dept.syncSource || 'server'
+      },
+      create: {
+        deptCode: dept.deptCode,
+        deptName: dept.deptName,
+        deptTaxCode: dept.deptTaxCode,
+        deptTypeCode: dept.deptTypeCode,
+        isActive: dept.isActive,
+        createdBy: dept.createdBy,
+        createdOn: dept.createdOn,
+        updatedBy: dept.updatedBy,
+        updatedOn: dept.updatedOn,
+        storeCode: storeCode,
+        syncId: dept.syncId,
+        syncSource: dept.syncSource || 'server'
       }
     })
     synced++

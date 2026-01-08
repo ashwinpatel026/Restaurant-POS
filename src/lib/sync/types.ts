@@ -259,6 +259,7 @@ export const SYNC_FIELD_MAP: Record<string, Record<string, string>> = {
   'tbl_master_time_events': {
     'Event_code': 'Event_code',
     'EventName': 'EventName',
+    'dept_code': 'dept_code',
     'GlobalPrice_Amount_Add': 'GlobalPrice_Amount_Add',
     'GlobalPrice_Amount_Disc': 'GlobalPrice_Amount_Disc',
     'GlobalPrice_Per_Add': 'GlobalPrice_Per_Add',

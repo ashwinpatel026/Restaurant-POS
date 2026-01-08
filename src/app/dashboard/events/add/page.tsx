@@ -1,22 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { ArrowLeftIcon, CheckIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { useApiWithStore } from "@/hooks/useApiWithStore";
+import StatusToggle from "@/components/forms/StatusToggle";
+
+interface Department {
+  deptId: string;
+  deptCode: string;
+  deptName: string;
+  isActive: number;
+}
 
 export default function AddEventPage() {
   const router = useRouter();
   const { buildApiUrl } = useApiWithStore();
-  
+
   const [loading, setLoading] = useState(false);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedDaysToApply, setSelectedDaysToApply] = useState<Set<string>>(
     new Set()
   );
   const [formData, setFormData] = useState({
     eventName: "",
+    deptCode: "",
     priceStrategy: "amount_add", // default strategy
     priceValue: "",
     globalPriceAmountAdd: "",
@@ -48,6 +58,24 @@ export default function AddEventPage() {
     eventEndDate: "",
     isActive: 1,
   });
+
+  useEffect(() => {
+    fetchDepartments();
+  }, []);
+
+  const fetchDepartments = async () => {
+    try {
+      const res = await fetch(buildApiUrl("/api/dashboard/department"), {
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDepartments(data.filter((d: Department) => d.isActive === 1));
+      }
+    } catch (e) {
+      console.error("Error fetching departments", e);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,7 +128,7 @@ export default function AddEventPage() {
       }
     } catch (error) {
       // Only log unexpected errors (network errors, etc.)
-      if (error instanceof TypeError && error.message.includes('fetch')) {
+      if (error instanceof TypeError && error.message.includes("fetch")) {
         toast.error("Network error. Please check your connection.");
       } else {
         toast.error("Failed to create event");
@@ -355,6 +383,25 @@ export default function AddEventPage() {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="e.g., Happy Hour Special"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Department
+                </label>
+                <select
+                  value={formData.deptCode}
+                  onChange={(e) =>
+                    setFormData({ ...formData, deptCode: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Select Department</option>
+                  {departments.map((dept) => (
+                    <option key={dept.deptCode} value={dept.deptCode}>
+                      {dept.deptName}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
@@ -754,24 +801,16 @@ export default function AddEventPage() {
           </div>
 
           {/* Status */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.isActive === 1}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    isActive: e.target.checked ? 1 : 0,
-                  })
-                }
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
-              />
-              <span className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                Active (Event is enabled and will be applied)
-              </span>
-            </label>
-          </div>
+          <StatusToggle
+            label="Event Status"
+            description="Toggle to control whether this event is active or inactive."
+            value={formData.isActive === 1}
+            onChange={(val) =>
+              setFormData({ ...formData, isActive: val ? 1 : 0 })
+            }
+            trueLabel="Active"
+            falseLabel="Inactive"
+          />
 
           {/* Actions */}
           <div className="flex justify-end space-x-3">
