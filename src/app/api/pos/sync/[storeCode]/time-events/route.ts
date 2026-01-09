@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticatePOSRequest, addPOSSyncMetadata } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
+import { normalizeDeptCode } from '@/lib/deptCodeHelper'
 
 /**
  * @api {get} /api/pos/sync/:storeCode/time-events List time events
@@ -93,6 +94,7 @@ export async function GET(
  *
  * @apiBody {String} eventCode Unique event code
  * @apiBody {String} eventName Event name
+ * @apiBody {String|Array} [deptCode] Department code(s) - can be string, JSON string, or JSON array
  * @apiBody {Number} [globalPriceAmountAdd] Amount add
  * @apiBody {Number} [globalPriceAmountDisc] Amount discount
  * @apiBody {Number} [globalPricePerAdd] Percent add
@@ -174,6 +176,7 @@ export async function POST(
       {
         eventCode,
         eventName,
+        deptCode: normalizeDeptCode(body.deptCode),
         globalPriceAmountAdd: body.globalPriceAmountAdd
           ? parseFloat(body.globalPriceAmountAdd)
           : null,

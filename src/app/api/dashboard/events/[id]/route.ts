@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getUserAccessInfo, getSelectedStoreCode, canAccessStore, checkLocationPermission } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
+import { normalizeDeptCode } from '@/lib/deptCodeHelper'
 
 // Helper function to validate and store time string directly
 function validateTimeString(time: string | null): string | null {
@@ -142,7 +143,7 @@ export async function PUT(
       where: { id },
       data: {
         eventName: body.eventName,
-        deptCode: body.deptCode || null,
+        deptCode: normalizeDeptCode(body.deptCode),
         globalPriceAmountAdd: body.globalPriceAmountAdd || null,
         globalPriceAmountDisc: body.globalPriceAmountDisc || null,
         globalPricePerAdd: body.globalPricePerAdd || null,

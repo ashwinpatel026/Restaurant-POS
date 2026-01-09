@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import MasterDashboardLayout from "@/components/layouts/MasterDashboardLayout";
 import { ArrowLeftIcon, CheckIcon } from "@heroicons/react/24/outline";
+import { CheckIcon as CheckIconSolid } from "@heroicons/react/24/solid";
 import toast from "react-hot-toast";
 import StatusToggle from "@/components/forms/StatusToggle";
 
@@ -18,12 +19,14 @@ export default function AddTimeEventPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [selectedDepartments, setSelectedDepartments] = useState<Set<string>>(
+    new Set()
+  );
   const [selectedDaysToApply, setSelectedDaysToApply] = useState<Set<string>>(
     new Set()
   );
   const [formData, setFormData] = useState({
     eventName: "",
-    deptCode: "",
     priceStrategy: "amount_add", // default strategy
     priceValue: "",
     globalPriceAmountAdd: "",
@@ -77,6 +80,25 @@ export default function AddTimeEventPage() {
     }
   };
 
+  const handleDepartmentToggle = (deptCode: string) => {
+    const updated = new Set(selectedDepartments);
+    if (updated.has(deptCode)) {
+      updated.delete(deptCode);
+    } else {
+      updated.add(deptCode);
+    }
+    setSelectedDepartments(updated);
+  };
+
+  const handleSelectAllDepartments = () => {
+    if (selectedDepartments.size === departments.length) {
+      setSelectedDepartments(new Set());
+    } else {
+      const allCodes = new Set(departments.map((d) => d.deptCode));
+      setSelectedDepartments(allCodes);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -108,6 +130,10 @@ export default function AddTimeEventPage() {
           submitData.globalPricePerDisc = formData.priceValue;
           break;
       }
+
+      // Convert selected departments to JSON array
+      const deptCodes = Array.from(selectedDepartments);
+      submitData.deptCode = deptCodes.length > 0 ? JSON.stringify(deptCodes) : null;
 
       const response = await fetch("/api/master/time-event", {
         method: "POST",
@@ -310,23 +336,57 @@ export default function AddTimeEventPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Department
-                </label>
-                <select
-                  value={formData.deptCode}
-                  onChange={(e) =>
-                    setFormData({ ...formData, deptCode: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">Select Department</option>
-                  {departments.map((dept) => (
-                    <option key={dept.deptCode} value={dept.deptCode}>
-                      {dept.deptName}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-2 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Select Departments
+                  </label>
+                  {departments.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleSelectAllDepartments}
+                      className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium px-3 py-1 border border-blue-600 dark:border-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                    >
+                      {selectedDepartments.size === departments.length
+                        ? "Deselect All"
+                        : "Select All"}
+                    </button>
+                  )}
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                  Select one or more departments for this event
+                </p>
+                {departments.length === 0 ? (
+                  <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                      No departments available
+                    </p>
+                  </div>
+                ) : (
+                  <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700">
+                    <div className="flex flex-wrap gap-2">
+                      {departments.map((dept) => {
+                        const isSelected = selectedDepartments.has(dept.deptCode);
+                        return (
+                          <button
+                            key={dept.deptCode}
+                            type="button"
+                            onClick={() => handleDepartmentToggle(dept.deptCode)}
+                            className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
+                              isSelected
+                                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                                : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                            }`}
+                          >
+                            {dept.deptName}
+                            {isSelected && (
+                              <CheckIconSolid className="w-4 h-4 inline-block ml-2" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -111,7 +111,7 @@ export default function ModifierSelectionModal({
                 ? `${itemsApiPrefix}/modifier-items?modifierGroupCode=${encodeURIComponent(
                     group.modifierGroupCode
                   )}`
-                : buildApiUrl(`/modifier-items?modifierGroupCode=${encodeURIComponent(
+                : buildApiUrl(`/api/dashboard/modifier-items?modifierGroupCode=${encodeURIComponent(
                     group.modifierGroupCode
                   )}`);
               

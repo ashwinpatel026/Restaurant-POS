@@ -77,32 +77,33 @@ export default function AddMenuMasterPage() {
   const fetchData = async () => {
     try {
       const token = localStorage.getItem("master_admin_token");
-      const [prepZonesRes, stationsRes, eventsRes, departmentsRes] = await Promise.all([
-        fetch("/api/master/prep-zone", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          cache: "no-store",
-        }),
-        fetch("/api/master/station", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          cache: "no-store",
-        }),
-        fetch("/api/master/time-event", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          cache: "no-store",
-        }),
-        fetch("/api/master/department", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          cache: "no-store",
-        }),
-      ]);
+      const [prepZonesRes, stationsRes, eventsRes, departmentsRes] =
+        await Promise.all([
+          fetch("/api/master/prep-zone", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          }),
+          fetch("/api/master/station", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          }),
+          fetch("/api/master/time-event", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          }),
+          fetch("/api/master/department", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          }),
+        ]);
 
       if (prepZonesRes.ok) {
         const prepZonesData = await prepZonesRes.json();
@@ -121,7 +122,9 @@ export default function AddMenuMasterPage() {
 
       if (departmentsRes.ok) {
         const departmentsData = await departmentsRes.json();
-        setDepartments(departmentsData.filter((d: Department) => d.isActive === 1));
+        setDepartments(
+          departmentsData.filter((d: Department) => d.isActive === 1)
+        );
       }
     } catch (error) {
       toast.error("Error loading data");
@@ -201,7 +204,8 @@ export default function AddMenuMasterPage() {
       } else {
         try {
           const errorData = await response.json();
-          const errorMessage = errorData.error || "Failed to create menu master";
+          const errorMessage =
+            errorData.error || "Failed to create menu master";
           toast.error(errorMessage);
         } catch (jsonError) {
           toast.error("Failed to create menu master");
@@ -209,10 +213,11 @@ export default function AddMenuMasterPage() {
       }
     } catch (error: any) {
       // Only log unexpected errors (network errors, etc.)
-      if (error instanceof TypeError && error.message.includes('fetch')) {
+      if (error instanceof TypeError && error.message.includes("fetch")) {
         toast.error("Network error. Please check your connection.");
       } else {
-        const errorMessage = error instanceof Error ? error.message : "Error creating menu master";
+        const errorMessage =
+          error instanceof Error ? error.message : "Error creating menu master";
         toast.error(errorMessage);
       }
     } finally {
@@ -307,9 +312,7 @@ export default function AddMenuMasterPage() {
                         ))}
                       </select>
                     </div>
-                    <div>
-                      {/* Empty div for alignment */}
-                    </div>
+                    <div>{/* Empty div for alignment */}</div>
                   </div>
 
                   {/* Color Code Section - All three wrapped */}

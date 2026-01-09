@@ -1663,7 +1663,7 @@ export default function MasterMenuItemTabbedForm({
                                     <div className="flex items-center">
                                       <div>
                                         <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                          {modifier.name}
+                                          {modifier.groupName || modifier.labelName || modifier.name || 'Unnamed Modifier'}
                                         </div>
                                       </div>
                                     </div>

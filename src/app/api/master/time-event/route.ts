@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { masterPrisma } from '@/lib/databaseManager'
 import { checkDuplicate } from '@/lib/validation'
+import { normalizeDeptCode } from '@/lib/deptCodeHelper'
 
 // Helper function to generate unique event code
 async function generateEventCode(): Promise<string> {
@@ -125,7 +126,7 @@ export async function POST(request: NextRequest) {
       data: {
         eventCode: eventCode,
         eventName: eventName,
-        deptCode: body.deptCode || null,
+        deptCode: normalizeDeptCode(body.deptCode),
         globalPriceAmountAdd: body.globalPriceAmountAdd ? parseFloat(body.globalPriceAmountAdd) : null,
         globalPriceAmountDisc: body.globalPriceAmountDisc ? parseFloat(body.globalPriceAmountDisc) : null,
         globalPricePerAdd: body.globalPricePerAdd ? parseFloat(body.globalPricePerAdd) : null,

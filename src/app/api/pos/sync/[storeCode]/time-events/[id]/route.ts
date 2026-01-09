@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticatePOSRequest, addPOSSyncMetadata } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
+import { normalizeDeptCode } from '@/lib/deptCodeHelper'
 
 /**
  * @api {get} /api/pos/sync/:storeCode/time-events/:id Get time event
@@ -70,6 +71,38 @@ export async function GET(
  *
  * @apiParam {String} storeCode Store code
  * @apiParam {String} id Time event identifier (BigInt `id` or `eventCode`)
+ *
+ * @apiBody {String} [eventName] Event name
+ * @apiBody {String|Array} [deptCode] Department code(s) - can be string, JSON string, or JSON array
+ * @apiBody {Number} [globalPriceAmountAdd] Amount add
+ * @apiBody {Number} [globalPriceAmountDisc] Amount discount
+ * @apiBody {Number} [globalPricePerAdd] Percent add
+ * @apiBody {Number} [globalPricePerDisc] Percent discount
+ * @apiBody {String} [monday] Monday flag
+ * @apiBody {String} [monStartTime] Monday start time (HH:mm)
+ * @apiBody {String} [monEndTime] Monday end time (HH:mm)
+ * @apiBody {String} [tuesday] Tuesday flag
+ * @apiBody {String} [tueStartTime] Tuesday start time
+ * @apiBody {String} [tueEndTime] Tuesday end time
+ * @apiBody {String} [wednesday] Wednesday flag
+ * @apiBody {String} [wedStartTime] Wednesday start time
+ * @apiBody {String} [wedEndTime] Wednesday end time
+ * @apiBody {String} [thursday] Thursday flag
+ * @apiBody {String} [thuStartTime] Thursday start time
+ * @apiBody {String} [thuEndTime] Thursday end time
+ * @apiBody {String} [friday] Friday flag
+ * @apiBody {String} [friStartTime] Friday start time
+ * @apiBody {String} [friEndTime] Friday end time
+ * @apiBody {String} [saturday] Saturday flag
+ * @apiBody {String} [satStartTime] Saturday start time
+ * @apiBody {String} [satEndTime] Saturday end time
+ * @apiBody {String} [sunday] Sunday flag
+ * @apiBody {String} [sunStartTime] Sunday start time
+ * @apiBody {String} [sunEndTime] Sunday end time
+ * @apiBody {String} [eventStartDate] Event start date (ISO)
+ * @apiBody {String} [eventEndDate] Event end date (ISO)
+ * @apiBody {Number|Boolean} [isActive] Active flag
+ * @apiBody {Number} [updatedBy] User ID who updated
  */
 export async function PUT(
   request: NextRequest,
@@ -122,6 +155,7 @@ export async function PUT(
       val === undefined || val === null || val === '' ? null : parseFloat(val)
 
     if (body.eventName !== undefined) updateData.eventName = body.eventName
+    if (body.deptCode !== undefined) updateData.deptCode = normalizeDeptCode(body.deptCode)
     if (body.globalPriceAmountAdd !== undefined) updateData.globalPriceAmountAdd = numeric(body.globalPriceAmountAdd)
     if (body.globalPriceAmountDisc !== undefined) updateData.globalPriceAmountDisc = numeric(body.globalPriceAmountDisc)
     if (body.globalPricePerAdd !== undefined) updateData.globalPricePerAdd = numeric(body.globalPricePerAdd)

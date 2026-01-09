@@ -16,6 +16,7 @@ import {
   SYNC_TABLE_DEPENDENCIES,
 } from './types';
 import { syncValidator } from './syncValidator';
+import { normalizeDeptCode } from '@/lib/deptCodeHelper';
 
 export class SyncProcessor {
   // Tables that are global (not store-specific) - don't use store_code
@@ -72,6 +73,14 @@ export class SyncProcessor {
     'is_sync_to_web',
     'is_sync_to_local',
   ]);
+
+  // JSON columns that need normalization (string to JSON array conversion)
+  // Maps table name to set of column names that are JSON columns
+  // Note: Use location table names (as that's what handleInsert/handleUpdate receive)
+  private readonly JSON_COLUMNS: Record<string, Set<string>> = {
+    'tbl_time_events': new Set(['dept_code']),  // Location table name
+    'tbl_master_time_events': new Set(['dept_code']),  // Master table name (for reference)
+  };
 
   /**
    * Process a batch for location-to-location sync
@@ -1007,17 +1016,38 @@ export class SyncProcessor {
                            key.toLowerCase() === 'event_code'; // Handle Event_code (case-sensitive in DB)
 
         if (isCodeField) {
-          // Handle arrays (JSON fields)
-          if (Array.isArray(value)) {
-            mappedData[mappedKey] = value.map((v: any) => 
-              this.transformLocationCode(String(v || ''), sourceLocationCode, targetLocationCode)
-            );
+          // Special handling for dept_code in time events (JSON array)
+          if (key === 'dept_code' && masterTableName === 'tbl_master_time_events') {
+            // First normalize to ensure it's a JSON array (handles old string format)
+            const normalizedDeptCode = normalizeDeptCode(value);
+            
+            // If it's an array, transform each department code
+            if (Array.isArray(normalizedDeptCode)) {
+              mappedData[mappedKey] = normalizedDeptCode.map((deptCode: any) => {
+                const deptCodeValue = String(deptCode || '');
+                // Transform from source location format to target location format
+                return this.transformLocationCode(deptCodeValue, sourceLocationCode, targetLocationCode);
+              });
+            } else if (normalizedDeptCode === null) {
+              mappedData[mappedKey] = null;
+            } else {
+              // Fallback: single value, wrap in array and transform
+              const deptCodeValue = String(normalizedDeptCode || '');
+              mappedData[mappedKey] = [this.transformLocationCode(deptCodeValue, sourceLocationCode, targetLocationCode)];
+            }
           } else {
-            mappedData[mappedKey] = this.transformLocationCode(
-              String(value || ''),
-              sourceLocationCode,
-              targetLocationCode
-            );
+            // Handle arrays (JSON fields) for other code fields
+            if (Array.isArray(value)) {
+              mappedData[mappedKey] = value.map((v: any) => 
+                this.transformLocationCode(String(v || ''), sourceLocationCode, targetLocationCode)
+              );
+            } else {
+              mappedData[mappedKey] = this.transformLocationCode(
+                String(value || ''),
+                sourceLocationCode,
+                targetLocationCode
+              );
+            }
           }
         } else {
           // For non-code fields, copy as-is
@@ -1240,12 +1270,43 @@ export class SyncProcessor {
               }
             }
             // Transform dept_code (in any table)
+            // Special handling: for time events, dept_code is JSON array, not a code field
             else if (key === 'dept_code') {
-              const deptMatch = codeValue.match(/^(DEP\d+)$/);
-              if (deptMatch) {
-                mappedData[mappedKey] = `WM${locationCode}${deptMatch[1]}`;
+              // Check if this is a time events table (dept_code is JSON array)
+              if (masterTableName === 'tbl_master_time_events') {
+                // First normalize to ensure it's a JSON array (handles old string format)
+                const normalizedDeptCode = normalizeDeptCode(value);
+                
+                // If it's an array, transform each department code
+                if (Array.isArray(normalizedDeptCode)) {
+                  mappedData[mappedKey] = normalizedDeptCode.map((deptCode: any) => {
+                    const deptCodeValue = String(deptCode || '');
+                    // Check if already transformed (starts with WM) or needs transformation
+                    if (deptCodeValue.startsWith('WM')) {
+                      // Already transformed, return as-is
+                      return deptCodeValue;
+                    } else {
+                      // Transform from master format (DEP1) to location format (WMLOC009DEP1)
+                      const deptMatch = deptCodeValue.match(/^(DEP\d+)$/);
+                      return deptMatch ? `WM${locationCode}${deptMatch[1]}` : deptCodeValue;
+                    }
+                  });
+                } else if (normalizedDeptCode === null) {
+                  mappedData[mappedKey] = null;
+                } else {
+                  // Fallback: single value, wrap in array and transform
+                  const deptCodeValue = String(normalizedDeptCode || '');
+                  const deptMatch = deptCodeValue.match(/^(DEP\d+)$/);
+                  mappedData[mappedKey] = deptMatch ? [`WM${locationCode}${deptMatch[1]}`] : [deptCodeValue];
+                }
               } else {
-                mappedData[mappedKey] = value;
+                // For other tables, transform as single code field
+                const deptMatch = codeValue.match(/^(DEP\d+)$/);
+                if (deptMatch) {
+                  mappedData[mappedKey] = `WM${locationCode}${deptMatch[1]}`;
+                } else {
+                  mappedData[mappedKey] = value;
+                }
               }
             }
             // Transform dept_taxcode (foreign key reference in department table)
@@ -1605,84 +1666,101 @@ export class SyncProcessor {
       const isTableInteger = this.TABLE_INTEGER_COLUMNS[tableName]?.has(key);
       const isBooleanColumn = isTableBoolean || (!isTableInteger && this.BOOLEAN_COLUMNS.has(key));
       const isIntegerColumn = isTableInteger || this.INTEGER_COLUMNS.has(key);
+      const isJsonColumn = this.JSON_COLUMNS[tableName]?.has(key);
       
-      if (val === null) {
+      // Normalize JSON columns (e.g., dept_code) - convert string to JSON array
+      let normalizedVal = val;
+      if (isJsonColumn && val !== null && val !== undefined) {
+        normalizedVal = normalizeDeptCode(val);
+      }
+      
+      if (normalizedVal === null) {
         values.push('NULL');
-      } else if (typeof val === 'boolean') {
+      } else if (isJsonColumn) {
+        // Handle JSON columns - normalize and format as JSONB
+        if (Array.isArray(normalizedVal)) {
+          values.push(`'${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`);
+        } else if (typeof normalizedVal === 'object' && normalizedVal !== null) {
+          values.push(`'${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`);
+        } else {
+          // Should not happen after normalization, but handle as fallback
+          values.push(`'${JSON.stringify([normalizedVal]).replace(/'/g, "''")}'::jsonb`);
+        }
+      } else if (typeof normalizedVal === 'boolean') {
         // Handle boolean values
         if (isBooleanColumn) {
-          values.push(val ? 'true' : 'false');
+          values.push(normalizedVal ? 'true' : 'false');
         } else {
           // Convert boolean to integer (0 or 1)
-          values.push(val ? '1' : '0');
+          values.push(normalizedVal ? '1' : '0');
         }
       } else if (isBooleanColumn) {
         // Handle boolean columns - convert various formats to boolean
         // This must come before integer column check to handle numeric values correctly
-        if (typeof val === 'number') {
+        if (typeof normalizedVal === 'number') {
           // Convert 0/1 to boolean
-          values.push(val ? 'true' : 'false');
-        } else if (typeof val === 'string') {
+          values.push(normalizedVal ? 'true' : 'false');
+        } else if (typeof normalizedVal === 'string') {
           // Handle string values like "1", "0", "true", "false"
-          const boolVal = val === '1' || val.toLowerCase().trim() === 'true';
+          const boolVal = normalizedVal === '1' || normalizedVal.toLowerCase().trim() === 'true';
           values.push(boolVal ? 'true' : 'false');
         } else {
           // Fallback for other types
-          values.push(val ? 'true' : 'false');
+          values.push(normalizedVal ? 'true' : 'false');
         }
       } else if (isTableInteger) {
         // Handle table-specific integer columns that might come as boolean or string
         let intVal: number;
-        if (typeof val === 'boolean') {
-          intVal = val ? 1 : 0;
-        } else if (typeof val === 'number') {
-          intVal = val;
-        } else if (typeof val === 'string') {
-          const normalized = val.toLowerCase().trim();
+        if (typeof normalizedVal === 'boolean') {
+          intVal = normalizedVal ? 1 : 0;
+        } else if (typeof normalizedVal === 'number') {
+          intVal = normalizedVal;
+        } else if (typeof normalizedVal === 'string') {
+          const normalized = normalizedVal.toLowerCase().trim();
           intVal = (normalized === 'true' || normalized === '1') ? 1 : 0;
         } else {
-          intVal = val ? 1 : 0;
+          intVal = normalizedVal ? 1 : 0;
         }
         values.push(String(intVal));
       } else if (isIntegerColumn) {
         // Handle integer columns that might come as boolean or string - always convert to integer
         let intVal: number;
-        if (typeof val === 'boolean') {
-          intVal = val ? 1 : 0;
-        } else if (typeof val === 'number') {
-          intVal = val;
-        } else if (typeof val === 'string') {
-          const normalized = val.toLowerCase().trim();
+        if (typeof normalizedVal === 'boolean') {
+          intVal = normalizedVal ? 1 : 0;
+        } else if (typeof normalizedVal === 'number') {
+          intVal = normalizedVal;
+        } else if (typeof normalizedVal === 'string') {
+          const normalized = normalizedVal.toLowerCase().trim();
           intVal = (normalized === 'true' || normalized === '1') ? 1 : 0;
         } else {
-          intVal = val ? 1 : 0;
+          intVal = normalizedVal ? 1 : 0;
         }
         values.push(String(intVal));
-      } else if (val instanceof Date) {
-        values.push(`'${val.toISOString()}'`);
-      } else if (typeof val === 'number') {
+      } else if (normalizedVal instanceof Date) {
+        values.push(`'${normalizedVal.toISOString()}'`);
+      } else if (typeof normalizedVal === 'number') {
         // Handle numeric values (including Decimal from Prisma)
-        values.push(String(val));
-      } else if (Array.isArray(val)) {
+        values.push(String(normalizedVal));
+      } else if (Array.isArray(normalizedVal)) {
         // Handle arrays as JSONB
-        values.push(`'${JSON.stringify(val).replace(/'/g, "''")}'::jsonb`);
-      } else if (typeof val === 'object' && val !== null) {
+        values.push(`'${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`);
+      } else if (typeof normalizedVal === 'object' && normalizedVal !== null) {
         // Check if it's a Decimal-like object with toNumber or valueOf method
-        if (typeof val.toNumber === 'function') {
-          values.push(String(val.toNumber()));
-        } else if (typeof val.valueOf === 'function' && typeof val.valueOf() === 'number') {
-          values.push(String(val.valueOf()));
-        } else if (val.constructor === Object) {
+        if (typeof normalizedVal.toNumber === 'function') {
+          values.push(String(normalizedVal.toNumber()));
+        } else if (typeof normalizedVal.valueOf === 'function' && typeof normalizedVal.valueOf() === 'number') {
+          values.push(String(normalizedVal.valueOf()));
+        } else if (normalizedVal.constructor === Object) {
           // Only treat plain objects as JSONB
-          values.push(`'${JSON.stringify(val).replace(/'/g, "''")}'::jsonb`);
+          values.push(`'${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`);
         } else {
           // For other objects, try to convert to string
-          values.push(`'${String(val).replace(/'/g, "''")}'`);
+          values.push(`'${String(normalizedVal).replace(/'/g, "''")}'`);
         }
-      } else if (typeof val === 'string') {
-        values.push(`'${val.replace(/'/g, "''")}'`);
+      } else if (typeof normalizedVal === 'string') {
+        values.push(`'${normalizedVal.replace(/'/g, "''")}'`);
       } else {
-        values.push(String(val));
+        values.push(String(normalizedVal));
       }
     }
 
@@ -1926,94 +2004,111 @@ export class SyncProcessor {
       // Determine if column should be treated as boolean (table-specific override takes precedence)
       const isBooleanColumn = isTableBoolean || (!isTableInteger && this.BOOLEAN_COLUMNS.has(key));
       const isIntegerColumn = isTableInteger || this.INTEGER_COLUMNS.has(key);
+      const isJsonColumn = this.JSON_COLUMNS[tableName]?.has(key);
       
-      if (val === null) {
+      // Normalize JSON columns (e.g., dept_code) - convert string to JSON array
+      let normalizedVal = val;
+      if (isJsonColumn && val !== null && val !== undefined) {
+        normalizedVal = normalizeDeptCode(val);
+      }
+      
+      if (normalizedVal === null) {
         setParts.push(`${quotedKey} = NULL`);
-      } else if (typeof val === 'boolean') {
+      } else if (isJsonColumn) {
+        // Handle JSON columns - normalize and format as JSONB
+        if (Array.isArray(normalizedVal)) {
+          setParts.push(`${quotedKey} = '${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`);
+        } else if (typeof normalizedVal === 'object' && normalizedVal !== null) {
+          setParts.push(`${quotedKey} = '${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`);
+        } else {
+          // Should not happen after normalization, but handle as fallback
+          setParts.push(`${quotedKey} = '${JSON.stringify([normalizedVal]).replace(/'/g, "''")}'::jsonb`);
+        }
+      } else if (typeof normalizedVal === 'boolean') {
         // Handle boolean values
         if (isBooleanColumn) {
-          setParts.push(`${quotedKey} = ${val ? 'true' : 'false'}`);
+          setParts.push(`${quotedKey} = ${normalizedVal ? 'true' : 'false'}`);
         } else {
           // Convert boolean to integer (0 or 1)
-          setParts.push(`${quotedKey} = ${val ? '1' : '0'}`);
+          setParts.push(`${quotedKey} = ${normalizedVal ? '1' : '0'}`);
         }
       } else if (isBooleanColumn) {
         // Handle boolean columns - MUST check before integer columns
         // Convert various formats (number, string) to boolean
-        if (typeof val === 'number') {
+        if (typeof normalizedVal === 'number') {
           // Convert 0/1 to boolean
-          setParts.push(`${quotedKey} = ${val ? 'true' : 'false'}`);
-        } else if (typeof val === 'string') {
+          setParts.push(`${quotedKey} = ${normalizedVal ? 'true' : 'false'}`);
+        } else if (typeof normalizedVal === 'string') {
           // Handle string values like "1", "0", "true", "false"
-          const boolVal = val === '1' || val.toLowerCase().trim() === 'true';
+          const boolVal = normalizedVal === '1' || normalizedVal.toLowerCase().trim() === 'true';
           setParts.push(`${quotedKey} = ${boolVal ? 'true' : 'false'}`);
         } else {
           // Fallback for other types
-          setParts.push(`${quotedKey} = ${val ? 'true' : 'false'}`);
+          setParts.push(`${quotedKey} = ${normalizedVal ? 'true' : 'false'}`);
         }
       } else if (isIntegerColumn) {
         // Handle integer columns - convert various formats to integer
         let intVal: number;
-        if (typeof val === 'boolean') {
-          intVal = val ? 1 : 0;
-        } else if (typeof val === 'number') {
-          intVal = val;
-        } else if (typeof val === 'string') {
-          const normalized = val.toLowerCase().trim();
+        if (typeof normalizedVal === 'boolean') {
+          intVal = normalizedVal ? 1 : 0;
+        } else if (typeof normalizedVal === 'number') {
+          intVal = normalizedVal;
+        } else if (typeof normalizedVal === 'string') {
+          const normalized = normalizedVal.toLowerCase().trim();
           intVal = (normalized === 'true' || normalized === '1') ? 1 : 0;
         } else {
-          intVal = val ? 1 : 0;
+          intVal = normalizedVal ? 1 : 0;
         }
         setParts.push(`${quotedKey} = ${intVal}`);
-      } else if (this.INTEGER_COLUMNS.has(key) && typeof val !== 'number') {
+      } else if (this.INTEGER_COLUMNS.has(key) && typeof normalizedVal !== 'number') {
         // Handle integer columns that might come as boolean or string - always convert to integer
         let intVal: number;
-        if (typeof val === 'boolean') {
-          intVal = val ? 1 : 0;
-        } else if (typeof val === 'string') {
-          const normalized = val.toLowerCase().trim();
+        if (typeof normalizedVal === 'boolean') {
+          intVal = normalizedVal ? 1 : 0;
+        } else if (typeof normalizedVal === 'string') {
+          const normalized = normalizedVal.toLowerCase().trim();
           intVal = (normalized === 'true' || normalized === '1') ? 1 : 0;
         } else {
-          intVal = val ? 1 : 0;
+          intVal = normalizedVal ? 1 : 0;
         }
         setParts.push(`${quotedKey} = ${intVal}`);
       } else if (isTableBoolean || this.BOOLEAN_COLUMNS.has(key)) {
         // Handle boolean columns - convert various formats to boolean
-        if (typeof val === 'number') {
-          setParts.push(`${quotedKey} = ${val ? 'true' : 'false'}`);
-        } else if (typeof val === 'string') {
+        if (typeof normalizedVal === 'number') {
+          setParts.push(`${quotedKey} = ${normalizedVal ? 'true' : 'false'}`);
+        } else if (typeof normalizedVal === 'string') {
           // Handle string values like "1", "0", "true", "false"
-          const boolVal = val === '1' || val.toLowerCase() === 'true';
+          const boolVal = normalizedVal === '1' || normalizedVal.toLowerCase() === 'true';
           setParts.push(`${quotedKey} = ${boolVal ? 'true' : 'false'}`);
         } else {
           // Fallback for other types
-          setParts.push(`${quotedKey} = ${val ? 'true' : 'false'}`);
+          setParts.push(`${quotedKey} = ${normalizedVal ? 'true' : 'false'}`);
         }
-      } else if (val instanceof Date) {
-        setParts.push(`${quotedKey} = '${val.toISOString()}'`);
-      } else if (typeof val === 'number') {
+      } else if (normalizedVal instanceof Date) {
+        setParts.push(`${quotedKey} = '${normalizedVal.toISOString()}'`);
+      } else if (typeof normalizedVal === 'number') {
         // Handle numeric values (including Decimal from Prisma)
-        setParts.push(`${quotedKey} = ${val}`);
-      } else if (Array.isArray(val)) {
+        setParts.push(`${quotedKey} = ${normalizedVal}`);
+      } else if (Array.isArray(normalizedVal)) {
         // Handle arrays as JSONB
-        setParts.push(`${quotedKey} = '${JSON.stringify(val).replace(/'/g, "''")}'::jsonb`);
-      } else if (typeof val === 'object' && val !== null) {
+        setParts.push(`${quotedKey} = '${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`);
+      } else if (typeof normalizedVal === 'object' && normalizedVal !== null) {
         // Check if it's a Decimal-like object with toNumber or valueOf method
-        if (typeof val.toNumber === 'function') {
-          setParts.push(`${quotedKey} = ${val.toNumber()}`);
-        } else if (typeof val.valueOf === 'function' && typeof val.valueOf() === 'number') {
-          setParts.push(`${quotedKey} = ${val.valueOf()}`);
-        } else if (val.constructor === Object) {
+        if (typeof normalizedVal.toNumber === 'function') {
+          setParts.push(`${quotedKey} = ${normalizedVal.toNumber()}`);
+        } else if (typeof normalizedVal.valueOf === 'function' && typeof normalizedVal.valueOf() === 'number') {
+          setParts.push(`${quotedKey} = ${normalizedVal.valueOf()}`);
+        } else if (normalizedVal.constructor === Object) {
           // Only treat plain objects as JSONB
-          setParts.push(`${quotedKey} = '${JSON.stringify(val).replace(/'/g, "''")}'::jsonb`);
+          setParts.push(`${quotedKey} = '${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`);
         } else {
           // For other objects, try to convert to string
-          setParts.push(`${quotedKey} = '${String(val).replace(/'/g, "''")}'`);
+          setParts.push(`${quotedKey} = '${String(normalizedVal).replace(/'/g, "''")}'`);
         }
-      } else if (typeof val === 'string') {
-        setParts.push(`${quotedKey} = '${val.replace(/'/g, "''")}'`);
+      } else if (typeof normalizedVal === 'string') {
+        setParts.push(`${quotedKey} = '${normalizedVal.replace(/'/g, "''")}'`);
       } else {
-        setParts.push(`${quotedKey} = ${val}`);
+        setParts.push(`${quotedKey} = ${normalizedVal}`);
       }
     }
 
@@ -2196,58 +2291,75 @@ export class SyncProcessor {
       const isTableInteger = this.TABLE_INTEGER_COLUMNS[locationTableName]?.has(key);
       const isBooleanColumn = isTableBoolean || (!isTableInteger && this.BOOLEAN_COLUMNS.has(key));
       const isIntegerColumn = isTableInteger || this.INTEGER_COLUMNS.has(key);
+      const isJsonColumn = this.JSON_COLUMNS[locationTableName]?.has(key);
+      
+      // Normalize JSON columns (e.g., dept_code) - convert string to JSON array
+      let normalizedVal = val;
+      if (isJsonColumn && val !== null && val !== undefined) {
+        normalizedVal = normalizeDeptCode(val);
+      }
       
       let valueStr: string;
-      if (val === null) {
+      if (normalizedVal === null) {
         valueStr = 'NULL';
-      } else if (typeof val === 'boolean') {
-        if (isBooleanColumn) {
-          valueStr = val ? 'true' : 'false';
+      } else if (isJsonColumn) {
+        // Handle JSON columns - normalize and format as JSONB
+        if (Array.isArray(normalizedVal)) {
+          valueStr = `'${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`;
+        } else if (typeof normalizedVal === 'object' && normalizedVal !== null) {
+          valueStr = `'${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`;
         } else {
-          valueStr = val ? '1' : '0';
+          // Should not happen after normalization, but handle as fallback
+          valueStr = `'${JSON.stringify([normalizedVal]).replace(/'/g, "''")}'::jsonb`;
+        }
+      } else if (typeof normalizedVal === 'boolean') {
+        if (isBooleanColumn) {
+          valueStr = normalizedVal ? 'true' : 'false';
+        } else {
+          valueStr = normalizedVal ? '1' : '0';
         }
       } else if (isBooleanColumn) {
-        if (typeof val === 'number') {
-          valueStr = val ? 'true' : 'false';
-        } else if (typeof val === 'string') {
-          const boolVal = val === '1' || val.toLowerCase().trim() === 'true';
+        if (typeof normalizedVal === 'number') {
+          valueStr = normalizedVal ? 'true' : 'false';
+        } else if (typeof normalizedVal === 'string') {
+          const boolVal = normalizedVal === '1' || normalizedVal.toLowerCase().trim() === 'true';
           valueStr = boolVal ? 'true' : 'false';
         } else {
-          valueStr = val ? 'true' : 'false';
+          valueStr = normalizedVal ? 'true' : 'false';
         }
       } else if (isTableInteger || isIntegerColumn) {
         let intVal: number;
-        if (typeof val === 'boolean') {
-          intVal = val ? 1 : 0;
-        } else if (typeof val === 'number') {
-          intVal = val;
-        } else if (typeof val === 'string') {
-          const normalized = val.toLowerCase().trim();
+        if (typeof normalizedVal === 'boolean') {
+          intVal = normalizedVal ? 1 : 0;
+        } else if (typeof normalizedVal === 'number') {
+          intVal = normalizedVal;
+        } else if (typeof normalizedVal === 'string') {
+          const normalized = normalizedVal.toLowerCase().trim();
           intVal = (normalized === 'true' || normalized === '1') ? 1 : 0;
         } else {
-          intVal = val ? 1 : 0;
+          intVal = normalizedVal ? 1 : 0;
         }
         valueStr = String(intVal);
-      } else if (val instanceof Date) {
-        valueStr = `'${val.toISOString()}'`;
-      } else if (typeof val === 'number') {
-        valueStr = String(val);
-      } else if (Array.isArray(val)) {
-        valueStr = `'${JSON.stringify(val).replace(/'/g, "''")}'::jsonb`;
-      } else if (typeof val === 'object' && val !== null) {
-        if (typeof val.toNumber === 'function') {
-          valueStr = String(val.toNumber());
-        } else if (typeof val.valueOf === 'function' && typeof val.valueOf() === 'number') {
-          valueStr = String(val.valueOf());
-        } else if (val.constructor === Object) {
-          valueStr = `'${JSON.stringify(val).replace(/'/g, "''")}'::jsonb`;
+      } else if (normalizedVal instanceof Date) {
+        valueStr = `'${normalizedVal.toISOString()}'`;
+      } else if (typeof normalizedVal === 'number') {
+        valueStr = String(normalizedVal);
+      } else if (Array.isArray(normalizedVal)) {
+        valueStr = `'${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`;
+      } else if (typeof normalizedVal === 'object' && normalizedVal !== null) {
+        if (typeof normalizedVal.toNumber === 'function') {
+          valueStr = String(normalizedVal.toNumber());
+        } else if (typeof normalizedVal.valueOf === 'function' && typeof normalizedVal.valueOf() === 'number') {
+          valueStr = String(normalizedVal.valueOf());
+        } else if (normalizedVal.constructor === Object) {
+          valueStr = `'${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`;
         } else {
-          valueStr = `'${String(val).replace(/'/g, "''")}'`;
+          valueStr = `'${String(normalizedVal).replace(/'/g, "''")}'`;
         }
-      } else if (typeof val === 'string') {
-        valueStr = `'${val.replace(/'/g, "''")}'`;
+      } else if (typeof normalizedVal === 'string') {
+        valueStr = `'${normalizedVal.replace(/'/g, "''")}'`;
       } else {
-        valueStr = String(val);
+        valueStr = String(normalizedVal);
       }
 
       values.push(valueStr);

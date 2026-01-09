@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { getUserAccessInfo, getSelectedStoreCode, buildStoreFilter, checkLocationPermission } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 import { checkDuplicate } from '@/lib/validation'
+import { normalizeDeptCode } from '@/lib/deptCodeHelper'
 
 // Helper function to convert BigInt and Decimal fields for JSON serialization
 function convertEventForJson(event: any): any {
@@ -172,7 +173,7 @@ export async function POST(request: NextRequest) {
       data: {
         eventCode: eventCode,
         eventName: body.eventName,
-        deptCode: body.deptCode || null,
+        deptCode: normalizeDeptCode(body.deptCode),
         globalPriceAmountAdd: body.globalPriceAmountAdd || null,
         globalPriceAmountDisc: body.globalPriceAmountDisc || null,
         globalPricePerAdd: body.globalPricePerAdd || null,

@@ -3,6 +3,7 @@
 
 import { masterPrisma, locationPrisma } from '@/lib/databaseManager'
 import { Prisma } from '@prisma/client'
+import { normalizeDeptCode } from '@/lib/deptCodeHelper'
 
 export type SyncType = 'FULL' | 'INCREMENTAL'
 export type SyncStatus = 'SUCCESS' | 'FAILED' | 'IN_PROGRESS'
@@ -668,16 +669,21 @@ async function syncTimeEvents(storeCode: string): Promise<{ recordsSynced: numbe
 
   let synced = 0
   for (const event of events) {
+    // Normalize deptCode from string to JSON array format
+    const normalizedDeptCode = normalizeDeptCode(event.deptCode)
+    
     await (locationPrisma as any).timeEvent.upsert({
       where: {
         eventCode: event.eventCode
       },
       update: {
         ...event,
+        deptCode: normalizedDeptCode,
         storeCode: storeCode
       },
       create: {
         ...event,
+        deptCode: normalizedDeptCode,
         storeCode: storeCode
       }
     })

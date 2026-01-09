@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { masterPrisma } from '@/lib/databaseManager'
+import { normalizeDeptCode } from '@/lib/deptCodeHelper'
 
 // Helper function to validate and store time string directly
 function validateTimeString(time: string | null): string | null {
@@ -86,7 +87,7 @@ export async function PUT(
       where: { id },
       data: {
         eventName: body.eventName,
-        deptCode: body.deptCode || null,
+        deptCode: normalizeDeptCode(body.deptCode),
         globalPriceAmountAdd: body.globalPriceAmountAdd ? parseFloat(body.globalPriceAmountAdd) : null,
         globalPriceAmountDisc: body.globalPriceAmountDisc ? parseFloat(body.globalPriceAmountDisc) : null,
         globalPricePerAdd: body.globalPricePerAdd ? parseFloat(body.globalPricePerAdd) : null,
