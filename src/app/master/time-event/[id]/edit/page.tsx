@@ -290,7 +290,7 @@ export default function EditTimeEventPage() {
       const token = localStorage.getItem("master_admin_token");
 
       // Map the selected strategy to the appropriate backend fields
-      const submitData = { ...formData };
+      const submitData: typeof formData & { deptCode?: string | null } = { ...formData };
 
       // Reset all price fields
       submitData.globalPriceAmountAdd = "";

@@ -250,12 +250,13 @@ export default function EditEventPage() {
         // Parse deptCode - could be JSON array or string
         if (event.deptCode) {
           try {
-            const deptCodes = typeof event.deptCode === 'string' 
-              ? JSON.parse(event.deptCode) 
-              : event.deptCode;
+            const deptCodes =
+              typeof event.deptCode === "string"
+                ? JSON.parse(event.deptCode)
+                : event.deptCode;
             if (Array.isArray(deptCodes)) {
               setSelectedDepartments(new Set(deptCodes));
-            } else if (typeof deptCodes === 'string') {
+            } else if (typeof deptCodes === "string") {
               setSelectedDepartments(new Set([deptCodes]));
             }
           } catch (e) {
@@ -282,7 +283,9 @@ export default function EditEventPage() {
 
     try {
       // Map the selected strategy to the appropriate backend fields
-      const submitData = { ...formData };
+      const submitData: typeof formData & { deptCode?: string | null } = {
+        ...formData,
+      };
 
       // Reset all price fields
       submitData.globalPriceAmountAdd = "";
@@ -308,7 +311,8 @@ export default function EditEventPage() {
 
       // Convert selected departments to JSON array
       const deptCodes = Array.from(selectedDepartments);
-      submitData.deptCode = deptCodes.length > 0 ? JSON.stringify(deptCodes) : null;
+      submitData.deptCode =
+        deptCodes.length > 0 ? JSON.stringify(deptCodes) : null;
 
       const url = buildApiUrl(`/api/dashboard/events/${eventId}`);
       const response = await fetch(url, {
@@ -616,12 +620,16 @@ export default function EditEventPage() {
                   <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700">
                     <div className="flex flex-wrap gap-2">
                       {departments.map((dept) => {
-                        const isSelected = selectedDepartments.has(dept.deptCode);
+                        const isSelected = selectedDepartments.has(
+                          dept.deptCode
+                        );
                         return (
                           <button
                             key={dept.deptCode}
                             type="button"
-                            onClick={() => handleDepartmentToggle(dept.deptCode)}
+                            onClick={() =>
+                              handleDepartmentToggle(dept.deptCode)
+                            }
                             className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
                               isSelected
                                 ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"

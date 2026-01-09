@@ -105,7 +105,7 @@ export default function AddEventPage() {
 
     try {
       // Map the selected strategy to the appropriate backend fields
-      const submitData = { ...formData };
+      const submitData: typeof formData & { deptCode?: string | null } = { ...formData };
 
       // Reset all price fields
       submitData.globalPriceAmountAdd = "";
