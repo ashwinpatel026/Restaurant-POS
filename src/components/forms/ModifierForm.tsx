@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { TrashIcon, PencilIcon } from "@heroicons/react/24/outline";
+import { TrashIcon, PencilIcon, ArrowUpIcon, ArrowDownIcon } from "@heroicons/react/24/outline";
 import { LoadingOverlay } from "@/components/ui/SkeletonLoader";
 import ModifierItemModal from "@/components/modifiers/ModifierItemModal";
 import ToggleIndicator from "@/components/ui/ToggleIndicator";
@@ -49,7 +49,9 @@ interface ModifierItemState {
   price: number;
   isDefault: number;
   displayOrder: number;
+  groupCode?: string;
   isActive: number;
+  _tempId?: string; // Temporary unique ID for items without id
 }
 
 interface ModifierFormProps {
@@ -108,7 +110,11 @@ export default function ModifierForm({
         showDefaultTop: modifier.showDefaultTop ?? 0,
         inheritFromMenuGroup: modifier.inheritFromMenuGroup ?? 0,
         priceStrategy: (modifier as any).priceStrategy ?? 1,
-        price: (modifier as any).price ?? 0,
+        price: (modifier as any).price
+          ? typeof (modifier as any).price === "number"
+            ? (modifier as any).price
+            : parseFloat(String((modifier as any).price)) || 0
+          : 0,
         isActive: modifier.isActive ?? 1,
         prefix: normalizePrefix((modifier as any).prefix),
       });
@@ -116,21 +122,31 @@ export default function ModifierForm({
       setRemovedItemIds([]);
       // Load items if provided in modifier data
       if ((modifier as any).items && Array.isArray((modifier as any).items)) {
-        const loadedItems = (modifier as any).items.map((item: any) => ({
-          id: item.id,
-          name: item.name || "",
-          labelName: item.labelName || "",
-          colorCode: item.colorCode || "#3B82F6",
-          forColorCode: item.forColorCode || "#FFFFFF",
-          price:
-            typeof item.price === "number"
-              ? item.price
-              : parseFloat(item.price) || 0,
-          isDefault: item.isDefault || 0,
-          displayOrder:
-            typeof item.displayOrder === "number" ? item.displayOrder : 1,
-          isActive: item.isActive ?? 1,
-        }));
+        const loadedItems = (modifier as any).items
+          .map((item: any, idx: number) => ({
+            id: item.id,
+            name: item.name || "",
+            labelName: item.labelName || "",
+            colorCode: item.colorCode || "#3B82F6",
+            forColorCode: item.forColorCode || "#FFFFFF",
+            price:
+              typeof item.price === "number"
+                ? item.price
+                : parseFloat(item.price) || 0,
+            isDefault: item.isDefault || 0,
+            displayOrder:
+              typeof item.displayOrder === "number" ? item.displayOrder : idx + 1,
+            groupCode: item.groupCode || "",
+            isActive: item.isActive ?? 1,
+            _tempId: item.id ? undefined : `loaded-${idx}-${item.name || 'item'}-${Math.random().toString(36).substr(2, 9)}`,
+          }))
+          .sort((a: ModifierItemState, b: ModifierItemState) => 
+            (a.displayOrder || 0) - (b.displayOrder || 0)
+          )
+          .map((item: ModifierItemState, idx: number) => ({
+            ...item,
+            displayOrder: idx + 1, // Ensure sequential ordering
+          }));
         setModifierItems(loadedItems);
       } else {
         setModifierItems([]);
@@ -225,11 +241,55 @@ export default function ModifierForm({
       updated[editingItemIndex] = item;
       setModifierItems(updated);
     } else {
-      // Add new item
-      setModifierItems([...modifierItems, item]);
+      // Add new item - ensure it has a unique temp ID if no id and auto-assign displayOrder
+      const nextOrder = modifierItems.length > 0
+        ? Math.max(...modifierItems.map((i) => i.displayOrder || 0), 0) + 1
+        : 1;
+      const newItem = {
+        ...item,
+        displayOrder: nextOrder,
+        _tempId: item.id || `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      };
+      setModifierItems([...modifierItems, newItem]);
     }
     setIsModalOpen(false);
     setEditingItemIndex(null);
+  };
+
+  const handleUpdateItemField = (
+    index: number,
+    field: keyof ModifierItemState,
+    value: any
+  ) => {
+    const updated = [...modifierItems];
+    updated[index] = { ...updated[index], [field]: value };
+    setModifierItems(updated);
+  };
+
+  const handleMoveItemUp = (index: number) => {
+    if (index === 0) return; // Can't move first item up
+    const updated = [...modifierItems];
+    const temp = updated[index];
+    updated[index] = updated[index - 1];
+    updated[index - 1] = temp;
+    // Update displayOrder based on new position
+    updated.forEach((item, idx) => {
+      item.displayOrder = idx + 1;
+    });
+    setModifierItems(updated);
+  };
+
+  const handleMoveItemDown = (index: number) => {
+    if (index === modifierItems.length - 1) return; // Can't move last item down
+    const updated = [...modifierItems];
+    const temp = updated[index];
+    updated[index] = updated[index + 1];
+    updated[index + 1] = temp;
+    // Update displayOrder based on new position
+    updated.forEach((item, idx) => {
+      item.displayOrder = idx + 1;
+    });
+    setModifierItems(updated);
   };
 
   const removeModifierItem = (index: number) => {
@@ -374,6 +434,7 @@ export default function ModifierForm({
               typeof item.displayOrder === "number"
                 ? item.displayOrder
                 : idx + 1,
+            groupCode: item.groupCode || null,
             isActive: typeof item.isActive === "number" ? item.isActive : 1,
           })),
         removedItemIds,
@@ -759,18 +820,21 @@ export default function ModifierForm({
                         Label
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Group Code
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Color
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Price
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Default
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Included in Menu
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Order
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Active
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -782,7 +846,7 @@ export default function ModifierForm({
                     {modifierItems.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={8}
+                          colSpan={9}
                           className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400"
                         >
                           No modifier items added yet. Click "+ Add Item" to
@@ -791,7 +855,7 @@ export default function ModifierForm({
                       </tr>
                     ) : (
                       modifierItems.map((item, index) => (
-                        <tr key={item.id || index}>
+                        <tr key={item.id || item._tempId || `item-${index}`}>
                           <td className="px-4 py-3">
                             <div className="text-sm font-medium text-gray-900 dark:text-white">
                               {item.name || "Unnamed Item"}
@@ -800,6 +864,11 @@ export default function ModifierForm({
                           <td className="px-4 py-3">
                             <div className="text-sm text-gray-600 dark:text-gray-400">
                               {item.labelName || "-"}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                              {item.groupCode || "-"}
                             </div>
                           </td>
                           <td className="px-4 py-3">
@@ -822,32 +891,110 @@ export default function ModifierForm({
                           <td className="px-4 py-3">
                             <div className="text-sm text-gray-900 dark:text-white">
                               {formData.priceStrategy === 2 &&
-                              typeof item.price === "number"
+                              typeof item.price === "number" &&
+                              !isNaN(item.price)
                                 ? `$${item.price.toFixed(2)}`
+                                : formData.priceStrategy === 3 &&
+                                  (typeof formData.price === "number" ||
+                                    (typeof formData.price === "string" &&
+                                      !isNaN(parseFloat(formData.price))))
+                                ? `$${(
+                                    typeof formData.price === "number"
+                                      ? formData.price
+                                      : parseFloat(formData.price)
+                                  ).toFixed(2)}`
                                 : "-"}
                             </div>
                           </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center">
-                              <ToggleIndicator
-                                value={item.isDefault}
-                                activeColor="blue"
-                                size="md"
-                              />
+                          <td className="px-4 py-3 text-center">
+                            <div className="flex items-center justify-center">
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={item.isDefault === 1}
+                                onClick={() =>
+                                  handleUpdateItemField(
+                                    index,
+                                    "isDefault",
+                                    item.isDefault === 1 ? 0 : 1
+                                  )
+                                }
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                                  item.isDefault === 1
+                                    ? "bg-blue-600 dark:bg-blue-500"
+                                    : "bg-gray-300 dark:bg-gray-600"
+                                } cursor-pointer`}
+                              >
+                                <span
+                                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                                    item.isDefault === 1
+                                      ? "translate-x-5"
+                                      : "translate-x-1"
+                                  }`}
+                                />
+                              </button>
                             </div>
                           </td>
-                          <td className="px-4 py-3">
-                            <div className="text-sm text-gray-900 dark:text-white">
-                              {item.displayOrder || index + 1}
+                          <td className="px-4 py-3 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleMoveItemUp(index)}
+                                disabled={index === 0}
+                                className={`p-1 rounded transition-colors ${
+                                  index === 0
+                                    ? "text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                                    : "text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                }`}
+                                title="Move up"
+                              >
+                                <ArrowUpIcon className="w-5 h-5" />
+                              </button>
+                              <span className="text-sm font-medium text-gray-900 dark:text-white min-w-[2rem] text-center">
+                                {item.displayOrder || index + 1}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleMoveItemDown(index)}
+                                disabled={index === modifierItems.length - 1}
+                                className={`p-1 rounded transition-colors ${
+                                  index === modifierItems.length - 1
+                                    ? "text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                                    : "text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                }`}
+                                title="Move down"
+                              >
+                                <ArrowDownIcon className="w-5 h-5" />
+                              </button>
                             </div>
                           </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center">
-                              <ToggleIndicator
-                                value={item.isActive}
-                                activeColor="green"
-                                size="md"
-                              />
+                          <td className="px-4 py-3 text-center">
+                            <div className="flex items-center justify-center">
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={item.isActive === 1}
+                                onClick={() =>
+                                  handleUpdateItemField(
+                                    index,
+                                    "isActive",
+                                    item.isActive === 1 ? 0 : 1
+                                  )
+                                }
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                                  item.isActive === 1
+                                    ? "bg-blue-600 dark:bg-blue-500"
+                                    : "bg-gray-300 dark:bg-gray-600"
+                                } cursor-pointer`}
+                              >
+                                <span
+                                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                                    item.isActive === 1
+                                      ? "translate-x-5"
+                                      : "translate-x-1"
+                                  }`}
+                                />
+                              </button>
                             </div>
                           </td>
                           <td className="px-4 py-3">
@@ -914,8 +1061,7 @@ export default function ModifierForm({
           priceStrategy={formData.priceStrategy}
           nextDisplayOrder={
             modifierItems.length > 0
-              ? Math.max(...modifierItems.map((i) => i.displayOrder || 0), 0) +
-                1
+              ? Math.max(...modifierItems.map((i) => i.displayOrder || 0), 0) + 1
               : 1
           }
         />

@@ -259,6 +259,7 @@ export async function POST(
               name: item.name || null,
               labelName: item.labelName || null,
               colorCode: item.colorCode || null,
+              forColorCode: item.forColorCode || null,
               price:
                 item.price !== undefined && item.price !== null
                   ? parseFloat(item.price)
@@ -266,6 +267,7 @@ export async function POST(
               isDefault: item.isDefault ? 1 : 0,
               displayOrder:
                 item.displayOrder !== undefined ? parseInt(item.displayOrder) : null,
+              groupCode: item.groupCode || null,
               isActive: item.isActive ? 1 : 0,
               createdBy,
               createdOn: new Date()

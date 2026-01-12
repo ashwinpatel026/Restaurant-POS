@@ -565,18 +565,33 @@ async function syncModifierItems(storeCode: string): Promise<{ recordsSynced: nu
 
   let synced = 0
   for (const item of items) {
+    const baseData: Record<string, any> = {
+      modifierItemCode: item.modifierItemCode,
+      modifierGroupCode: item.modifierGroupCode,
+      name: item.name,
+      labelName: item.labelName,
+      colorCode: item.colorCode,
+      forColorCode: item.forColorCode,
+      price: item.price,
+      isDefault: item.isDefault,
+      displayOrder: item.displayOrder,
+      groupCode: item.groupCode,
+      isActive: item.isActive,
+      createdBy: item.createdBy,
+      createdOn: item.createdOn,
+      updatedBy: item.updatedBy,
+      updatedOn: item.updatedOn,
+      syncId: item.syncId,
+      syncSource: item.syncSource || 'server',
+      storeCode: storeCode
+    }
+
     await (locationPrisma as any).modifierItem.upsert({
       where: {
         modifierItemCode: item.modifierItemCode
       },
-      update: {
-        ...item,
-        storeCode: storeCode
-      },
-      create: {
-        ...item,
-        storeCode: storeCode
-      }
+      update: baseData,
+      create: baseData
     })
     synced++
   }

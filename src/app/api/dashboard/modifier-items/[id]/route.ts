@@ -104,6 +104,7 @@ export async function PUT(
       price,
       isDefault,
       displayOrder,
+      groupCode,
       isActive,
     } = body
 
@@ -118,6 +119,7 @@ export async function PUT(
         price: price ?? null,
         isDefault: typeof isDefault === 'number' ? isDefault : undefined,
         displayOrder: typeof displayOrder === 'number' ? displayOrder : null,
+        groupCode: groupCode ?? null,
         isActive: typeof isActive === 'number' ? isActive : undefined,
         // Keep the original storeCode, don't change it
         storeCode: existingItem.storeCode || selectedStoreCode,

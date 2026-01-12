@@ -402,6 +402,7 @@ model ModifierItem {
   price              Decimal? @map("price") @db.Decimal(10, 2)
   isDefault          Int      @default(0) @map("is_default")
   displayOrder       Int?     @map("display_order")
+  groupCode          String?  @map("group_code") @db.VarChar(50)
   isActive           Int      @default(1) @map("is_active")
   createdBy          Int?     @map("createdby")
   createdOn          DateTime @default(now()) @map("createdon")

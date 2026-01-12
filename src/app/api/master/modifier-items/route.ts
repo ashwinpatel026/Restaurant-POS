@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
       price,
       isDefault = 0,
       displayOrder,
+      groupCode,
       isActive = 1,
     } = body
 
@@ -102,6 +103,7 @@ export async function POST(request: NextRequest) {
         price: price ? parseFloat(price.toString()) : null,
         isDefault,
         displayOrder: typeof displayOrder === 'number' ? displayOrder : null,
+        groupCode: groupCode || null,
         isActive,
         createdBy: admin.adminId,
       },

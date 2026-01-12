@@ -132,6 +132,7 @@ export async function POST(request: NextRequest) {
       price,
       isDefault = 0,
       displayOrder,
+      groupCode,
       isActive = 1,
     } = body
 
@@ -171,6 +172,7 @@ export async function POST(request: NextRequest) {
         price: price ?? null,
         isDefault,
         displayOrder: typeof displayOrder === 'number' ? displayOrder : null,
+        groupCode: groupCode || null,
         isActive,
         createdBy: parseInt(session.user.id),
         storeCode: finalStoreCode, // Use the storeCode from modifier group if available

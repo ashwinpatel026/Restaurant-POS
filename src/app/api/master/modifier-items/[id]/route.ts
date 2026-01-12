@@ -71,6 +71,7 @@ export async function PUT(
       price,
       isDefault,
       displayOrder,
+      groupCode,
       isActive,
     } = body
 
@@ -85,6 +86,7 @@ export async function PUT(
         price: price ? parseFloat(price.toString()) : null,
         isDefault: typeof isDefault === 'number' ? isDefault : undefined,
         displayOrder: typeof displayOrder === 'number' ? displayOrder : null,
+        groupCode: groupCode ?? null,
         isActive: typeof isActive === 'number' ? isActive : undefined,
         updatedBy: admin.adminId,
         updatedOn: new Date(),

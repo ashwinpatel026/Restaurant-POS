@@ -17,6 +17,7 @@ interface ModifierItem {
   price: number;
   isDefault: number;
   displayOrder: number;
+  groupCode?: string;
   isActive: number;
 }
 
@@ -46,6 +47,7 @@ export default function ModifierItemModal({
     price: 0,
     isDefault: 0,
     displayOrder: 1,
+    groupCode: "",
     isActive: 1,
   });
 
@@ -61,11 +63,12 @@ export default function ModifierItemModal({
           forColorCode: item.forColorCode || "#FFFFFF",
           price: item.price || 0,
           isDefault: item.isDefault || 0,
-          displayOrder: item.displayOrder || 1,
+          displayOrder: item.displayOrder || nextDisplayOrder,
+          groupCode: item.groupCode || "",
           isActive: item.isActive ?? 1,
         });
       } else {
-        // New item - reset form
+        // New item - reset form (displayOrder will be auto-assigned)
         setFormData({
           id: undefined,
           name: "",
@@ -75,6 +78,7 @@ export default function ModifierItemModal({
           price: 0,
           isDefault: 0,
           displayOrder: nextDisplayOrder,
+          groupCode: "",
           isActive: 1,
         });
       }
@@ -105,6 +109,7 @@ export default function ModifierItemModal({
       price: 0,
       isDefault: 0,
       displayOrder: 1,
+      groupCode: "",
       isActive: 1,
     });
     onClose();
@@ -147,7 +152,7 @@ export default function ModifierItemModal({
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  POS Label Name
+                  Label Name
                 </label>
                 <input
                   type="text"
@@ -156,9 +161,26 @@ export default function ModifierItemModal({
                     setFormData({ ...formData, labelName: e.target.value })
                   }
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter POS label name"
+                  placeholder="Enter label Name"
                 />
               </div>
+            </div>
+
+            {/* Group Code */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Group Code
+              </label>
+              <input
+                type="text"
+                value={formData.groupCode}
+                onChange={(e) =>
+                  setFormData({ ...formData, groupCode: e.target.value })
+                }
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter group code"
+                maxLength={50}
+              />
             </div>
 
             {/* Color Code and Text Color */}
@@ -205,63 +227,43 @@ export default function ModifierItemModal({
               </div>
             </div>
 
-            {/* Price and Display Order in one row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Price
-                </label>
-                <div className="flex items-center">
-                  <span className="text-gray-500 dark:text-gray-400 mr-2">
-                    $
-                  </span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.price}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        price: parseFloat(e.target.value) || 0,
-                      })
-                    }
-                    disabled={priceStrategy !== 2}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-                    placeholder="0.00"
-                  />
-                </div>
-                {priceStrategy !== 2 && (
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Price is managed at the group level
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Display Order No
-                </label>
+            {/* Price */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Price
+              </label>
+              <div className="flex items-center">
+                <span className="text-gray-500 dark:text-gray-400 mr-2">
+                  $
+                </span>
                 <input
                   type="number"
-                  min={1}
-                  value={formData.displayOrder}
+                  step="0.01"
+                  min="0"
+                  value={formData.price}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      displayOrder: parseInt(e.target.value) || 1,
+                      price: parseFloat(e.target.value) || 0,
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="1"
+                  disabled={priceStrategy !== 2}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+                  placeholder="0.00"
                 />
               </div>
+              {priceStrategy !== 2 && (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Price is managed at the group level
+                </p>
+              )}
             </div>
 
             {/* Is Default and Status in one row with toggle */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Is Default Toggle */}
               <StatusToggle
-                label="Is Default"
+                label="Included in Menu"
                 value={formData.isDefault === 1}
                 onChange={(value) =>
                   setFormData({ ...formData, isDefault: value ? 1 : 0 })

@@ -70,7 +70,8 @@ export default function AddModifierPage() {
                   typeof item.displayOrder === "number"
                     ? item.displayOrder
                     : null,
-                isActive: 1,
+                groupCode: item.groupCode || null,
+                isActive: typeof item.isActive === "number" ? item.isActive : 1,
               }),
             }
           );

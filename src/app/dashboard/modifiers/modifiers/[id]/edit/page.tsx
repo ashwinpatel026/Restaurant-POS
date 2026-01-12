@@ -136,6 +136,7 @@ export default function EditModifierPage() {
             isDefault: item.isDefault ? 1 : 0,
             displayOrder:
               typeof item.displayOrder === "number" ? item.displayOrder : null,
+            groupCode: item.groupCode || null,
             isActive: typeof item.isActive === "number" ? item.isActive : 1,
           };
 
