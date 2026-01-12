@@ -1,6 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
@@ -10,7 +11,71 @@ import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 export default function AddModifierPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { buildApiUrl } = useApiWithStore();
+  const [clonedModifier, setClonedModifier] = useState<any>(null);
+  const [loadingClone, setLoadingClone] = useState(false);
+
+  useEffect(() => {
+    const cloneId = searchParams.get("cloneId");
+    if (cloneId) {
+      fetchClonedModifier(cloneId);
+    }
+  }, [searchParams]);
+
+  const fetchClonedModifier = async (cloneId: string) => {
+    try {
+      setLoadingClone(true);
+      // Fetch modifier group
+      const groupResponse = await fetch(buildApiUrl(`/api/dashboard/modifier-groups/${cloneId}`));
+
+      if (!groupResponse.ok) {
+        throw new Error("Failed to fetch modifier for cloning");
+      }
+
+      const modifierData = await groupResponse.json();
+
+      // Fetch modifier items for this group
+      let items: any[] = [];
+      if (modifierData.modifierGroupCode) {
+        const itemsResponse = await fetch(
+          buildApiUrl(`/api/dashboard/modifier-items?modifierGroupCode=${modifierData.modifierGroupCode}`)
+        );
+
+        if (itemsResponse.ok) {
+          items = await itemsResponse.json();
+        }
+      }
+
+      // Transform the data for cloning
+      const clonedData = {
+        ...modifierData,
+        // Remove IDs - new ones will be generated
+        id: undefined,
+        modifierGroupCode: undefined,
+        // Append " (Copy)" to name and labelName
+        groupName: modifierData.groupName ? `${modifierData.groupName} (Copy)` : "",
+        labelName: modifierData.labelName ? `${modifierData.labelName} (Copy)` : "",
+        // Keep all other fields (settings, prefix, etc.)
+        // Transform items - remove IDs only, keep names as is
+        items: items.map((item: any) => ({
+          ...item,
+          id: undefined, // Remove ID so it will be created as new
+          // Keep name and labelName as is (no "(Copy)" appended)
+          // Keep all other item fields (price, color, etc.)
+        })),
+      };
+
+      setClonedModifier(clonedData);
+    } catch (error) {
+      toast.error("Failed to load modifier for cloning");
+      console.error("Error fetching cloned modifier:", error);
+      // Redirect back to list if cloning fails
+      router.push("/dashboard/modifiers/modifiers");
+    } finally {
+      setLoadingClone(false);
+    }
+  };
 
   const handleSave = async (formData: any) => {
     try {
@@ -121,10 +186,15 @@ export default function AddModifierPage() {
           Create a new Modifiers with selection rules and items.
         </p>
 
-        <ModifierForm
-          onSave={handleSave}
-          onCancel={() => router.push("/dashboard/modifiers/modifiers")}
-        />
+        {loadingClone ? (
+          <FormSkeleton />
+        ) : (
+          <ModifierForm
+            modifier={clonedModifier}
+            onSave={handleSave}
+            onCancel={() => router.push("/dashboard/modifiers/modifiers")}
+          />
+        )}
       </div>
     </DashboardLayout>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
@@ -27,16 +27,26 @@ interface MenuMaster {
 
 export default function AddMenuItemPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { selectedStoreCode, buildApiUrl } = useApiWithStore();
   const [menuMasters, setMenuMasters] = useState<MenuMaster[]>([]);
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clonedItem, setClonedItem] = useState<any>(null);
+  const [loadingClone, setLoadingClone] = useState(false);
 
   useEffect(() => {
     if (selectedStoreCode) {
       fetchData();
     }
   }, [selectedStoreCode]);
+
+  useEffect(() => {
+    const cloneId = searchParams.get("cloneId");
+    if (cloneId && selectedStoreCode) {
+      fetchClonedItem(cloneId);
+    }
+  }, [searchParams, selectedStoreCode]);
 
   const fetchData = async () => {
     try {
@@ -59,6 +69,44 @@ export default function AddMenuItemPage() {
       console.error("Error:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchClonedItem = async (cloneId: string) => {
+    try {
+      setLoadingClone(true);
+      const response = await fetch(buildApiUrl(`/api/dashboard/menu/items/${cloneId}`));
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch item for cloning");
+      }
+
+      const itemData = await response.json();
+
+      // Transform the data for cloning
+      const clonedData = {
+        ...itemData,
+        // Remove IDs - new ones will be generated
+        menuItemId: undefined,
+        tblMenuItemId: undefined,
+        menuItemCode: undefined,
+        // Append " (Copy)" to name and labelName
+        name: itemData.name ? `${itemData.name} (Copy)` : "",
+        labelName: itemData.labelName ? `${itemData.labelName} (Copy)` : "",
+        // Clear barcode (should be unique)
+        barcode: "",
+        // Keep all other fields (modifiers, prep time, pricing, categories, etc.)
+        // The form will handle the rest
+      };
+
+      setClonedItem(clonedData);
+    } catch (error) {
+      toast.error("Failed to load item for cloning");
+      console.error("Error fetching cloned item:", error);
+      // Redirect back to list if cloning fails
+      router.push("/dashboard/menu/items");
+    } finally {
+      setLoadingClone(false);
     }
   };
 
@@ -99,7 +147,7 @@ export default function AddMenuItemPage() {
     router.push("/dashboard/menu/items");
   };
 
-  if (loading) {
+  if (loading || loadingClone) {
     return (
       <DashboardLayout>
         <div className="space-y-6">
@@ -141,6 +189,7 @@ export default function AddMenuItemPage() {
 
         {/* Form */}
         <MenuItemTabbedForm
+          menuItem={clonedItem}
           menuMasters={menuMasters}
           categories={categories}
           onSave={handleSave}

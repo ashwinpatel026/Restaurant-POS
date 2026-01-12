@@ -10,6 +10,7 @@ import {
   ArrowLeftIcon,
   Squares2X2Icon,
   TableCellsIcon,
+  DocumentDuplicateIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import CRUDModal from "@/components/modals/CRUDModal";
@@ -90,6 +91,11 @@ export default function ModifiersPage() {
 
   const handleEdit = (modifier: ModifierGroup) => {
     router.push(`/dashboard/modifiers/modifiers/${modifier.id}/edit`);
+  };
+
+  const handleClone = (modifier: ModifierGroup) => {
+    const url = `/dashboard/modifiers/modifiers/add?cloneId=${modifier.id}${selectedStoreCode ? `&storeCode=${selectedStoreCode}` : ''}`;
+    router.push(url);
   };
 
   const handleDelete = (modifierId: string | number) => {
@@ -334,6 +340,13 @@ export default function ModifiersPage() {
                             <PencilIcon className="w-4 h-4" />
                           </button>
                           <button
+                            onClick={() => handleClone(modifier)}
+                            className="text-purple-600 hover:text-purple-900 dark:text-purple-400 dark:hover:text-purple-300"
+                            title="Clone modifier"
+                          >
+                            <DocumentDuplicateIcon className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => handleDelete(modifier.id)}
                             className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                             title="Delete modifier"
@@ -408,6 +421,14 @@ export default function ModifiersPage() {
                         >
                           <PencilIcon className="w-4 h-4 mr-1" />
                           Edit
+                        </button>
+                        <button
+                          onClick={() => handleClone(modifier)}
+                          className="flex-1 inline-flex justify-center items-center px-3 py-2 text-sm font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+                          title="Clone modifier"
+                        >
+                          <DocumentDuplicateIcon className="w-4 h-4 mr-1" />
+                          Clone
                         </button>
                         <button
                           onClick={() => handleDelete(modifier.id)}

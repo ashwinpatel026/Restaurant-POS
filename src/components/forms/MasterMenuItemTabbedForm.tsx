@@ -300,13 +300,36 @@ export default function MasterMenuItemTabbedForm({
         menuItem.assignedModifiers &&
         Array.isArray(menuItem.assignedModifiers)
       ) {
-        const explicitIds = menuItem.assignedModifiers
-          .filter(
-            (modifier: any) => Number(modifier.inheritFromMenuGroup) === 0
-          )
+        const explicitModifiers = menuItem.assignedModifiers.filter(
+          (modifier: any) => Number(modifier.inheritFromMenuGroup) === 0
+        );
+        const explicitIds = explicitModifiers
           .map((modifier: any) => modifier.tblModifierId || modifier.id)
           .filter(Boolean);
         setSelectedModifiers(explicitIds);
+
+        // Set modifier options from assignedModifiers to preserve settings when cloning
+        const options: Record<
+          number,
+          {
+            isRequired: number;
+            isMultiselect: number;
+            minSelection: number | null;
+            maxSelection: number | null;
+          }
+        > = {};
+        explicitModifiers.forEach((modifier: any) => {
+          const modifierId = modifier.tblModifierId || modifier.id;
+          if (modifierId) {
+            options[modifierId] = {
+              isRequired: modifier.isRequired ?? 0,
+              isMultiselect: modifier.isMultiselect ?? 0,
+              minSelection: modifier.minSelection ?? null,
+              maxSelection: modifier.maxSelection ?? null,
+            };
+          }
+        });
+        setModifierOptions(options);
       }
 
       // Set inherit modifiers flag from MenuItem.inheritModifiers

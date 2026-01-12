@@ -11,6 +11,7 @@ import {
   ArrowLeftIcon,
   Squares2X2Icon,
   TableCellsIcon,
+  DocumentDuplicateIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import CRUDModal from "@/components/modals/CRUDModal";
@@ -201,6 +202,14 @@ export default function MenuItemsPage() {
   const handleEdit = (item: MenuItem) => {
     const id = item.menuItemId || item.tblMenuItemId?.toString();
     if (id) router.push(`/dashboard/menu/items/${id}/edit`);
+  };
+
+  const handleClone = (item: MenuItem) => {
+    const id = item.menuItemId || item.tblMenuItemId?.toString();
+    if (id) {
+      const url = `/dashboard/menu/items/add?cloneId=${id}${selectedStoreCode ? `&storeCode=${selectedStoreCode}` : ''}`;
+      router.push(url);
+    }
   };
 
   const handleDelete = (itemId: number) => {
@@ -658,6 +667,13 @@ export default function MenuItemsPage() {
                             <PencilIcon className="w-4 h-4" />
                           </button>
                           <button
+                            onClick={() => handleClone(item)}
+                            className="p-1 text-purple-500 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors duration-200"
+                            title="Clone menu item"
+                          >
+                            <DocumentDuplicateIcon className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() =>
                               handleDelete(
                                 item.tblMenuItemId ??
@@ -876,6 +892,13 @@ export default function MenuItemsPage() {
                         title="Edit menu item"
                       >
                         <PencilIcon className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleClone(item)}
+                        className="p-1 text-purple-500 hover:text-purple-700 transition-colors duration-200"
+                        title="Clone menu item"
+                      >
+                        <DocumentDuplicateIcon className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() =>
