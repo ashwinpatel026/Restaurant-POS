@@ -389,6 +389,7 @@ async function syncMenuItems(storeCode: string): Promise<{ recordsSynced: number
         isAlcohol: item.isAlcohol,
         menuImg: item.menuImg,
         priceStrategy: item.priceStrategy,
+        basePrice: item.basePrice,
         cardPrice: item.cardPrice,
         cashPrice: item.cashPrice,
         isPrice: item.isPrice,
@@ -400,7 +401,9 @@ async function syncMenuItems(storeCode: string): Promise<{ recordsSynced: number
         isSyncToWeb: 0,
         isSyncToLocal: 0,
         createdBy: item.createdBy,
-        createdOn: item.createdOn
+        createdOn: item.createdOn,
+        updatedBy: item.updatedBy,
+        updatedOn: item.updatedOn || new Date()
       },
       create: {
         menuItemCode: item.menuItemCode,
@@ -420,6 +423,7 @@ async function syncMenuItems(storeCode: string): Promise<{ recordsSynced: number
         isAlcohol: item.isAlcohol,
         menuImg: item.menuImg,
         priceStrategy: item.priceStrategy,
+        basePrice: item.basePrice,
         cardPrice: item.cardPrice,
         cashPrice: item.cashPrice,
         isPrice: item.isPrice,

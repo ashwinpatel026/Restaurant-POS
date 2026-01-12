@@ -42,8 +42,7 @@ export default function MasterMenuItemTabbedForm({
     menuImg: "",
     priceStrategy: 1, // 1=Base Price, 3=Open Price
     basePrice: 0,
-    cardPrice: 0,
-    cashPrice: 0,
+    retailPrice: 0,
     isPrice: 1,
     menuMasterCode: "",
     menuCategoryCode: "",
@@ -223,18 +222,7 @@ export default function MasterMenuItemTabbedForm({
         menuImg: menuItem.menuImg || "",
         priceStrategy: menuItem.priceStrategy || 1,
         basePrice: menuItem.basePrice ?? menuItem.price ?? 0,
-        cardPrice:
-          menuItem.cardPrice !== null && menuItem.cardPrice !== undefined
-            ? parseFloat(menuItem.cardPrice.toString())
-            : menuItem.priceStrategy === 3
-            ? 0
-            : menuItem.basePrice ?? menuItem.price ?? 0,
-        cashPrice:
-          menuItem.cashPrice !== null && menuItem.cashPrice !== undefined
-            ? parseFloat(menuItem.cashPrice.toString())
-            : menuItem.priceStrategy === 3
-            ? 0
-            : menuItem.basePrice ?? menuItem.price ?? 0,
+        retailPrice: menuItem.basePrice ?? menuItem.price ?? 0,
         isPrice: menuItem.isPrice ?? 1,
         menuMasterCode: menuItem.menuMasterCode || "",
         menuCategoryCode: menuItem.menuCategoryCode || "",
@@ -490,23 +478,18 @@ export default function MasterMenuItemTabbedForm({
         priceStrategy: formData.priceStrategy
           ? parseInt(formData.priceStrategy.toString())
           : null,
-        // Card and Cash prices
-        cardPrice:
+        // Retail price saved to basePrice
+        basePrice:
           formData.priceStrategy === 1
-            ? formData.cardPrice
-              ? parseFloat(formData.cardPrice.toString())
+            ? formData.retailPrice
+              ? parseFloat(formData.retailPrice.toString())
               : null
             : formData.priceStrategy === 3
             ? 0
             : null,
-        cashPrice:
-          formData.priceStrategy === 1
-            ? formData.cashPrice
-              ? parseFloat(formData.cashPrice.toString())
-              : null
-            : formData.priceStrategy === 3
-            ? 0
-            : null,
+        // Keep cardPrice and cashPrice for backward compatibility (set to null)
+        cardPrice: null,
+        cashPrice: null,
         menuMasterCode: formData.menuMasterCode || null,
         menuCategoryCode:
           Array.from(selectedCategories).length > 0
@@ -1055,10 +1038,10 @@ export default function MasterMenuItemTabbedForm({
             </div>
           </div>
 
-          {/* Pricing Section */}
+          {/* Need Price Section */}
           <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-            <div className="mb-6 flex items-center justify-between">
-              <div>
+            <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-6">
+              <div className="mb-6">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                   Pricing
                 </h3>
@@ -1066,145 +1049,98 @@ export default function MasterMenuItemTabbedForm({
                   Set pricing strategy and prices
                 </p>
               </div>
-              {/* Enable/Disable Price Toggle */}
-              <div className="flex items-center space-x-3">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {formData.isPrice === 1 ? "Price Enabled" : "Price Disabled"}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFormData({
-                      ...formData,
-                      isPrice: formData.isPrice === 1 ? 0 : 1,
-                    });
-                  }}
-                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                    formData.isPrice === 1
-                      ? "bg-blue-600"
-                      : "bg-gray-200 dark:bg-gray-700"
-                  }`}
-                  role="switch"
-                  aria-checked={formData.isPrice === 1}
-                >
-                  <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      formData.isPrice === 1 ? "translate-x-5" : "translate-x-0"
+
+              {/* Price Enabled Toggle at the top */}
+              <div className="mb-6 flex items-center space-x-8">
+                <div className="flex items-center space-x-3">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Enable Pricing
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData({
+                        ...formData,
+                        isPrice: formData.isPrice === 1 ? 0 : 1,
+                      });
+                    }}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                      formData.isPrice === 1
+                        ? "bg-blue-600"
+                        : "bg-gray-200 dark:bg-gray-700"
                     }`}
-                  />
-                </button>
-              </div>
-            </div>
-
-            {formData.isPrice === 1 && (
-              <div className="space-y-6">
-                {/* Price Strategy Selection - Buttons */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                    Price Strategy *
-                  </label>
-                  <div className="flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormData({
-                          ...formData,
-                          priceStrategy: 1,
-                          // Keep existing prices when switching to Base Price
-                        });
-                      }}
-                      className={`relative px-6 py-3 rounded-lg border-2 transition-all font-medium ${
-                        formData.priceStrategy === 1
-                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
-                          : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                    role="switch"
+                    aria-checked={formData.isPrice === 1}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                        formData.isPrice === 1 ? "translate-x-5" : "translate-x-0"
                       }`}
-                    >
-                      Base Price
-                      {formData.priceStrategy === 1 && (
-                        <CheckIcon className="w-5 h-5 inline-block ml-2" />
-                      )}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFormData({
-                          ...formData,
-                          priceStrategy: 3,
-                          cardPrice: 0,
-                          cashPrice: 0,
-                        });
-                      }}
-                      className={`relative px-6 py-3 rounded-lg border-2 transition-all font-medium ${
-                        formData.priceStrategy === 3
-                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
-                          : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                      }`}
-                    >
-                      Open Price
-                      {formData.priceStrategy === 3 && (
-                        <CheckIcon className="w-5 h-5 inline-block ml-2" />
-                      )}
-                    </button>
-                  </div>
+                    />
+                  </button>
                 </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Disable if pricing is managed by combos or modifiers
+                </p>
+              </div>
 
-                {/* Conditional Price Inputs */}
-                {formData.priceStrategy === 1 ? (
-                  <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                      Base Price Configuration
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Card Price *
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={formData.cardPrice || ""}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              cardPrice: parseFloat(e.target.value) || 0,
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="0.00"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Cash Price *
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={formData.cashPrice || ""}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              cashPrice: parseFloat(e.target.value) || 0,
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="0.00"
-                        />
-                      </div>
+              {formData.isPrice === 1 && (
+                <div className="space-y-6">
+                  {/* Price Strategy Selection - Buttons */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                      Price Strategy *
+                    </label>
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            priceStrategy: 1,
+                          });
+                        }}
+                        className={`relative px-6 py-3 rounded-lg border-2 transition-all font-medium ${
+                          formData.priceStrategy === 1
+                            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                            : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                        }`}
+                      >
+                        Base Price
+                        {formData.priceStrategy === 1 && (
+                          <CheckIcon className="w-5 h-5 inline-block ml-2" />
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            priceStrategy: 3,
+                            retailPrice: 0,
+                          });
+                        }}
+                        className={`relative px-6 py-3 rounded-lg border-2 transition-all font-medium ${
+                          formData.priceStrategy === 3
+                            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                            : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                        }`}
+                      >
+                        Open Price
+                        {formData.priceStrategy === 3 && (
+                          <CheckIcon className="w-5 h-5 inline-block ml-2" />
+                        )}
+                      </button>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      * At least one price (Card or Cash) must be provided
-                    </p>
                   </div>
-                ) : (
-                  <div className="space-y-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                    <div className="flex items-start space-x-3">
-                      <div className="flex-shrink-0">
+
+                  {/* Conditional Price Inputs */}
+                  {formData.priceStrategy === 1 ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-2 mb-2">
                         <svg
-                          className="w-5 h-5 text-yellow-600 dark:text-yellow-400"
+                          className="w-4 h-4 text-gray-500 dark:text-gray-400"
                           fill="currentColor"
                           viewBox="0 0 20 20"
                         >
@@ -1214,45 +1150,61 @@ export default function MasterMenuItemTabbedForm({
                             clipRule="evenodd"
                           />
                         </svg>
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-1">
-                          Open Price Strategy
-                        </h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          This item uses open pricing. Prices will be set at the
-                          point of sale. Card Price and Cash Price are set to 0.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Card Price (Read-only)
-                        </label>
-                        <input
-                          type="number"
-                          value="0.00"
-                          disabled
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed"
-                        />
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          Set retail prices
+                        </span>
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Cash Price (Read-only)
+                          Retail Price
                         </label>
                         <input
                           type="number"
-                          value="0.00"
-                          disabled
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                          step="0.01"
+                          min="0"
+                          value={formData.retailPrice || ""}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              retailPrice: parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          className="w-1/3 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="0.00"
                         />
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
+                  ) : (
+                    <div className="space-y-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                      <div className="flex items-start space-x-3">
+                        <div className="flex-shrink-0">
+                          <svg
+                            className="w-5 h-5 text-yellow-600 dark:text-yellow-400"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                              clipRule="evenodd"
+                            />
+                          </svg>
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                            Open Price Strategy
+                          </h4>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            This item uses open pricing. Prices will be set at the
+                            point of sale.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Tax Configuration Section */}

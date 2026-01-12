@@ -219,6 +219,7 @@ export async function PUT(
       isPrice,
       cashPrice,
       cardPrice,
+      basePrice,
       isActive,
       inheritModifierGroup,
       modifierGroupCodes,
@@ -255,6 +256,7 @@ export async function PUT(
         : null
     }
     if (isPrice !== undefined) updateData.isPrice = isPrice ? 1 : 0
+    if (basePrice !== undefined) updateData.basePrice = basePrice ? parseFloat(basePrice) : null
     if (cashPrice !== undefined) updateData.cashPrice = cashPrice ? parseFloat(cashPrice) : null
     if (cardPrice !== undefined) updateData.cardPrice = cardPrice ? parseFloat(cardPrice) : null
     if (isActive !== undefined) updateData.isActive = isActive ? 1 : 0
@@ -292,7 +294,7 @@ export async function PUT(
           updateData[field] = otherFields[field]
         } else if (field === 'skuPlu' && otherFields[field]) {
           updateData[field] = BigInt(otherFields[field])
-        } else if ((field === 'cashPrice' || field === 'cardPrice' || field === 'stockinhand') && otherFields[field]) {
+        } else if ((field === 'basePrice' || field === 'cashPrice' || field === 'cardPrice' || field === 'stockinhand') && otherFields[field]) {
           updateData[field] = parseFloat(otherFields[field])
         } else {
           updateData[field] = otherFields[field]

@@ -230,7 +230,8 @@ export async function POST(
       prepZoneCode,
       isPrice,
       cashPrice, 
-      cardPrice, 
+      cardPrice,
+      basePrice,
       isActive = 1,
       inheritModifierGroup = true,
       modifierGroupCodes,
@@ -275,6 +276,7 @@ export async function POST(
       menuCategoryCode: menuCategoryCode ? (Array.isArray(menuCategoryCode) ? menuCategoryCode : [menuCategoryCode]) : null,
       prepZoneCode: prepZoneCode ? (Array.isArray(prepZoneCode) ? prepZoneCode : [prepZoneCode]) : null,
       isPrice: isPrice !== undefined ? (isPrice ? 1 : 0) : 1,
+      basePrice: basePrice !== undefined ? parseFloat(basePrice) : null,
       cashPrice: cashPrice !== undefined ? parseFloat(cashPrice) : null,
       cardPrice: cardPrice !== undefined ? parseFloat(cardPrice) : null,
       isActive: isActive ? 1 : 0,
@@ -304,7 +306,7 @@ export async function POST(
           menuItemData[field] = otherFields[field]
         } else if (field === 'skuPlu' && otherFields[field]) {
           menuItemData[field] = BigInt(otherFields[field])
-        } else if ((field === 'cashPrice' || field === 'cardPrice' || field === 'stockinhand') && otherFields[field]) {
+        } else if ((field === 'basePrice' || field === 'cashPrice' || field === 'cardPrice' || field === 'stockinhand') && otherFields[field]) {
           menuItemData[field] = parseFloat(otherFields[field])
         } else {
           menuItemData[field] = otherFields[field]

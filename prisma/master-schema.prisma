@@ -462,6 +462,7 @@ model MasterMenuItem {
   isAlcohol                      Int       @default(0) @map("is_alcohol")
   menuImg                        String?   @map("menu_img")
   priceStrategy                  Int?      @map("price_strategy") // 1=Base Price, 3=Open Price
+  basePrice                      Decimal?  @map("base_price") @db.Decimal(10, 2)
   cardPrice                      Decimal?  @map("card_price") @db.Decimal(10, 2)
   cashPrice                      Decimal?  @map("cash_price") @db.Decimal(10, 2)
   isPrice                        Int       @default(1) @map("is_price")
