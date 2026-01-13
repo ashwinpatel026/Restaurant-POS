@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
@@ -12,6 +12,10 @@ import TextColorPicker from "@/components/ui/TextColorPicker";
 import { CheckIcon } from "@heroicons/react/24/solid";
 import StatusToggle from "@/components/forms/StatusToggle";
 import { useApiWithStore } from "@/hooks/useApiWithStore";
+import { useFormik } from "formik";
+import { menuCategorySchema } from "@/validation/menuCategorySchema";
+import { useFormikAutoFocus } from "@/hooks/useFormikAutoFocus";
+import { capitalizeFirstLetter } from "@/lib/utils";
 
 interface MenuMaster {
   menuMasterId: string;
@@ -59,14 +63,12 @@ export default function EditCategoryPage() {
     Set<string>
   >(new Set());
   const [category, setCategory] = useState<MenuCategory | null>(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    colorCode: getPrimaryColor(),
-    forColorCode: "#FFFFFF",
-    menuMasterId: "",
-    deptCode: "",
-    isActive: 1,
-  });
+
+  // Refs for auto-focus on validation errors
+  const nameRef = useRef<HTMLInputElement>(null);
+  const colorCodeRef = useRef<HTMLElement>(null);
+  const forColorCodeRef = useRef<HTMLElement>(null);
+  const menuMasterRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (categoryId && selectedStoreCode) {
@@ -94,7 +96,7 @@ export default function EditCategoryPage() {
       if (categoryRes.ok) {
         const categoryData = await categoryRes.json();
         setCategory(categoryData);
-        setFormData({
+        const initialData = {
           name: categoryData.name || "",
           colorCode: categoryData.colorCode || getPrimaryColor(),
           forColorCode: categoryData.forColorCode || "#FFFFFF",
@@ -107,7 +109,8 @@ export default function EditCategoryPage() {
             typeof categoryData.isActive === "number"
               ? categoryData.isActive
               : 1,
-        });
+        };
+        formik.setValues(initialData);
 
         // Preselect using codes (prefer codes over names)
         if (
@@ -180,29 +183,12 @@ export default function EditCategoryPage() {
   const handleMenuMasterSelect = (menuMasterId: string) => {
     const selectedMaster = menuMasters.find((m) => m.menuMasterId === menuMasterId);
     // Auto-select department from menu master only if category doesn't already have one
-    const newDeptCode = formData.deptCode || selectedMaster?.deptCode || "";
-    setFormData({
-      ...formData,
-      menuMasterId: menuMasterId,
-      deptCode: newDeptCode,
-    });
+    const newDeptCode = formik.values.deptCode || selectedMaster?.deptCode || "";
+    formik.setFieldValue("menuMasterId", menuMasterId);
+    formik.setFieldValue("deptCode", newDeptCode);
   };
 
-  const handleSelectAll = () => {
-    if (selectedModifierGroups.size === modifierGroups.length) {
-      setSelectedModifierGroups(new Set());
-    } else {
-      const allCodes = new Set(
-        modifierGroups
-          .map((g) => g.modifierGroupCode)
-          .filter((code): code is string => code !== null)
-      );
-      setSelectedModifierGroups(allCodes);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  async function onSubmitForm(values: any) {
     setLoading(true);
 
     try {
@@ -214,12 +200,12 @@ export default function EditCategoryPage() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            name: formData.name,
-            colorCode: formData.colorCode,
-            forColorCode: formData.forColorCode,
-            menuMasterId: formData.menuMasterId,
-            deptCode: formData.deptCode || null,
-            isActive: formData.isActive,
+            name: values.name.trim(),
+            colorCode: values.colorCode,
+            forColorCode: values.forColorCode,
+            menuMasterId: values.menuMasterId,
+            deptCode: values.deptCode || null,
+            isActive: values.isActive,
             modifierGroupCodes: Array.from(selectedModifierGroups),
           }),
         }
@@ -238,7 +224,6 @@ export default function EditCategoryPage() {
         }
       }
     } catch (error: any) {
-      // Only log unexpected errors (network errors, etc.)
       if (error instanceof TypeError && error.message.includes('fetch')) {
         toast.error("Network error. Please check your connection.");
       } else {
@@ -248,7 +233,65 @@ export default function EditCategoryPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  const formik = useFormik({
+    initialValues: {
+      name: "",
+      colorCode: getPrimaryColor(),
+      forColorCode: "#FFFFFF",
+      menuMasterId: "",
+      deptCode: "",
+      isActive: 1,
+    },
+    validationSchema: menuCategorySchema,
+    enableReinitialize: true,
+    onSubmit: async (values, { setTouched }) => {
+      // Mark all fields as touched to show errors
+      setTouched({
+        name: true,
+        colorCode: true,
+        forColorCode: true,
+        menuMasterId: true,
+        deptCode: true,
+      });
+
+      // Validate and check for errors
+      await formik.validateForm();
+
+      // If there are errors, don't submit
+      if (Object.keys(formik.errors).length > 0) {
+        return;
+      }
+
+      // No errors, proceed with submission
+      onSubmitForm(values);
+    },
+    validateOnChange: false,
+    validateOnBlur: true,
+  });
+
+  // Auto-focus on first error field
+  useFormikAutoFocus(formik, {
+    name: nameRef,
+    colorCode: colorCodeRef,
+    forColorCode: forColorCodeRef,
+    menuMasterId: menuMasterRef,
+  });
+
+  const handleSelectAll = () => {
+    if (selectedModifierGroups.size === modifierGroups.length) {
+      setSelectedModifierGroups(new Set());
+    } else {
+      const allCodes = new Set(
+        modifierGroups
+          .map((g) => g.modifierGroupCode)
+          .filter((code): code is string => code !== null)
+      );
+      setSelectedModifierGroups(allCodes);
+    }
   };
+
 
   if (fetchLoading) {
     return (
@@ -283,7 +326,7 @@ export default function EditCategoryPage() {
 
         {/* Form */}
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={formik.handleSubmit}>
             <div className="p-6 space-y-6">
               {/* Basic Information */}
               <div>
@@ -293,23 +336,34 @@ export default function EditCategoryPage() {
                 <div className="space-y-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Category Name *
+                      Category Name <span className="text-red-500">*</span>
                     </label>
                     <input
+                      ref={nameRef}
                       type="text"
-                      required
-                      value={formData.name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      maxLength={30}
+                      {...formik.getFieldProps("name")}
+                      onChange={(e) => {
+                        const capitalizedValue = capitalizeFirstLetter(e.target.value);
+                        formik.setFieldValue("name", capitalizedValue);
+                      }}
+                      className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:outline-none transition-all ${
+                        formik.errors.name && formik.touched.name
+                          ? "border-red-500 dark:border-red-500 animate-shake focus:border-red-500"
+                          : "border-gray-300 dark:border-gray-600 focus:border-blue-500"
+                      }`}
                       placeholder="Enter category name"
                     />
+                    {formik.errors.name && formik.touched.name && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                        {formik.errors.name}
+                      </p>
+                    )}
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Select Menu Master *
+                      Select Menu Master <span className="text-red-500">*</span>
                     </label>
                     {menuMasters.length === 0 ? (
                       <div className="border border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 text-sm text-gray-500 dark:text-gray-400">
@@ -317,12 +371,13 @@ export default function EditCategoryPage() {
                         first.
                       </div>
                     ) : (
+                      <>
                       <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700">
                         <div className="max-h-48 overflow-y-auto pr-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-track]:dark:bg-gray-800 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:dark:bg-gray-600 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-gray-400 [&::-webkit-scrollbar-thumb]:dark:hover:bg-gray-500">
                           <div className="grid grid-cols-1 sm:grid-cols-4 md:grid-cols-6 gap-3">
                             {menuMasters.map((master) => {
                               const isSelected =
-                                formData.menuMasterId === master.menuMasterId;
+                                formik.values.menuMasterId === master.menuMasterId;
                               return (
                                 <button
                                   key={master.menuMasterId}
@@ -359,6 +414,12 @@ export default function EditCategoryPage() {
                           </div>
                         </div>
                       </div>
+                      {formik.errors.menuMasterId && formik.touched.menuMasterId && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                          {formik.errors.menuMasterId}
+                        </p>
+                      )}
+                      </>
                     )}
                   </div>
 
@@ -368,11 +429,8 @@ export default function EditCategoryPage() {
                       Department
                     </label>
                     <select
-                      value={formData.deptCode}
-                      onChange={(e) =>
-                        setFormData({ ...formData, deptCode: e.target.value })
-                      }
-                      disabled={!formData.menuMasterId}
+                      {...formik.getFieldProps("deptCode")}
+                      disabled={!formik.values.menuMasterId}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <option value="">Select Department</option>
@@ -382,7 +440,7 @@ export default function EditCategoryPage() {
                         </option>
                       ))}
                     </select>
-                    {!formData.menuMasterId && (
+                    {!formik.values.menuMasterId && (
                       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                         Please select a menu master first
                       </p>
@@ -395,20 +453,30 @@ export default function EditCategoryPage() {
                       <div>
                         <SystemColorPicker
                           label="Color Code (Background)"
-                          value={formData.colorCode || ""}
+                          value={formik.values.colorCode || ""}
                           onChange={(color: string) =>
-                            setFormData({ ...formData, colorCode: color })
+                            formik.setFieldValue("colorCode", color)
                           }
                         />
+                        {formik.errors.colorCode && formik.touched.colorCode && (
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                            {formik.errors.colorCode}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <TextColorPicker
                           label="Text Color"
-                          value={formData.forColorCode || "#FFFFFF"}
+                          value={formik.values.forColorCode || "#FFFFFF"}
                           onChange={(color: string) =>
-                            setFormData({ ...formData, forColorCode: color })
+                            formik.setFieldValue("forColorCode", color)
                           }
                         />
+                        {formik.errors.forColorCode && formik.touched.forColorCode && (
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                            {formik.errors.forColorCode}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -424,8 +492,8 @@ export default function EditCategoryPage() {
                         type="button"
                         className="px-6 py-3 rounded-lg font-medium transition-all hover:opacity-90"
                         style={{
-                          backgroundColor: formData.colorCode || "#3B82F6",
-                          color: formData.forColorCode || "#FFFFFF",
+                          backgroundColor: formik.values.colorCode || "#3B82F6",
+                          color: formik.values.forColorCode || "#FFFFFF",
                         }}
                       >
                         Sample Button
@@ -513,9 +581,9 @@ export default function EditCategoryPage() {
               <StatusToggle
                 label="Category Status"
                 description="Toggle to control whether this category is active and visible across the POS."
-                value={formData.isActive === 1}
+                value={formik.values.isActive === 1}
                 onChange={(val) =>
-                  setFormData({ ...formData, isActive: val ? 1 : 0 })
+                  formik.setFieldValue("isActive", val ? 1 : 0)
                 }
               />
             </div>

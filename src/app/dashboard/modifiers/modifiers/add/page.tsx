@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
@@ -9,7 +9,7 @@ import ModifierForm from "@/components/forms/ModifierForm";
 import { FormSkeleton } from "@/components/ui/SkeletonLoader";
 import { useApiWithStore } from "@/hooks/useApiWithStore";
 
-export default function AddModifierPage() {
+function AddModifierContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { buildApiUrl } = useApiWithStore();
@@ -197,5 +197,29 @@ export default function AddModifierPage() {
         )}
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function AddModifierPage() {
+  return (
+    <Suspense
+      fallback={
+        <DashboardLayout>
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="inline-flex items-center text-gray-600 dark:text-gray-400">
+                <ArrowLeftIcon className="w-5 h-5 mr-2" />
+                <div className="h-6 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              </div>
+            </div>
+            <div className="h-9 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+            <div className="h-5 w-96 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+            <FormSkeleton />
+          </div>
+        </DashboardLayout>
+      }
+    >
+      <AddModifierContent />
+    </Suspense>
   );
 }

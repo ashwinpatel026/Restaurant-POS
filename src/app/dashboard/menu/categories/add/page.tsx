@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
@@ -12,6 +12,10 @@ import TextColorPicker from "@/components/ui/TextColorPicker";
 import { CheckIcon } from "@heroicons/react/24/solid";
 import StatusToggle from "@/components/forms/StatusToggle";
 import { useApiWithStore } from "@/hooks/useApiWithStore";
+import { useFormik } from "formik";
+import { menuCategorySchema } from "@/validation/menuCategorySchema";
+import { useFormikAutoFocus } from "@/hooks/useFormikAutoFocus";
+import { capitalizeFirstLetter } from "@/lib/utils";
 
 interface MenuMaster {
   menuMasterId: string;
@@ -43,22 +47,61 @@ export default function AddCategoryPage() {
   const [selectedModifierGroups, setSelectedModifierGroups] = useState<
     Set<string>
   >(new Set());
-  const [formData, setFormData] = useState({
-    name: "",
-    colorCode: getPrimaryColor(),
-    forColorCode: "#FFFFFF",
-    menuMasterId: "",
-    deptCode: "",
-    isActive: 1,
+
+  // Refs for auto-focus on validation errors
+  const nameRef = useRef<HTMLInputElement>(null);
+  const colorCodeRef = useRef<HTMLElement>(null);
+  const forColorCodeRef = useRef<HTMLElement>(null);
+  const menuMasterRef = useRef<HTMLElement>(null);
+
+  // Formik instance for validation
+  const formik = useFormik({
+    initialValues: {
+      name: "",
+      colorCode: getPrimaryColor(),
+      forColorCode: "#FFFFFF",
+      menuMasterId: "",
+      deptCode: "",
+      isActive: 1,
+    },
+    validationSchema: menuCategorySchema,
+    onSubmit: async (values, { setTouched }) => {
+      // Mark all fields as touched to show errors
+      setTouched({
+        name: true,
+        colorCode: true,
+        forColorCode: true,
+        menuMasterId: true,
+        deptCode: true,
+      });
+
+      // Validate and check for errors
+      await formik.validateForm();
+
+      // If there are errors, don't submit
+      if (Object.keys(formik.errors).length > 0) {
+        return;
+      }
+
+      // No errors, proceed with submission
+      onSubmitForm(values);
+    },
+    validateOnChange: true,
+    validateOnBlur: true,
+  });
+
+  // Auto-focus on first error field
+  useFormikAutoFocus(formik, {
+    name: nameRef,
+    colorCode: colorCodeRef,
+    forColorCode: forColorCodeRef,
+    menuMasterId: menuMasterRef,
   });
 
   useEffect(() => {
     // Set default color to primary color on mount
-    setFormData((prev) => ({
-      ...prev,
-      colorCode: getPrimaryColor(),
-      forColorCode: "#FFFFFF",
-    }));
+    formik.setFieldValue("colorCode", getPrimaryColor());
+    formik.setFieldValue("forColorCode", "#FFFFFF");
     if (selectedStoreCode) {
       fetchData();
     }
@@ -101,12 +144,56 @@ export default function AddCategoryPage() {
   // Handle menu master selection and auto-select department
   const handleMenuMasterSelect = (menuMasterId: string) => {
     const selectedMaster = menuMasters.find((m) => m.menuMasterId === menuMasterId);
-    setFormData({
-      ...formData,
-      menuMasterId: menuMasterId,
-      deptCode: selectedMaster?.deptCode || "",
-    });
+    formik.setFieldValue("menuMasterId", menuMasterId);
+    formik.setFieldValue("deptCode", selectedMaster?.deptCode || "");
   };
+
+  async function onSubmitForm(values: any) {
+    setLoading(true);
+
+    try {
+      const response = await fetch(
+        buildApiUrl("/api/dashboard/menu/categories"),
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: values.name.trim(),
+            colorCode: values.colorCode,
+            forColorCode: values.forColorCode,
+            menuMasterId: values.menuMasterId,
+            deptCode: values.deptCode || null,
+            isActive: values.isActive,
+            modifierGroupCodes: Array.from(selectedModifierGroups),
+          }),
+        }
+      );
+
+      if (response.ok) {
+        toast.success("Category created successfully!");
+        router.push(`/dashboard/menu/categories`);
+      } else {
+        try {
+          const errorData = await response.json();
+          const errorMessage = errorData.error || "Failed to create category";
+          toast.error(errorMessage);
+        } catch (jsonError) {
+          toast.error("Failed to create category");
+        }
+      }
+    } catch (error: any) {
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast.error("Network error. Please check your connection.");
+      } else {
+        const errorMessage = error instanceof Error ? error.message : "Error creating category";
+        toast.error(errorMessage);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const handleModifierGroupToggle = (modifierGroupCode: string) => {
     const updated = new Set(selectedModifierGroups);
@@ -131,58 +218,6 @@ export default function AddCategoryPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.menuMasterId) {
-      toast.error("Please select a menu master");
-      return;
-    }
-    setLoading(true);
-
-    try {
-      const response = await fetch(
-        buildApiUrl("/api/dashboard/menu/categories"),
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        body: JSON.stringify({
-          name: formData.name,
-          colorCode: formData.colorCode,
-          forColorCode: formData.forColorCode,
-          menuMasterId: formData.menuMasterId,
-          deptCode: formData.deptCode || null,
-          isActive: formData.isActive,
-          modifierGroupCodes: Array.from(selectedModifierGroups),
-        }),
-        }
-      );
-
-      if (response.ok) {
-        toast.success("Category created successfully!");
-        router.push(`/dashboard/menu/categories`);
-      } else {
-        try {
-          const errorData = await response.json();
-          const errorMessage = errorData.error || "Failed to create category";
-          toast.error(errorMessage);
-        } catch (jsonError) {
-          toast.error("Failed to create category");
-        }
-      }
-    } catch (error: any) {
-      // Only log unexpected errors (network errors, etc.)
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        toast.error("Network error. Please check your connection.");
-      } else {
-        const errorMessage = error instanceof Error ? error.message : "Error creating category";
-        toast.error(errorMessage);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <DashboardLayout>
@@ -207,7 +242,7 @@ export default function AddCategoryPage() {
 
         {/* Form */}
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={formik.handleSubmit}>
             <div className="p-6 space-y-6">
               {/* Basic Information */}
               <div>
@@ -217,23 +252,34 @@ export default function AddCategoryPage() {
                 <div className="space-y-6">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Category Name *
+                      Category Name <span className="text-red-500">*</span>
                     </label>
                     <input
+                      ref={nameRef}
                       type="text"
-                      required
-                      value={formData.name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      maxLength={30}
+                      {...formik.getFieldProps("name")}
+                      onChange={(e) => {
+                        const capitalizedValue = capitalizeFirstLetter(e.target.value);
+                        formik.setFieldValue("name", capitalizedValue);
+                      }}
+                      className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:outline-none transition-all ${
+                        formik.errors.name && formik.touched.name
+                          ? "border-red-500 dark:border-red-500 animate-shake focus:border-red-500"
+                          : "border-gray-300 dark:border-gray-600 focus:border-blue-500"
+                      }`}
                       placeholder="Enter category name"
                     />
+                    {formik.errors.name && formik.touched.name && (
+                      <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                        {formik.errors.name}
+                      </p>
+                    )}
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Select Menu Master *
+                      Select Menu Master <span className="text-red-500">*</span>
                     </label>
                     {menuMasters.length === 0 ? (
                       <div className="border border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 text-sm text-gray-500 dark:text-gray-400">
@@ -241,12 +287,13 @@ export default function AddCategoryPage() {
                         first.
                       </div>
                     ) : (
+                      <>
                       <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700">
                         <div className="max-h-48 overflow-y-auto pr-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-track]:dark:bg-gray-800 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:dark:bg-gray-600 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-gray-400 [&::-webkit-scrollbar-thumb]:dark:hover:bg-gray-500">
                           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3">
                             {menuMasters.map((master) => {
                               const isSelected =
-                                formData.menuMasterId === master.menuMasterId;
+                                formik.values.menuMasterId === master.menuMasterId;
                               return (
                                 <button
                                   key={master.menuMasterId}
@@ -283,6 +330,12 @@ export default function AddCategoryPage() {
                           </div>
                         </div>
                       </div>
+                      {formik.errors.menuMasterId && formik.touched.menuMasterId && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                          {formik.errors.menuMasterId}
+                        </p>
+                      )}
+                      </>
                     )}
                   </div>
 
@@ -292,11 +345,8 @@ export default function AddCategoryPage() {
                       Department
                     </label>
                     <select
-                      value={formData.deptCode}
-                      onChange={(e) =>
-                        setFormData({ ...formData, deptCode: e.target.value })
-                      }
-                      disabled={!formData.menuMasterId}
+                      {...formik.getFieldProps("deptCode")}
+                      disabled={!formik.values.menuMasterId}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <option value="">Select Department</option>
@@ -306,7 +356,7 @@ export default function AddCategoryPage() {
                         </option>
                       ))}
                     </select>
-                    {!formData.menuMasterId && (
+                    {!formik.values.menuMasterId && (
                       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                         Please select a menu master first
                       </p>
@@ -319,20 +369,30 @@ export default function AddCategoryPage() {
                       <div>
                         <SystemColorPicker
                           label="Color Code (Background)"
-                          value={formData.colorCode}
+                          value={formik.values.colorCode}
                           onChange={(color: string) =>
-                            setFormData({ ...formData, colorCode: color })
+                            formik.setFieldValue("colorCode", color)
                           }
                         />
+                        {formik.errors.colorCode && formik.touched.colorCode && (
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                            {formik.errors.colorCode}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <TextColorPicker
                           label="Text Color"
-                          value={formData.forColorCode}
+                          value={formik.values.forColorCode}
                           onChange={(color: string) =>
-                            setFormData({ ...formData, forColorCode: color })
+                            formik.setFieldValue("forColorCode", color)
                           }
                         />
+                        {formik.errors.forColorCode && formik.touched.forColorCode && (
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                            {formik.errors.forColorCode}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -348,8 +408,8 @@ export default function AddCategoryPage() {
                         type="button"
                         className="px-6 py-3 rounded-lg font-medium transition-all hover:opacity-90"
                         style={{
-                          backgroundColor: formData.colorCode || "#3B82F6",
-                          color: formData.forColorCode || "#FFFFFF",
+                          backgroundColor: formik.values.colorCode || "#3B82F6",
+                          color: formik.values.forColorCode || "#FFFFFF",
                         }}
                       >
                         Sample Button
@@ -450,9 +510,9 @@ export default function AddCategoryPage() {
               <StatusToggle
                 label="Category Status"
                 description="Toggle to control whether this category is active and visible across the POS."
-                value={formData.isActive === 1}
+                value={formik.values.isActive === 1}
                 onChange={(val) =>
-                  setFormData({ ...formData, isActive: val ? 1 : 0 })
+                  formik.setFieldValue("isActive", val ? 1 : 0)
                 }
               />
             </div>

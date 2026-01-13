@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
@@ -25,7 +25,7 @@ interface MenuMaster {
   name: string;
 }
 
-export default function AddMenuItemPage() {
+function AddMenuItemContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { selectedStoreCode, buildApiUrl } = useApiWithStore();
@@ -197,5 +197,30 @@ export default function AddMenuItemPage() {
         />
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function AddMenuItemPage() {
+  return (
+    <Suspense
+      fallback={
+        <DashboardLayout>
+          <div className="space-y-6">
+            <div className="flex items-center space-x-4">
+              <div className="p-2 text-gray-500 dark:text-gray-400">
+                <ArrowLeftIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                <div className="h-4 w-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              </div>
+            </div>
+            <FormSkeleton />
+          </div>
+        </DashboardLayout>
+      }
+    >
+      <AddMenuItemContent />
+    </Suspense>
   );
 }

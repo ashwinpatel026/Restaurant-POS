@@ -4,6 +4,16 @@ export function cn(...inputs: ClassValue[]) {
   return clsx(inputs)
 }
 
+/**
+ * Capitalizes the first letter of a string
+ * @param str - The string to capitalize
+ * @returns The string with first letter capitalized, or original string if empty/null
+ */
+export function capitalizeFirstLetter(str: string): string {
+  if (!str) return str;
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
 export function generateOrderNumber(): string {
   const timestamp = Date.now().toString(36).toUpperCase()
   const random = Math.random().toString(36).substring(2, 6).toUpperCase()

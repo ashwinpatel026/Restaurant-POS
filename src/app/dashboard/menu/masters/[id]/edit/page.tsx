@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
@@ -11,6 +11,10 @@ import TextColorPicker from "@/components/ui/TextColorPicker";
 import { CheckIcon } from "@heroicons/react/24/solid";
 import StatusToggle from "@/components/forms/StatusToggle";
 import { useApiWithStore } from "@/hooks/useApiWithStore";
+import { useFormik } from "formik";
+import { menuMasterSchema } from "@/validation/menuMasterSchema";
+import { useFormikAutoFocus } from "@/hooks/useFormikAutoFocus";
+import { capitalizeFirstLetter } from "@/lib/utils";
 
 interface PrepZone {
   prepZoneId: string;
@@ -79,16 +83,11 @@ export default function EditMenuMasterPage() {
     new Set()
   );
 
-  const [formData, setFormData] = useState({
-    name: "",
-    labelName: "",
-    colorCode: "#3B82F6",
-    forColorCode: "#FFFFFF",
-    deptCode: "",
-    eventCode: "",
-    isEventMenu: 0,
-    isActive: 1,
-  });
+  // Refs for auto-focus on validation errors
+  const nameRef = useRef<HTMLInputElement>(null);
+  const labelNameRef = useRef<HTMLInputElement>(null);
+  const colorCodeRef = useRef<HTMLElement>(null);
+  const forColorCodeRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (masterId && selectedStoreCode) {
@@ -187,7 +186,7 @@ export default function EditMenuMasterPage() {
         }
         setSelectedStations(new Set(stationCodes));
 
-        setFormData({
+        const initialData = {
           name: masterData.name || "",
           labelName: masterData.labelName || "",
           colorCode: masterData.colorCode || "#3B82F6",
@@ -197,7 +196,8 @@ export default function EditMenuMasterPage() {
           isEventMenu: masterData.isEventMenu ? 1 : 0,
           isActive:
             typeof masterData.isActive === "number" ? masterData.isActive : 1,
-        });
+        };
+        formik.setValues(initialData);
       }
     } catch (error) {
       toast.error("Error loading data");
@@ -245,8 +245,7 @@ export default function EditMenuMasterPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  async function onSubmitForm(values: any) {
     setSubmitting(true);
 
     try {
@@ -260,17 +259,17 @@ export default function EditMenuMasterPage() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            name: formData.name,
-            labelName: formData.labelName,
-            colorCode: formData.colorCode,
-            forColorCode: formData.forColorCode,
-            deptCode: formData.deptCode || null,
+            name: values.name.trim(),
+            labelName: values.labelName || null,
+            colorCode: values.colorCode,
+            forColorCode: values.forColorCode,
+            deptCode: values.deptCode || null,
             prepZoneCodes: prepZoneCodes.length > 0 ? prepZoneCodes : null,
             stationCodes: stationCodes.length > 0 ? stationCodes : null,
-            eventCode: formData.eventCode || null,
+            eventCode: values.eventCode || null,
             currentEventCode: currentEventCode || null,
-            isEventMenu: formData.eventCode ? 1 : 0,
-            isActive: formData.isActive,
+            isEventMenu: values.eventCode ? 1 : 0,
+            isActive: values.isActive,
           }),
         }
       );
@@ -288,7 +287,6 @@ export default function EditMenuMasterPage() {
         }
       }
     } catch (error: any) {
-      // Only log unexpected errors (network errors, etc.)
       if (error instanceof TypeError && error.message.includes('fetch')) {
         toast.error("Network error. Please check your connection.");
       } else {
@@ -298,7 +296,54 @@ export default function EditMenuMasterPage() {
     } finally {
       setSubmitting(false);
     }
-  };
+  }
+
+  const formik = useFormik({
+    initialValues: {
+      name: "",
+      labelName: "",
+      colorCode: "#3B82F6",
+      forColorCode: "#FFFFFF",
+      deptCode: "",
+      eventCode: "",
+      isEventMenu: 0,
+      isActive: 1,
+    },
+    validationSchema: menuMasterSchema,
+    enableReinitialize: true,
+    onSubmit: async (values, { setTouched }) => {
+      // Mark all fields as touched to show errors
+      setTouched({
+        name: true,
+        labelName: true,
+        colorCode: true,
+        forColorCode: true,
+        deptCode: true,
+        eventCode: true,
+      });
+      
+      // Validate and check for errors
+      await formik.validateForm();
+      
+      // If there are errors, don't submit
+      if (Object.keys(formik.errors).length > 0) {
+        return;
+      }
+      
+      // No errors, proceed with submission
+      onSubmitForm(values);
+    },
+    validateOnChange: false,
+    validateOnBlur: true,
+  });
+
+  // Auto-focus on first error field
+  useFormikAutoFocus(formik, {
+    name: nameRef,
+    labelName: labelNameRef,
+    colorCode: colorCodeRef,
+    forColorCode: forColorCodeRef,
+  });
 
   if (loading) {
     return (
@@ -352,7 +397,7 @@ export default function EditMenuMasterPage() {
 
         {/* Form */}
         <div className="bg-white dark:bg-gray-800 shadow rounded-lg">
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={formik.handleSubmit}>
             <div className="p-6 space-y-6">
               {/* Basic Information */}
               <div>
@@ -363,18 +408,36 @@ export default function EditMenuMasterPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Menu Master Name *
+                        Menu Master Name <span className="text-red-500">*</span>
                       </label>
                       <input
+                        ref={nameRef}
                         type="text"
-                        required
-                        value={formData.name}
-                        onChange={(e) =>
-                          setFormData({ ...formData, name: e.target.value })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        maxLength={30}
+                        {...formik.getFieldProps("name")}
+                        onChange={(e) => {
+                          const capitalizedValue = capitalizeFirstLetter(e.target.value);
+                          formik.setFieldValue("name", capitalizedValue);
+                        }}
+                        onBlur={(e) => {
+                          formik.handleBlur(e);
+                          // Only copy if labelName is blank/empty
+                          if (!formik.values.labelName || formik.values.labelName.trim() === "") {
+                            formik.setFieldValue("labelName", e.target.value);
+                          }
+                        }}
+                        className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:outline-none transition-all ${
+                          formik.errors.name && formik.touched.name
+                            ? "border-red-500 dark:border-red-500 animate-shake focus:border-red-500"
+                            : "border-gray-300 dark:border-gray-600 focus:border-blue-500"
+                        }`}
                         placeholder="Enter menu master name"
                       />
+                      {formik.errors.name && formik.touched.name && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                          {formik.errors.name}
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -382,17 +445,22 @@ export default function EditMenuMasterPage() {
                         Label Name
                       </label>
                       <input
+                        ref={labelNameRef}
                         type="text"
-                        value={formData.labelName}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            labelName: e.target.value,
-                          })
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        maxLength={30}
+                        {...formik.getFieldProps("labelName")}
+                        className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:outline-none transition-all ${
+                          formik.errors.labelName && formik.touched.labelName
+                            ? "border-red-500 dark:border-red-500 animate-shake focus:border-red-500"
+                            : "border-gray-300 dark:border-gray-600 focus:border-blue-500"
+                        }`}
                         placeholder="Enter display label"
                       />
+                      {formik.errors.labelName && formik.touched.labelName && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                          {formik.errors.labelName}
+                        </p>
+                      )}
                     </div>
                   </div>
 
@@ -402,10 +470,7 @@ export default function EditMenuMasterPage() {
                         Department
                       </label>
                       <select
-                        value={formData.deptCode}
-                        onChange={(e) =>
-                          setFormData({ ...formData, deptCode: e.target.value })
-                        }
+                        {...formik.getFieldProps("deptCode")}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       >
                         <option value="">Select Department</option>
@@ -427,20 +492,30 @@ export default function EditMenuMasterPage() {
                       <div>
                         <SystemColorPicker
                           label="Color Code (Background)"
-                          value={formData.colorCode || ""}
+                          value={formik.values.colorCode || ""}
                           onChange={(color: string) =>
-                            setFormData({ ...formData, colorCode: color })
+                            formik.setFieldValue("colorCode", color)
                           }
                         />
+                        {formik.errors.colorCode && formik.touched.colorCode && (
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                            {formik.errors.colorCode}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <TextColorPicker
                           label="Text Color"
-                          value={formData.forColorCode || "#FFFFFF"}
+                          value={formik.values.forColorCode || "#FFFFFF"}
                           onChange={(color: string) =>
-                            setFormData({ ...formData, forColorCode: color })
+                            formik.setFieldValue("forColorCode", color)
                           }
                         />
+                        {formik.errors.forColorCode && formik.touched.forColorCode && (
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                            {formik.errors.forColorCode}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -456,8 +531,8 @@ export default function EditMenuMasterPage() {
                         type="button"
                         className="px-6 py-3 rounded-lg font-medium transition-all hover:opacity-90"
                         style={{
-                          backgroundColor: formData.colorCode || "#3B82F6",
-                          color: formData.forColorCode || "#FFFFFF",
+                          backgroundColor: formik.values.colorCode || "#3B82F6",
+                          color: formik.values.forColorCode || "#FFFFFF",
                         }}
                       >
                         Sample Button
@@ -594,14 +669,11 @@ export default function EditMenuMasterPage() {
                       Time Event
                     </label>
                     <select
-                      value={formData.eventCode}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          eventCode: e.target.value,
-                          isEventMenu: e.target.value ? 1 : 0,
-                        })
-                      }
+                      {...formik.getFieldProps("eventCode")}
+                      onChange={(e) => {
+                        formik.setFieldValue("eventCode", e.target.value);
+                        formik.setFieldValue("isEventMenu", e.target.value ? 1 : 0);
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       <option value="">No Time Event (Available Always)</option>
@@ -622,9 +694,9 @@ export default function EditMenuMasterPage() {
               <StatusToggle
                 label="Menu Master Status"
                 description="Toggle to control whether this menu master is active across the POS."
-                value={formData.isActive === 1}
+                value={formik.values.isActive === 1}
                 onChange={(val) =>
-                  setFormData({ ...formData, isActive: val ? 1 : 0 })
+                  formik.setFieldValue("isActive", val ? 1 : 0)
                 }
                 disabled={submitting}
               />

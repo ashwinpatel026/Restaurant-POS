@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import toast from "react-hot-toast";
 import SystemColorPicker, {
   getPrimaryColor,
@@ -12,6 +12,10 @@ import { LoadingOverlay } from "@/components/ui/SkeletonLoader";
 import { CheckIcon } from "@heroicons/react/24/solid";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { useApiWithStore } from "@/hooks/useApiWithStore";
+import { useFormik } from "formik";
+import { menuItemSchema } from "@/validation/menuItemSchema";
+import { useFormikAutoFocus } from "@/hooks/useFormikAutoFocus";
+import { capitalizeFirstLetter } from "@/lib/utils";
 
 interface MenuItemFormProps {
   menuItem?: any;
@@ -29,6 +33,15 @@ export default function MenuItemTabbedForm({
   onCancel,
 }: MenuItemFormProps) {
   const { selectedStoreCode, buildApiUrl } = useApiWithStore();
+  
+  // Refs for auto-focus on validation errors
+  const nameRef = useRef<HTMLInputElement>(null);
+  const labelNameRef = useRef<HTMLInputElement>(null);
+  const colorCodeRef = useRef<HTMLElement>(null);
+  const forColorCodeRef = useRef<HTMLElement>(null);
+  const menuMasterRef = useRef<HTMLElement>(null);
+  const categoryRef = useRef<HTMLElement>(null);
+
   const [formData, setFormData] = useState({
     name: "",
     kitchenName: "",
@@ -195,6 +208,7 @@ export default function MenuItemTabbedForm({
         menuMasterCode: master.menuMasterCode,
         deptCode: autoDeptCode,
       });
+      formik.setFieldValue("menuMasterCode", master.menuMasterCode);
       setSelectedMenuMaster(master);
       setSelectedCategories(new Set(categoryCodes));
     } else {
@@ -210,7 +224,7 @@ export default function MenuItemTabbedForm({
 
   useEffect(() => {
     if (menuItem) {
-      setFormData({
+      const initialData = {
         name: menuItem.name || "",
         kitchenName: menuItem.kitchenName || "",
         labelName: menuItem.labelName || "",
@@ -258,7 +272,10 @@ export default function MenuItemTabbedForm({
         dimension: menuItem.dimension || "",
         weight: menuItem.weight || "",
         prepTimeMinutes: menuItem.prepTimeMinutes ?? 0,
-      });
+      };
+      setFormData(initialData);
+      // Also update Formik values
+      formik.setValues(initialData);
 
       // Parse prepZoneCode from JSON if it exists
       let prepZoneCodes: string[] = [];
@@ -459,8 +476,114 @@ export default function MenuItemTabbedForm({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Formik instance for validation
+  const formik = useFormik({
+    initialValues: {
+      name: formData.name,
+      labelName: formData.labelName,
+      kitchenName: formData.kitchenName,
+      colorCode: formData.colorCode,
+      forColorCode: formData.forColorCode,
+      menuMasterCode: formData.menuMasterCode,
+      menuCategoryCode: formData.menuCategoryCode,
+      calories: formData.calories,
+      description: formData.description,
+      itemSize: formData.itemSize,
+      skuPlu: formData.skuPlu,
+      barcode: formData.barcode,
+      itemContainAlcohol: formData.itemContainAlcohol,
+      menuImg: formData.menuImg,
+      priceStrategy: formData.priceStrategy,
+      basePrice: formData.basePrice,
+      retailPrice: formData.retailPrice,
+      isPrice: formData.isPrice,
+      deptCode: formData.deptCode,
+      isActive: formData.isActive,
+      stockinhand: formData.stockinhand,
+      taxCode: formData.taxCode,
+      inheritTaxInclusion: formData.inheritTaxInclusion,
+      isTaxIncluded: formData.isTaxIncluded,
+      inheritDiningTax: formData.inheritDiningTax,
+      diningTaxEffect: formData.diningTaxEffect,
+      disqualifyDiningTaxExemption: formData.disqualifyDiningTaxExemption,
+      isOutStock: formData.isOutStock,
+      isPosVisible: formData.isPosVisible,
+      isKioskOrderPay: formData.isKioskOrderPay,
+      isOnlineOrderByApp: formData.isOnlineOrderByApp,
+      isOnlineOrdering: formData.isOnlineOrdering,
+      isCustomerInvoice: formData.isCustomerInvoice,
+      dimension: formData.dimension,
+      weight: formData.weight,
+      prepTimeMinutes: formData.prepTimeMinutes,
+    },
+    validationSchema: menuItemSchema,
+    enableReinitialize: true,
+    validateOnChange: true,
+    validateOnBlur: true,
+    onSubmit: async (values, { setTouched, setFieldError }) => {
+      // Update Formik values from current formData before validation
+      formik.setFieldValue("name", formData.name, false);
+      formik.setFieldValue("labelName", formData.labelName, false);
+      formik.setFieldValue("kitchenName", formData.kitchenName, false);
+      formik.setFieldValue("colorCode", formData.colorCode, false);
+      formik.setFieldValue("forColorCode", formData.forColorCode, false);
+      formik.setFieldValue("menuMasterCode", formData.menuMasterCode, false);
+      formik.setFieldValue("menuCategoryCode", Array.from(selectedCategories).length > 0 ? Array.from(selectedCategories)[0] : "", false);
+      
+      // Mark all fields as touched to show errors
+      setTouched({
+        name: true,
+        labelName: true,
+        colorCode: true,
+        forColorCode: true,
+        menuMasterCode: true,
+        menuCategoryCode: true,
+      });
+      
+      // Validate and check for errors
+      await formik.validateForm();
+      
+      // Check for category selection manually
+      if (selectedCategories.size === 0) {
+        setFieldError("menuCategoryCode", "Please select at least one category");
+        toast.error("Please select at least one category");
+        return;
+      }
+      
+      // If there are errors, don't submit
+      if (Object.keys(formik.errors).length > 0) {
+        toast.error("Please fix the validation errors");
+        return;
+      }
+      
+      // No errors, proceed with submission
+      onSubmitForm();
+    },
+  });
+
+  // Sync Formik values with formData when formData changes (for non-validated fields)
+  useEffect(() => {
+    // Only sync the fields that are used for validation
+    formik.setFieldValue("name", formData.name);
+    formik.setFieldValue("labelName", formData.labelName);
+    formik.setFieldValue("kitchenName", formData.kitchenName);
+    formik.setFieldValue("colorCode", formData.colorCode);
+    formik.setFieldValue("forColorCode", formData.forColorCode);
+    formik.setFieldValue("menuMasterCode", formData.menuMasterCode);
+  }, [formData.name, formData.labelName, formData.kitchenName, formData.colorCode, formData.forColorCode, formData.menuMasterCode]);
+
+  // Auto-focus on first error field
+  useFormikAutoFocus(formik, {
+    name: nameRef,
+    labelName: labelNameRef,
+    colorCode: colorCodeRef,
+    forColorCode: forColorCodeRef,
+    menuMasterCode: menuMasterRef,
+    menuCategoryCode: categoryRef,
+  });
+
+  // Extract submission logic to separate function
+  const onSubmitForm = async () => {
     setLoading(true);
 
     try {
@@ -569,7 +692,7 @@ export default function MenuItemTabbedForm({
   return (
     <LoadingOverlay isLoading={loading}>
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-        <form onSubmit={handleSubmit} className="space-y-8">
+        <form onSubmit={formik.handleSubmit} className="space-y-8">
           {/* Basic Information Section */}
           <div className="p-6 border-b border-gray-200 dark:border-gray-700">
             <div className="mb-6">
@@ -585,18 +708,39 @@ export default function MenuItemTabbedForm({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Name *
+                    Name <span className="text-red-500">*</span>
                   </label>
                   <input
+                    ref={nameRef}
                     type="text"
-                    required
+                    maxLength={30}
+                    name="name"
                     value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onChange={(e) => {
+                      const capitalizedValue = capitalizeFirstLetter(e.target.value);
+                      setFormData({ ...formData, name: capitalizedValue });
+                      formik.setFieldValue("name", capitalizedValue);
+                    }}
+                    onBlur={(e) => {
+                      formik.handleBlur(e);
+                      // Only copy if labelName is blank/empty
+                      if (!formData.labelName || formData.labelName.trim() === "") {
+                        setFormData({ ...formData, labelName: e.target.value });
+                        formik.setFieldValue("labelName", e.target.value);
+                      }
+                    }}
+                    className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:outline-none transition-all ${
+                      formik.errors.name && formik.touched.name
+                        ? "border-red-500 dark:border-red-500 animate-shake focus:border-red-500"
+                        : "border-gray-300 dark:border-gray-600 focus:border-blue-500"
+                    }`}
                     placeholder="Enter item name"
                   />
+                  {formik.errors.name && formik.touched.name && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                      {formik.errors.name}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -618,18 +762,31 @@ export default function MenuItemTabbedForm({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Label Name *
+                    Label Name <span className="text-red-500">*</span>
                   </label>
                   <input
+                    ref={labelNameRef}
                     type="text"
-                    required
+                    maxLength={30}
+                    name="labelName"
                     value={formData.labelName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, labelName: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onChange={(e) => {
+                      setFormData({ ...formData, labelName: e.target.value });
+                      formik.setFieldValue("labelName", e.target.value);
+                    }}
+                    onBlur={formik.handleBlur}
+                    className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:outline-none transition-all ${
+                      formik.errors.labelName && formik.touched.labelName
+                        ? "border-red-500 dark:border-red-500 animate-shake focus:border-red-500"
+                        : "border-gray-300 dark:border-gray-600 focus:border-blue-500"
+                    }`}
                     placeholder="Enter display label"
                   />
+                  {formik.errors.labelName && formik.touched.labelName && (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                      {formik.errors.labelName}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -649,32 +806,32 @@ export default function MenuItemTabbedForm({
               </div>
 
               <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Menu Master & Categories *
-                  </label>
-                  <div className="space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowMenuMasterCategoryModal(true)}
-                      className="w-full px-4 py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-left"
-                    >
-                      {selectedMenuMaster && selectedCategories.size > 0
-                        ? `${
-                            selectedMenuMaster.name ||
-                            selectedMenuMaster.labelName ||
-                            selectedMenuMaster.menuMasterCode
-                          } - ${selectedCategories.size} categor${
-                            selectedCategories.size === 1 ? "y" : "ies"
-                          } selected`
-                        : selectedMenuMaster
-                        ? `${
-                            selectedMenuMaster.name ||
-                            selectedMenuMaster.labelName ||
-                            selectedMenuMaster.menuMasterCode
-                          } - No categories selected`
-                        : "Click to select Menu Master & Categories"}
-                    </button>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Menu Master & Categories <span className="text-red-500">*</span>
+                    </label>
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowMenuMasterCategoryModal(true)}
+                        className="w-full px-4 py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-left"
+                      >
+                        {selectedMenuMaster && selectedCategories.size > 0
+                          ? `${
+                              selectedMenuMaster.name ||
+                              selectedMenuMaster.labelName ||
+                              selectedMenuMaster.menuMasterCode
+                            } - ${selectedCategories.size} categor${
+                              selectedCategories.size === 1 ? "y" : "ies"
+                            } selected`
+                          : selectedMenuMaster
+                          ? `${
+                              selectedMenuMaster.name ||
+                              selectedMenuMaster.labelName ||
+                              selectedMenuMaster.menuMasterCode
+                            } - No categories selected`
+                          : "Click to select Menu Master & Categories"}
+                      </button>
 
                     {/* Display Selected Menu Master */}
                     {selectedMenuMaster && (
@@ -754,6 +911,13 @@ export default function MenuItemTabbedForm({
                       </div>
                     )}
                   </div>
+                  {(formik.errors.menuMasterCode && formik.touched.menuMasterCode) || 
+                   (formik.errors.menuCategoryCode && formik.touched.menuCategoryCode) || 
+                   (selectedCategories.size === 0 && formik.touched.menuCategoryCode) ? (
+                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                      {formik.errors.menuMasterCode || formik.errors.menuCategoryCode || "Please select at least one category"}
+                    </p>
+                  ) : null}
                 </div>
 
                 {/* Department Selection - Always visible, enabled after menu master and category selection */}
@@ -790,19 +954,31 @@ export default function MenuItemTabbedForm({
                       <SystemColorPicker
                         label="Color Code (Background)"
                         value={formData.colorCode}
-                        onChange={(color: string) =>
-                          setFormData({ ...formData, colorCode: color })
-                        }
+                        onChange={(color: string) => {
+                          setFormData({ ...formData, colorCode: color });
+                          formik.setFieldValue("colorCode", color);
+                        }}
                       />
+                      {formik.errors.colorCode && formik.touched.colorCode && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                          {formik.errors.colorCode}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <TextColorPicker
                         label="Text Color"
                         value={formData.forColorCode}
-                        onChange={(color: string) =>
-                          setFormData({ ...formData, forColorCode: color })
-                        }
+                        onChange={(color: string) => {
+                          setFormData({ ...formData, forColorCode: color });
+                          formik.setFieldValue("forColorCode", color);
+                        }}
                       />
+                      {formik.errors.forColorCode && formik.touched.forColorCode && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                          {formik.errors.forColorCode}
+                        </p>
+                      )}
                     </div>
                   </div>
 
