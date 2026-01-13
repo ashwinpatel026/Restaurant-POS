@@ -77,8 +77,8 @@ const navigation: MenuItem[] = [
       {
         name: "Menu Master",
         href: "/dashboard/menu/masters",
-        icon: BuildingStorefrontIcon,
-        iconImage: "/assets/icon/menu_10154074.png",
+        icon: DocumentTextIcon,
+        //iconImage: "/assets/icon/menu_10154074.png",
         permissions: ["menu.masters.view", "menu.view"], // Allow both granular and general permission
       },
       {

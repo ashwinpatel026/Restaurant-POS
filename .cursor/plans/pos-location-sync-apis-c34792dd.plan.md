@@ -1,4 +1,9 @@
-<!-- c34792dd-7125-4a46-aabb-8ff4ad1ea690 02b9d6f0-dded-4d56-9be5-515402185b74 -->
+---
+name: POS Location Sync APIs - Two-Way Sync Architecture
+overview: ""
+todos: []
+---
+
 # POS Location Sync APIs - Two-Way Sync Architecture
 
 Create API modules for POS clients to sync location data store-wise with **two-way synchronization** between Location Database and POS System. This complements the existing one-way sync from Master to Location.
@@ -24,53 +29,53 @@ All APIs interact with **Location Database** (not Master), filtered by `storeCod
 
 **GET `/api/pos/sync/location/[storeCode]`** - Pull location info from Location DB
 
-  - Returns location information for the specified store
-  - Validates storeCode exists and location is active
-  - Includes location metadata (address, contact, etc.)
-  - Location: `src/app/api/pos/sync/location/[storeCode]/route.ts`
+- Returns location information for the specified store
+- Validates storeCode exists and location is active
+- Includes location metadata (address, contact, etc.)
+- Location: `src/app/api/pos/sync/location/[storeCode]/route.ts`
 
 **POST `/api/pos/sync/location/[storeCode]`** - Push location updates to Location DB
 
-  - Accepts location data updates from POS client
-  - Updates location data in Location database only
-  - Sets `syncSource = "POS"` to track POS-originated changes
-  - Updates sync flags appropriately
-  - Location: `src/app/api/pos/sync/location/[storeCode]/route.ts`
+- Accepts location data updates from POS client
+- Updates location data in Location database only
+- Sets `syncSource = "POS"` to track POS-originated changes
+- Updates sync flags appropriately
+- Location: `src/app/api/pos/sync/location/[storeCode]/route.ts`
 
 #### B. Store Data Sync (Comprehensive)
 
 **GET `/api/pos/sync/location/[storeCode]/data`** - Pull all store data from Location DB
 
-  - Returns comprehensive store data filtered by storeCode:
-    - Menu items, modifiers, prep zones
-    - Orders, tables, stations
-    - Tax, events, printers
-  - Supports query parameters for incremental sync (since lastSyncAt)
-  - Returns sync metadata for conflict resolution
-  - Location: `src/app/api/pos/sync/location/[storeCode]/data/route.ts`
+- Returns comprehensive store data filtered by storeCode:
+  - Menu items, modifiers, prep zones
+  - Orders, tables, stations
+  - Tax, events, printers
+- Supports query parameters for incremental sync (since lastSyncAt)
+- Returns sync metadata for conflict resolution
+- Location: `src/app/api/pos/sync/location/[storeCode]/data/route.ts`
 
 **POST `/api/pos/sync/location/[storeCode]/data`** - Push store data updates to Location DB
 
-  - Accepts bulk data updates from POS (orders, inventory, etc.)
-  - Handles multiple table types in one request
-  - Sets `syncSource = "POS"` for all POS-originated records
-  - Updates `isSyncToWeb` flags to indicate changes need web sync
-  - Handles conflict resolution (if record exists, merge or override based on timestamp)
-  - Location: `src/app/api/pos/sync/location/[storeCode]/data/route.ts`
+- Accepts bulk data updates from POS (orders, inventory, etc.)
+- Handles multiple table types in one request
+- Sets `syncSource = "POS"` for all POS-originated records
+- Updates `isSyncToWeb` flags to indicate changes need web sync
+- Handles conflict resolution (if record exists, merge or override based on timestamp)
+- Location: `src/app/api/pos/sync/location/[storeCode]/data/route.ts`
 
 #### C. Table-Specific Sync Endpoints
 
 **GET `/api/pos/sync/location/[storeCode]/[tableName]`** - Pull specific table data
 
-  - Returns data for a specific table (e.g., menu_items, orders, etc.)
-  - Supports filtering and pagination
-  - Location: `src/app/api/pos/sync/location/[storeCode]/[tableName]/route.ts`
+- Returns data for a specific table (e.g., menu_items, orders, etc.)
+- Supports filtering and pagination
+- Location: `src/app/api/pos/sync/location/[storeCode]/[tableName]/route.ts`
 
 **POST `/api/pos/sync/location/[storeCode]/[tableName]`** - Push table-specific updates
 
-  - Accepts updates for a specific table
-  - Bulk insert/update/delete operations
-  - Location: `src/app/api/pos/sync/location/[storeCode]/[tableName]/route.ts`
+- Accepts updates for a specific table
+- Bulk insert/update/delete operations
+- Location: `src/app/api/pos/sync/location/[storeCode]/[tableName]/route.ts`
 
 ### 2. Create POS Authentication Helper
 
@@ -87,7 +92,7 @@ All APIs interact with **Location Database** (not Master), filtered by `storeCod
 **Location**: `src/services/posSyncService.ts`
 
 - **Data Transformation**: Transform POS data format to Location DB schema
-- **Conflict Resolution**: 
+- **Conflict Resolution**:
   - Handle conflicts when POS and Master sync overlap
   - Compare timestamps and syncSource
   - Implement merge strategies (last-write-wins, manual merge, etc.)
@@ -102,18 +107,18 @@ All APIs interact with **Location Database** (not Master), filtered by `storeCod
 
 When POS pushes data that conflicts with Master-synced data:
 
-1. **Check syncSource**: 
+1. **Check syncSource**:
 
    - If existing record has `syncSource = "server"` (from Master), POS update may override
    - If existing record has `syncSource = "POS"`, allow POS updates
    - If existing record has `syncSource = "location"` (dashboard), apply conflict resolution
 
-2. **Timestamp Comparison**: 
+2. **Timestamp Comparison**:
 
    - Compare `updatedAt` timestamps
    - Last-write-wins strategy (configurable)
 
-3. **Conflict Flags**: 
+3. **Conflict Flags**:
 
    - Mark records with conflicts for manual review
    - Log conflicts for audit trail

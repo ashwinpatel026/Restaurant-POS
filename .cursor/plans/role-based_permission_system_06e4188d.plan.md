@@ -1,54 +1,3 @@
----
-name: Role-Based Permission System
-overview: Implement a comprehensive role-based access control (RBAC) system that allows managing roles and assigning granular permissions (both module-level and action-level). The system will include role management UI, permission assignment interface, and update all existing permission checks to use the new dynamic permission system.
-todos:
-  - id: schema_master
-    content: Add Permission, Role, and RolePermission models to master-schema.prisma and create migration
-    status: pending
-  - id: schema_location
-    content: Add Permission, Role, and RolePermission models to location schema.prisma and create migration
-    status: pending
-  - id: seed
-    content: Create seed script to populate default permissions and assign them to system roles in master DB
-    status: pending
-  - id: permission_service_master
-    content: Create master permissionService.ts that checks permissions in master database
-    status: pending
-  - id: permission_service_location
-    content: Create location permissionService.ts that checks permissions in location database
-    status: pending
-  - id: sync_permissions
-    content: Update sync processor to handle permission, role, and role-permission table syncing
-    status: pending
-  - id: role_apis
-    content: Create API routes for role CRUD operations (/api/master/roles)
-    status: pending
-  - id: permission_apis
-    content: Create API routes for permissions and role-permission assignment
-    status: pending
-  - id: access_control
-    content: Update accessControl.ts with checkMasterPermission and checkLocationPermission helpers
-    status: pending
-  - id: update_master_apis
-    content: Update all master API routes to use checkMasterPermission instead of hardcoded role arrays
-    status: pending
-  - id: update_location_apis
-    content: Update all dashboard API routes to use checkLocationPermission instead of hardcoded role arrays
-    status: pending
-  - id: role_ui
-    content: Create role management page and RoleModal component
-    status: pending
-  - id: permission_ui
-    content: Create PermissionAssignment component with module/action grouping
-    status: pending
-  - id: update_user_form
-    content: Update user creation form to fetch roles from API
-    status: pending
-  - id: navigation
-    content: Add Roles & Permissions menu item and permission-based menu visibility
-    status: pending
----
-
 # Role-Based Permission System Implementation
 
 ## Overview
@@ -179,8 +128,6 @@ graph TB
     LocationAPIs --> LPS2
 ```
 
-
-
 ### 4. Permission Check Strategy
 
 **Master Database (Master APIs - `/api/master/*`):**
@@ -237,8 +184,6 @@ Master DB (Source of Truth)
   ↓ Location DB (Synced Copy)
   ↓ Permission checks use local data
 ```
-
-
 
 ### 6. Permission Service Architecture
 
@@ -405,8 +350,6 @@ if (!['SUPER_ADMIN', 'OUTLET_MANAGER'].includes(session.user.role))
 // Location API - New:
 if (!(await checkLocationPermission(session.user.role, 'menu.create')))
 ```
-
-
 
 ## UI/UX Enhancements
 

@@ -634,6 +634,29 @@ model Department {
   @@map("tbl_department")
 }
 
+model Suggestion {
+  suggestionId      BigInt    @id @default(autoincrement()) @map("suggestion_id")
+  suggestionCode   String    @unique @map("suggestion_code") @db.VarChar(50)
+  suggestionText   String    @map("suggestion_text") @db.VarChar(255)
+  category         String?   @map("category") @db.VarChar(100)
+  isActive         Int       @default(1) @map("is_active")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
+  prepZoneCode     String?   @map("prep_zone_code") @db.VarChar(50)
+  storeCode        String?   @map("store_code") @db.VarChar(50)
+  suggestionDesc   String?   @map("suggestion_desc") @db.VarChar(1000)
+  isDelete         Boolean   @default(false) @map("is_delete")
+  syncId           String?   @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource       String?   @default("server") @map("sync_source") @db.VarChar(20)
+
+  @@index([suggestionCode])
+  @@index([category])
+  @@index([storeCode])
+  @@index([isActive])
+  @@index([syncId])
+  @@map("tbl_suggestion")
+}
+
 
 // Enums
 enum UserRole {

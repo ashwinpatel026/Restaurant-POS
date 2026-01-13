@@ -109,6 +109,7 @@ export const SYNC_TABLE_MAP: Record<string, string> = {
   'tbl_master_tax': 'tbl_tax',
   'tbl_master_time_events': 'tbl_time_events',
   'tbl_master_discount_master': 'tbl_discount_master',
+  'tbl_master_suggestion': 'tbl_suggestion',
   // User management tables - Individual sync only (not in full sync)
   'tbl_user': 'users',
   // Permission system tables
@@ -310,6 +311,15 @@ export const SYNC_FIELD_MAP: Record<string, Record<string, string>> = {
     'is_open_discount': 'is_open_discount',
     'is_active': 'is_active',
   },
+  'tbl_master_suggestion': {
+    'suggestion_code': 'suggestion_code',
+    'suggestion_text': 'suggestion_text',
+    'category': 'category',
+    'is_active': 'is_active',
+    'prep_zone_code': 'prep_zone_code',
+    'suggestion_desc': 'suggestion_desc',
+    'is_delete': 'is_delete',
+  },
   // User management tables - Individual sync only (synced on create/update, not in full sync)
   'tbl_user': {
     'email': 'email',
@@ -384,6 +394,7 @@ export const SYNC_ORDER_BY_COLUMN: Record<string, string> = {
   'tbl_master_tax': 'created_date',
   'tbl_master_time_events': 'created_date',
   'tbl_master_discount_master': 'created_date',
+  'tbl_master_suggestion': 'createdon',
   // User management tables - Individual sync only (not in full sync)
   'tbl_user': 'created_on',
   // Permission system tables
@@ -411,6 +422,7 @@ export const SYNC_TABLE_ORDER: string[] = [
   'tbl_master_time_events',
   'tbl_master_prep_zone',
   'tbl_master_discount_master',
+  'tbl_master_suggestion',
   
   // Permission system tables (must sync before users)
   'tbl_permission',              // Independent

@@ -1,33 +1,3 @@
----
-name: User access level filtering
-overview: Implement role-based user filtering in the /api/dashboard/users endpoint so users only see other users based on their access level and storeCode access. SUPER_ADMIN sees all users, COMPANY_ADMIN sees company users, DEALER sees dealer users, and LOCATION users with single storeCode see only themselves.
-todos:
-  - id: "1"
-    content: Update GET handler in /api/dashboard/users/route.ts to import getUserAccessInfo and masterPrisma
-    status: completed
-  - id: "2"
-    content: Implement SUPER_ADMIN filter (return all users)
-    status: in_progress
-  - id: "3"
-    content: Implement COMPANY access level filter (by companyId)
-    status: in_progress
-  - id: "4"
-    content: Implement DEALER access level filter (by dealerId)
-    status: in_progress
-  - id: "5"
-    content: Implement LOCATION access level filter (single storeCode = own user, multiple = query master DB for syncIds)
-    status: in_progress
-  - id: "6"
-    content: Implement selectedStoreCode filtering - query master UserStoreAccess to find users with access to selectedStoreCode
-    status: in_progress
-  - id: "7"
-    content: Combine access level filter and storeCode filter in the Prisma query
-    status: in_progress
-  - id: "8"
-    content: Test the filtering logic with different user roles, access levels, and selectedStoreCode values
-    status: pending
----
-
 # User Access Level Filtering for Dashboard Users
 
 ## Overview

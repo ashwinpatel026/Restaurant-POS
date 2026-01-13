@@ -125,6 +125,12 @@ const navigation: MenuItem[] = [
     roles: ["SUPER_ADMIN", "COMPANY_ADMIN", "DEALER_ADMIN"],
   },
   {
+    name: "Reason/Request Master",
+    href: "/master/suggestion",
+    icon: DocumentTextIcon,
+    roles: ["SUPER_ADMIN", "COMPANY_ADMIN", "DEALER_ADMIN"],
+  },
+  {
     name: "Menu",
     icon: CubeIcon,
     roles: ["SUPER_ADMIN", "COMPANY_ADMIN", "DEALER_ADMIN"],
