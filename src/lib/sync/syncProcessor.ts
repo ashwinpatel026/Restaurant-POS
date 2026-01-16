@@ -57,6 +57,8 @@ export class SyncProcessor {
     'tbl_master_printer': new Set(['isreceipt', 'isdocument', 'is_kitchen']),  // Master table name (for reverse lookup)
     'tbl_discount_master': new Set(['is_item_level', 'is_bill_level', 'requires_manager_approval', 'is_open_discount', 'is_delete', 'is_active']),  // Location table name
     'tbl_master_discount_master': new Set(['is_item_level', 'is_bill_level', 'requires_manager_approval', 'is_open_discount', 'is_delete', 'is_active']),  // Master table name (for reverse lookup)
+    'tbl_suggestion': new Set(['is_delete']),  // Location table name
+    'tbl_master_suggestion': new Set(['is_delete']),  // Master table name (for reverse lookup)
   };
 
   // Table-specific integer columns (columns that are integer in some tables)
@@ -926,6 +928,7 @@ export class SyncProcessor {
       { pattern: /^(DPT\d+)$/, prefix: targetPrefix },
       { pattern: /^(DEP\d+)$/, prefix: targetPrefix },
       { pattern: /^(DISC\d+)$/, prefix: targetPrefix },
+      { pattern: /^(SG\d+)$/, prefix: targetPrefix },
     ];
 
     for (const { pattern, prefix } of masterPatterns) {
@@ -1008,7 +1011,7 @@ export class SyncProcessor {
           'event_code', 'prep_zone_code', 'menu_master_code', 'menu_category_code',
           'menu_item_code', 'modifier_group_code', 'modifier_item_code',
           'dept_type_code', 'dept_code', 'dept_taxcode', 'dept_type',
-          'discount_code'
+          'discount_code', 'suggestion_code'
         ];
 
         // Check if this is a code field (case-insensitive check)
@@ -1229,6 +1232,15 @@ export class SyncProcessor {
               const discountMatch = codeValue.match(/^(DISC\d+)$/);
               if (discountMatch) {
                 mappedData[mappedKey] = `WM${locationCode}${discountMatch[1]}`;
+              } else {
+                mappedData[mappedKey] = value;
+              }
+            }
+            // Transform suggestion_code (in any table)
+            else if (key === 'suggestion_code') {
+              const suggestionMatch = codeValue.match(/^(SG\d+)$/);
+              if (suggestionMatch) {
+                mappedData[mappedKey] = `WM${locationCode}${suggestionMatch[1]}`;
               } else {
                 mappedData[mappedKey] = value;
               }

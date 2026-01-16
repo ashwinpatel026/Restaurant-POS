@@ -16,7 +16,6 @@ import DeleteConfirmationModal from "@/components/modals/DeleteConfirmationModal
 import DataTable from "@/components/tables/DataTable";
 import {
   TableSkeleton,
-  StatsSkeleton,
   PageHeaderSkeleton,
 } from "@/components/ui/SkeletonLoader";
 
@@ -26,6 +25,7 @@ interface Suggestion {
   suggestionText: string;
   category?: string | null;
   isActive: number;
+  isDelete?: boolean;
   prepZoneCode?: string | null;
   suggestionDesc?: string | null;
   createdBy?: string | null;
@@ -83,7 +83,8 @@ export default function SuggestionPage() {
 
       if (suggestionsRes.ok) {
         const data = await suggestionsRes.json();
-        setSuggestions(Array.isArray(data) ? data : []);
+        const suggestionsList = Array.isArray(data) ? data : [];
+        setSuggestions(suggestionsList.filter((item) => !item.isDelete));
       }
 
       if (prepZonesRes.ok) {
@@ -158,9 +159,6 @@ export default function SuggestionPage() {
           {/* Header Skeleton */}
           <PageHeaderSkeleton />
 
-          {/* Stats Skeleton */}
-          <StatsSkeleton count={3} />
-
           {/* Table Skeleton */}
           <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
             <div className="mb-4">
@@ -172,9 +170,6 @@ export default function SuggestionPage() {
       </MasterDashboardLayout>
     );
   }
-
-  const activeSuggestions = suggestions.filter((s) => s.isActive === 1).length;
-  const inactiveSuggestions = suggestions.filter((s) => s.isActive === 0).length;
 
   return (
     <MasterDashboardLayout>
@@ -196,63 +191,6 @@ export default function SuggestionPage() {
             <PlusIcon className="w-4 h-4 mr-2" />
             Add Suggestion
           </button>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
-                  <DocumentTextIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                </div>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Total Suggestions
-                </p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {suggestions.length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
-                  <CheckCircleIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
-                </div>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Active
-                </p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {activeSuggestions}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-red-100 dark:bg-red-900/20 rounded-lg flex items-center justify-center">
-                  <XCircleIcon className="w-5 h-5 text-red-600 dark:text-red-400" />
-                </div>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Inactive
-                </p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {inactiveSuggestions}
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Suggestions List */}

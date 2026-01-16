@@ -132,6 +132,12 @@ const navigation: MenuItem[] = [
     permissions: ["discount.view", "discount.create", "discount.update", "discount.delete"],
   },
   {
+    name: "Reason/Request Master",
+    href: "/dashboard/suggestion",
+    icon: DocumentTextIcon,
+    permissions: ["suggestion.view", "suggestion.create", "suggestion.update", "suggestion.delete"],
+  },
+  {
     name: "Department",
     icon: BuildingOfficeIcon,
     permissions: [

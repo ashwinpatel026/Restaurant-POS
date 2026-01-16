@@ -21,8 +21,8 @@ async function generateSuggestionCode(): Promise<string> {
     }
   }
   
-  // Format as SG + number starting from 1 (padded to 3 digits)
-  return `SG${nextNumber.toString().padStart(3, '0')}`
+  // Format as SG + number starting from 1 (no padding)
+  return `SG${nextNumber}`
 }
 
 // Helper function to map suggestion response

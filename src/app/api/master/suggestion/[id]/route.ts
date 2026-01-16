@@ -144,11 +144,12 @@ export async function DELETE(
     const { id: idParam } = await params
     const suggestionId = BigInt(idParam)
 
-    // Soft delete by setting isDelete to true
+    // Soft delete by setting isDelete to true and isActive to 0
     await masterPrisma.masterSuggestion.update({
       where: { suggestionId },
       data: {
         isDelete: true,
+        isActive: 0,
         updatedBy: admin.adminId,
         updatedOn: new Date()
       }

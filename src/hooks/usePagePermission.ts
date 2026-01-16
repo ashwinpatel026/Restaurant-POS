@@ -48,21 +48,15 @@ export function usePagePermission(options: UsePagePermissionOptions = {}) {
 
       const userRole = session.user.role as string;
 
-      // SUPER_ADMIN always has all permissions
-      if (userRole === "SUPER_ADMIN") {
-        setHasPermission(true);
-        setLoading(false);
-        return;
-      }
-
       try {
         // Fetch user permissions from location database
         const res = await fetch("/api/dashboard/user-permissions");
         if (!res.ok) {
           console.error("Failed to fetch user permissions");
-          setHasPermission(false);
+          const isSuperAdmin = userRole === "SUPER_ADMIN";
+          setHasPermission(isSuperAdmin);
           setLoading(false);
-          if (showAccessDenied) {
+          if (!isSuperAdmin && showAccessDenied) {
             router.push(redirectTo);
           }
           return;
@@ -77,18 +71,20 @@ export function usePagePermission(options: UsePagePermissionOptions = {}) {
           permissions.includes(permission)
         );
 
-        setHasPermission(hasAnyPermission);
+        const isSuperAdmin = userRole === "SUPER_ADMIN";
+        setHasPermission(isSuperAdmin || hasAnyPermission);
         setLoading(false);
 
         // Redirect to access denied if no permission
-        if (!hasAnyPermission && showAccessDenied) {
+        if (!hasAnyPermission && !isSuperAdmin && showAccessDenied) {
           router.push(redirectTo);
         }
       } catch (error) {
         console.error("Error checking permissions:", error);
-        setHasPermission(false);
+        const isSuperAdmin = userRole === "SUPER_ADMIN";
+        setHasPermission(isSuperAdmin);
         setLoading(false);
-        if (showAccessDenied) {
+        if (!isSuperAdmin && showAccessDenied) {
           router.push(redirectTo);
         }
       }

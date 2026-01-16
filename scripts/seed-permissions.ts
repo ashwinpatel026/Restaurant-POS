@@ -21,6 +21,7 @@ const MODULES = {
   events: ['create', 'update', 'delete', 'view'],
   modifiers: ['create', 'update', 'delete', 'view'],
   prepzone: ['create', 'update', 'delete', 'view'],
+  suggestion: ['create', 'update', 'delete', 'view'],
   departments: ['create', 'update', 'delete', 'view'],
   department_types: ['create', 'update', 'delete', 'view'],
   employees: ['create', 'update', 'delete', 'view'],
