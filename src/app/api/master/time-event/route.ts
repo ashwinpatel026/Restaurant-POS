@@ -127,6 +127,7 @@ export async function POST(request: NextRequest) {
         eventCode: eventCode,
         eventName: eventName,
         deptCode: normalizeDeptCode(body.deptCode),
+        byFixedValue: Boolean(body.byFixedValue),
         globalPriceAmountAdd: body.globalPriceAmountAdd ? parseFloat(body.globalPriceAmountAdd) : null,
         globalPriceAmountDisc: body.globalPriceAmountDisc ? parseFloat(body.globalPriceAmountDisc) : null,
         globalPricePerAdd: body.globalPricePerAdd ? parseFloat(body.globalPricePerAdd) : null,

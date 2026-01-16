@@ -116,8 +116,8 @@ export async function GET(
 
 /**
  * @api {post} /api/pos/sync/:storeCode/modifier-groups Create modifier group
- * @apiName CreateModifierGroup
- * @apiGroup ModifierGroups
+ * @apiName CreateModifiers
+ * @apiGroup Modifiers
  * @apiVersion 1.0.0
  *
  * @apiHeader {String} x-api-key API key for POS authentication

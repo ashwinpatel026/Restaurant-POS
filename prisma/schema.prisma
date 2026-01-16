@@ -96,6 +96,7 @@ model TimeEvent {
   sunEndTime             String?   @map("Sun_EndTime") @db.VarChar(10)
   eventStartDate         DateTime? @map("Event_Start_Date") @db.Date
   eventEndDate           DateTime? @map("Event_End_Date") @db.Date
+  byFixedValue           Boolean   @default(false) @map("by_fixed_value")
   isActive               Int?      @map("is_active")
   createdBy              BigInt?  @map("created_by")
   createdDate            DateTime @default(now()) @map("created_date")

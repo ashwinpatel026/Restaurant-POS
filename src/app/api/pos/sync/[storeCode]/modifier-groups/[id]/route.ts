@@ -4,8 +4,8 @@ import { locationPrisma } from '@/lib/databaseManager'
 
 /**
  * @api {get} /api/pos/sync/:storeCode/modifier-groups/:id Get modifier group
- * @apiName GetModifierGroup
- * @apiGroup ModifierGroups
+ * @apiName GetModifiers
+ * @apiGroup Modifiers
  * @apiVersion 1.0.0
  *
  * @apiHeader {String} x-api-key API key for POS authentication
@@ -90,8 +90,8 @@ export async function GET(
 
 /**
  * @api {put} /api/pos/sync/:storeCode/modifier-groups/:id Update modifier group
- * @apiName UpdateModifierGroup
- * @apiGroup ModifierGroups
+ * @apiName UpdateModifiers
+ * @apiGroup Modifiers
  * @apiVersion 1.0.0
  *
  * @apiHeader {String} x-api-key API key for POS authentication
@@ -230,8 +230,8 @@ export async function PUT(
 
 /**
  * @api {delete} /api/pos/sync/:storeCode/modifier-groups/:id Delete modifier group
- * @apiName DeleteModifierGroup
- * @apiGroup ModifierGroups
+ * @apiName DeleteModifiers
+ * @apiGroup Modifiers
  * @apiVersion 1.0.0
  *
  * @apiHeader {String} x-api-key API key for POS authentication

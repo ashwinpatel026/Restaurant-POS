@@ -290,6 +290,9 @@ export async function PUT(
  * @apiName DeleteDiscount
  * @apiGroup Discount
  * @apiVersion 1.0.0
+ *
+ * @apiParam {String} storeCode Store code
+ * @apiParam {String} id Discount identifier (numeric `discountId` or string `discountCode`)
  */
 export async function DELETE(
   request: NextRequest,

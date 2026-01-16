@@ -37,6 +37,7 @@ export class SyncProcessor {
     'inherit_dining_tax',
     'disqualify_dining_tax_exemption',
     'inherit_modifier_group',
+    'by_fixed_value',
     'is_kitchen',
     'is_bar',
     'is_bill',

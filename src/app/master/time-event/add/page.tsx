@@ -29,6 +29,7 @@ export default function AddTimeEventPage() {
     eventName: "",
     priceStrategy: "amount_add", // default strategy
     priceValue: "",
+    byFixedValue: false,
     globalPriceAmountAdd: "",
     globalPriceAmountDisc: "",
     globalPricePerAdd: "",
@@ -116,21 +117,28 @@ export default function AddTimeEventPage() {
       submitData.globalPriceAmountDisc = "";
       submitData.globalPricePerAdd = "";
       submitData.globalPricePerDisc = "";
+      submitData.priceValue = "";
 
       // Set the appropriate field based on selected strategy
-      switch (formData.priceStrategy) {
-        case "amount_add":
-          submitData.globalPriceAmountAdd = formData.priceValue;
-          break;
-        case "amount_disc":
-          submitData.globalPriceAmountDisc = formData.priceValue;
-          break;
-        case "percent_add":
-          submitData.globalPricePerAdd = formData.priceValue;
-          break;
-        case "percent_disc":
-          submitData.globalPricePerDisc = formData.priceValue;
-          break;
+      if (!formData.byFixedValue) {
+        switch (formData.priceStrategy) {
+          case "amount_add":
+            submitData.globalPriceAmountAdd = formData.priceValue;
+            submitData.priceValue = formData.priceValue;
+            break;
+          case "amount_disc":
+            submitData.globalPriceAmountDisc = formData.priceValue;
+            submitData.priceValue = formData.priceValue;
+            break;
+          case "percent_add":
+            submitData.globalPricePerAdd = formData.priceValue;
+            submitData.priceValue = formData.priceValue;
+            break;
+          case "percent_disc":
+            submitData.globalPricePerDisc = formData.priceValue;
+            submitData.priceValue = formData.priceValue;
+            break;
+        }
       }
 
       // Convert selected departments to JSON array
@@ -403,6 +411,31 @@ export default function AddTimeEventPage() {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
               Price Adjustments
             </h2>
+            <div className="mb-6">
+              <label className="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={formData.byFixedValue}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setFormData((prev) => ({
+                      ...prev,
+                      byFixedValue: checked,
+                      priceStrategy: checked
+                        ? ""
+                        : prev.priceStrategy || "amount_add",
+                      priceValue: checked ? "" : prev.priceValue,
+                    }));
+                  }}
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                By Fixed Value
+              </label>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                When enabled, price adjustments are disabled and handled as a
+                fixed value.
+              </p>
+            </div>
             <div className="space-y-6">
               {/* Amount Group */}
               <div>
@@ -412,6 +445,7 @@ export default function AddTimeEventPage() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
+                    disabled={formData.byFixedValue}
                     onClick={() =>
                       setFormData({
                         ...formData,
@@ -423,7 +457,7 @@ export default function AddTimeEventPage() {
                       formData.priceStrategy === "amount_add"
                         ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
                         : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                    }`}
+                    } ${formData.byFixedValue ? "opacity-50 cursor-not-allowed hover:border-gray-300 dark:hover:border-gray-600" : ""}`}
                   >
                     Amount Add ($)
                     {formData.priceStrategy === "amount_add" && (
@@ -432,6 +466,7 @@ export default function AddTimeEventPage() {
                   </button>
                   <button
                     type="button"
+                    disabled={formData.byFixedValue}
                     onClick={() =>
                       setFormData({
                         ...formData,
@@ -443,7 +478,7 @@ export default function AddTimeEventPage() {
                       formData.priceStrategy === "amount_disc"
                         ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
                         : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                    }`}
+                    } ${formData.byFixedValue ? "opacity-50 cursor-not-allowed hover:border-gray-300 dark:hover:border-gray-600" : ""}`}
                   >
                     Amount Discount ($)
                     {formData.priceStrategy === "amount_disc" && (
@@ -464,6 +499,7 @@ export default function AddTimeEventPage() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
+                    disabled={formData.byFixedValue}
                     onClick={() =>
                       setFormData({
                         ...formData,
@@ -475,7 +511,7 @@ export default function AddTimeEventPage() {
                       formData.priceStrategy === "percent_add"
                         ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
                         : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                    }`}
+                    } ${formData.byFixedValue ? "opacity-50 cursor-not-allowed hover:border-gray-300 dark:hover:border-gray-600" : ""}`}
                   >
                     Percentage Add (%)
                     {formData.priceStrategy === "percent_add" && (
@@ -484,6 +520,7 @@ export default function AddTimeEventPage() {
                   </button>
                   <button
                     type="button"
+                    disabled={formData.byFixedValue}
                     onClick={() =>
                       setFormData({
                         ...formData,
@@ -495,7 +532,7 @@ export default function AddTimeEventPage() {
                       formData.priceStrategy === "percent_disc"
                         ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
                         : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                    }`}
+                    } ${formData.byFixedValue ? "opacity-50 cursor-not-allowed hover:border-gray-300 dark:hover:border-gray-600" : ""}`}
                   >
                     Percentage Discount (%)
                     {formData.priceStrategy === "percent_disc" && (
@@ -518,13 +555,14 @@ export default function AddTimeEventPage() {
                 type="number"
                 step="0.01"
                 value={formData.priceValue}
+                disabled={formData.byFixedValue}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
                     priceValue: e.target.value,
                   })
                 }
-                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed"
                 placeholder="0.00"
               />
             </div>

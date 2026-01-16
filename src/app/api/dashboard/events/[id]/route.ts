@@ -144,6 +144,7 @@ export async function PUT(
       data: {
         eventName: body.eventName,
         deptCode: normalizeDeptCode(body.deptCode),
+        byFixedValue: Boolean(body.byFixedValue),
         globalPriceAmountAdd: body.globalPriceAmountAdd || null,
         globalPriceAmountDisc: body.globalPriceAmountDisc || null,
         globalPricePerAdd: body.globalPricePerAdd || null,

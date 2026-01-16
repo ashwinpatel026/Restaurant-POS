@@ -18,6 +18,7 @@ interface TimeEvent {
   id: string;
   eventCode: string;
   eventName: string;
+  byFixedValue?: boolean;
   globalPriceAmountAdd: number | null;
   globalPriceAmountDisc: number | null;
   globalPricePerAdd: number | null;
@@ -209,6 +210,7 @@ export default function EventsPage() {
   };
 
   const getPriceAdjustmentDisplay = (event: TimeEvent) => {
+    if (event.byFixedValue) return "Fixed value";
     const parts = [];
     if (event.globalPriceAmountAdd)
       parts.push(`+$${event.globalPriceAmountAdd}`);

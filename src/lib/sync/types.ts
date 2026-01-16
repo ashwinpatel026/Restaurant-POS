@@ -265,6 +265,7 @@ export const SYNC_FIELD_MAP: Record<string, Record<string, string>> = {
     'GlobalPrice_Amount_Disc': 'GlobalPrice_Amount_Disc',
     'GlobalPrice_Per_Add': 'GlobalPrice_Per_Add',
     'GlobalPrice_Per_Disc': 'GlobalPrice_Per_Disc',
+    'by_fixed_value': 'by_fixed_value',
     'Monday': 'Monday',
     'Mon_StartTime': 'Mon_StartTime',
     'Mon_EndTime': 'Mon_EndTime',

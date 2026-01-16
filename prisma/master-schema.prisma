@@ -345,10 +345,11 @@ model MasterTimeEvent {
   sunEndTime             String?   @map("Sun_EndTime") @db.VarChar(10)
   eventStartDate         DateTime? @map("Event_Start_Date") @db.Date
   eventEndDate           DateTime? @map("Event_End_Date") @db.Date
+  byFixedValue           Boolean   @default(false) @map("by_fixed_value")
   isActive               Int       @default(1) @map("is_active")
-  createdBy              BigInt?  @map("created_by")
-  createdDate            DateTime @default(now()) @map("created_date")
-  updatedBy              BigInt?  @map("updated_by")
+  createdBy              BigInt?   @map("created_by")
+  createdDate            DateTime  @default(now()) @map("created_date")
+  updatedBy              BigInt?   @map("updated_by")
   updatedOn              DateTime? @map("updated_on")
   syncId                 String    @unique @default(uuid()) @map("sync_id") @db.Uuid
   syncSource             String?   @default("server") @map("sync_source") @db.VarChar(20)
@@ -688,12 +689,12 @@ model MasterSuggestion {
   prepZoneCode     String?   @map("prep_zone_code") @db.VarChar(50)
   suggestionDesc   String?   @map("suggestion_desc") @db.VarChar(1000)
   isDelete         Boolean   @default(false) @map("is_delete")
-  createdBy        BigInt?   @map("createdby")
-  createdOn        DateTime  @default(now()) @map("createdon")
-  updatedBy        BigInt?   @map("updatedby")
-  updatedOn        DateTime? @map("updatedon")
-  syncId           String    @unique @default(uuid()) @map("sync_id") @db.Uuid
-  syncSource       String?   @default("server") @map("sync_source") @db.VarChar(20)
+  createdBy             BigInt?  @map("createdby")
+  createdOn             DateTime @default(now()) @map("createdon")
+  updatedBy             BigInt?  @map("updatedby")
+  updatedOn             DateTime? @map("updatedon")
+  syncId                String   @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource            String?  @default("server") @map("sync_source") @db.VarChar(20)
 
   @@index([suggestionCode])
   @@index([category])
@@ -702,3 +703,25 @@ model MasterSuggestion {
   @@map("tbl_master_suggestion")
 }
 
+model MasterMenuItemTimeEvent {
+  menuItemTimeEventId   BigInt   @id @default(autoincrement()) @map("menuitem_timeevent_id")
+  menuItemTimeEventCode String?  @map("menuitem_timeevent_code") @db.VarChar(100)
+  timeEventCode         String?  @map("time_event_code") @db.VarChar(100)
+  menuItemCode          String?  @map("menu_item_code") @db.VarChar(100)
+  isFixedValue          Boolean? @default(false) @map("is_fixed_value")
+  isDelete              Boolean? @default(false) @map("is_delete")
+  isOverride            Boolean? @default(false) @map("is_override")
+  formulaValue          Decimal? @map("formula_value") @db.Decimal(10, 2)
+  createdBy             BigInt?  @map("createdby")
+  createdOn             DateTime @default(now()) @map("createdon")
+  updatedBy             BigInt?  @map("updatedby")
+  updatedOn             DateTime? @map("updatedon")
+  syncId                String   @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource            String?  @default("server") @map("sync_source") @db.VarChar(20)
+  
+  @@index([menuItemTimeEventCode])
+  @@index([menuItemCode])
+  @@index([timeEventCode])
+  @@index([syncId])
+  @@map("tbl_menuitem_timeevent")
+}
