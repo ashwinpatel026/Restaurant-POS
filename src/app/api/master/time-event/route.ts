@@ -39,6 +39,26 @@ function validateTimeString(time: string | null): string | null {
   return null
 }
 
+// Helper function to convert deptCode JSON array to comma-separated string
+function deptCodeToCommaSeparated(deptCode: any): string {
+  if (!deptCode) return ''
+  
+  let deptArray: string[] = []
+  
+  if (Array.isArray(deptCode)) {
+    deptArray = deptCode
+  } else if (typeof deptCode === 'string') {
+    try {
+      const parsed = JSON.parse(deptCode)
+      deptArray = Array.isArray(parsed) ? parsed : [parsed]
+    } catch {
+      deptArray = [deptCode]
+    }
+  }
+  
+  return deptArray.filter(Boolean).join(',')
+}
+
 // Helper function to map event response
 function mapEventResponse(event: any) {
   return {
@@ -128,6 +148,7 @@ export async function POST(request: NextRequest) {
         eventName: eventName,
         deptCode: normalizeDeptCode(body.deptCode),
         byFixedValue: Boolean(body.byFixedValue),
+        overrideAllEvents: Boolean(body.overrideAllEvents),
         globalPriceAmountAdd: body.globalPriceAmountAdd ? parseFloat(body.globalPriceAmountAdd) : null,
         globalPriceAmountDisc: body.globalPriceAmountDisc ? parseFloat(body.globalPriceAmountDisc) : null,
         globalPricePerAdd: body.globalPricePerAdd ? parseFloat(body.globalPricePerAdd) : null,
@@ -159,6 +180,43 @@ export async function POST(request: NextRequest) {
         createdBy: admin.adminId
       }
     })
+    
+    // Call stored procedure to apply time event to menu items
+    try {
+      const deptCodeList = deptCodeToCommaSeparated(event.deptCode)
+      const priceAdjustValue = 0 // SP reads prices from table, but pass 0 for compatibility
+      const isOverride = event.overrideAllEvents
+      
+      // Escape single quotes in string parameters for SQL safety
+      const escapedEventCode = eventCode.replace(/'/g, "''")
+      const escapedDeptCodeList = deptCodeList.replace(/'/g, "''")
+      
+      // Log parameters before calling stored procedure
+      console.log('Calling stored procedure sp_apply_time_event_to_menuitems_webmaster with parameters:', {
+        p_time_event_code: eventCode,
+        p_dept_code_list: deptCodeList,
+        p_is_fixed_value: Boolean(body.byFixedValue),
+        p_price_adjust_value: priceAdjustValue,
+        p_is_override: isOverride,
+        escapedEventCode,
+        escapedDeptCodeList
+      })
+      
+      await masterPrisma.$executeRawUnsafe(
+        `CALL sp_apply_time_event_to_menuitems_webmaster('${escapedEventCode}', '${escapedDeptCodeList}', ${Boolean(body.byFixedValue)}, ${priceAdjustValue}, ${isOverride})`
+      )
+      
+      console.log(`Successfully applied time event ${eventCode} to menu items for departments: ${deptCodeList || 'none'}`)
+    } catch (spError: any) {
+      // Log error but continue - event is created successfully
+      console.error(`Error calling stored procedure for time event ${eventCode}:`, {
+        error: spError.message,
+        eventCode,
+        deptCode: event.deptCode,
+        stack: spError.stack
+      })
+      // Continue execution - event creation succeeded even if SP failed
+    }
     
     return NextResponse.json(mapEventResponse(event), { status: 201 })
   } catch (error: any) {

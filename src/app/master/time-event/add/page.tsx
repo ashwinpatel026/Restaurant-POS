@@ -30,6 +30,7 @@ export default function AddTimeEventPage() {
     priceStrategy: "amount_add", // default strategy
     priceValue: "",
     byFixedValue: false,
+    overrideAllEvents: false,
     globalPriceAmountAdd: "",
     globalPriceAmountDisc: "",
     globalPricePerAdd: "",
@@ -840,6 +841,18 @@ export default function AddTimeEventPage() {
             }
             trueLabel="Active"
             falseLabel="Inactive"
+          />
+
+          {/* Override All Events */}
+          <StatusToggle
+            label="Override All Events"
+            description="This event takes priority over other events."
+            value={formData.overrideAllEvents}
+            onChange={(val) =>
+              setFormData({ ...formData, overrideAllEvents: val })
+            }
+            trueLabel="Enabled"
+            falseLabel="Disabled"
           />
 
           {/* Actions */}
