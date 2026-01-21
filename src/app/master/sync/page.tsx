@@ -71,6 +71,7 @@ export default function SyncManagementPage() {
     { value: "tbl_master_menu_master", label: "Menu Master" },
     { value: "tbl_master_menu_category", label: "Menu Category" },
     { value: "tbl_master_menu_item", label: "Menu Item" },
+    { value: "tbl_master_menuitem_timeevent", label: "Menu Item Time Event" },
     { value: "tbl_master_modifier_group", label: "Modifier Group" },
     { value: "tbl_master_modifier_item", label: "Modifier Item" },
     { value: "tbl_master_prep_zone", label: "Prep Zone" },

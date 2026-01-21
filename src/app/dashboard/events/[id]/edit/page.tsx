@@ -37,6 +37,7 @@ export default function EditEventPage() {
     priceStrategy: "amount_add",
     priceValue: "",
     byFixedValue: false,
+    overrideAllEvents: false,
     globalPriceAmountAdd: "",
     globalPriceAmountDisc: "",
     globalPricePerAdd: "",
@@ -136,6 +137,7 @@ export default function EditEventPage() {
           priceStrategy: byFixedValue ? "" : priceStrategy,
           priceValue: byFixedValue ? "" : priceValue,
           byFixedValue,
+          overrideAllEvents: Boolean(event.overrideAllEvents || false),
           globalPriceAmountAdd: event.globalPriceAmountAdd?.toString() || "",
           globalPriceAmountDisc: event.globalPriceAmountDisc?.toString() || "",
           globalPricePerAdd: event.globalPricePerAdd?.toString() || "",
@@ -1094,6 +1096,18 @@ export default function EditEventPage() {
             }
             trueLabel="Active"
             falseLabel="Inactive"
+          />
+
+          {/* Override All Events */}
+          <StatusToggle
+            label="Override All Events"
+            description="This event takes priority over other events."
+            value={formData.overrideAllEvents}
+            onChange={(val) =>
+              setFormData({ ...formData, overrideAllEvents: val })
+            }
+            trueLabel="Enabled"
+            falseLabel="Disabled"
           />
 
           {/* Actions */}

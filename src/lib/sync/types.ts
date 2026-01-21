@@ -424,23 +424,23 @@ export const SYNC_TABLE_ORDER: string[] = [
   'tbl_master_prep_zone',
   'tbl_master_discount_master',
   'tbl_master_suggestion',
-  
+
   // Permission system tables (must sync before users)
   'tbl_permission',              // Independent
   'tbl_role',                    // Independent
   'tbl_role_permission',         // Depends on tbl_permission and tbl_role
-  
+
   // User management - REMOVED: synced separately
-  
+
   // Menu hierarchy (parent -> child)
   'tbl_master_menu_master',      // Must sync before menu_category and menu_master_event
   'tbl_master_menu_category',    // Depends on menu_master
   'tbl_master_menu_item',         // Depends on menu_master and menu_category
-  
+
   // Modifier hierarchy
   'tbl_master_modifier_group',   // Independent
   'tbl_master_modifier_item',     // Depends on modifier_group
-  
+
   // Relationship/junction tables (must sync after all parent tables)
   'tbl_master_menu_master_event',        // Depends on menu_master and time_events
   'tbl_master_menu_category_modifier',   // Depends on menu_category and modifier_group

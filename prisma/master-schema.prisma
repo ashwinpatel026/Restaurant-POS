@@ -347,6 +347,7 @@ model MasterTimeEvent {
   eventEndDate           DateTime? @map("Event_End_Date") @db.Date
   byFixedValue           Boolean   @default(false) @map("by_fixed_value")
   overrideAllEvents      Boolean   @default(false) @map("override_all_events")
+  isDelete               Boolean   @default(false) @map("is_delete")
   isActive               Int       @default(1) @map("is_active")
   createdBy              BigInt?   @map("created_by")
   createdDate            DateTime  @default(now()) @map("created_date")
@@ -713,6 +714,7 @@ model MasterMenuItemTimeEvent {
   isDelete              Boolean? @default(false) @map("is_delete")
   isOverride            Boolean? @default(false) @map("is_override")
   formulaValue          Decimal? @map("formula_value") @db.Decimal(10, 2)
+  isActive              Boolean  @default(true) @map("is_active")
   createdBy             BigInt?  @map("createdby")
   createdOn             DateTime @default(now()) @map("createdon")
   updatedBy             BigInt?  @map("updatedby")
@@ -725,4 +727,16 @@ model MasterMenuItemTimeEvent {
   @@index([timeEventCode])
   @@index([syncId])
   @@map("tbl_master_menuitem_timeevent")
+}
+
+model MasterTableCounter {
+  id                    BigInt   @id @default(autoincrement()) @map("id")
+  tableName             String   @map("tablename") @db.VarChar(100)
+  counter               BigInt   @default(0)
+  isDelete              Boolean  @default(false) @map("is_delete")
+  syncId                String   @unique @default(uuid()) @map("sync_id") @db.Uuid
+
+  @@index([syncId])
+  @@index([tableName])
+  @@map("tbl_table_counter")
 }

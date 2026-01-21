@@ -122,15 +122,19 @@ export default function EditMenuItemPage() {
       });
 
       if (response.ok) {
-        toast.success("Menu item updated successfully!");
-        router.push("/dashboard/menu/items");
+        const data = await response.json();
+        // Don't show success toast yet - form will show it after saving time events
+        // Return the updated menu item data so form can save time events
+        return data;
       } else {
         try {
           const errorData = await response.json();
           const errorMessage = errorData.error || "Failed to update menu item";
           toast.error(errorMessage);
+          throw new Error(errorMessage);
         } catch (jsonError) {
           toast.error("Failed to update menu item");
+          throw jsonError;
         }
       }
     } catch (error) {

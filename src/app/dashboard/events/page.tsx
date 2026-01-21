@@ -19,6 +19,7 @@ interface TimeEvent {
   eventCode: string;
   eventName: string;
   byFixedValue?: boolean;
+  overrideAllEvents?: boolean;
   globalPriceAmountAdd: number | null;
   globalPriceAmountDisc: number | null;
   globalPricePerAdd: number | null;
@@ -340,15 +341,25 @@ export default function EventsPage() {
                           </h3>
                         </div>
                       </div>
-                      <span
-                        className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          event.isActive === 1
-                            ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400"
-                            : "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400"
-                        }`}
-                      >
-                        {event.isActive === 1 ? "Active" : "Inactive"}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {event.overrideAllEvents && (
+                          <span
+                            className="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-400"
+                            title="Override All Events"
+                          >
+                            Override All
+                          </span>
+                        )}
+                        <span
+                          className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            event.isActive === 1
+                              ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400"
+                              : "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400"
+                          }`}
+                        >
+                          {event.isActive === 1 ? "Active" : "Inactive"}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Price Adjustment with Border */}

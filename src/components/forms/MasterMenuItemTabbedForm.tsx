@@ -20,7 +20,7 @@ interface MenuItemFormProps {
   menuItem?: any;
   menuMasters?: any[];
   categories: any[];
-  onSave: (data: any) => void;
+  onSave: (data: any) => Promise<any> | void;
   onCancel: () => void;
 }
 
@@ -59,6 +59,7 @@ export default function MasterMenuItemTabbedForm({
     menuMasterCode: "",
     menuCategoryCode: "",
     deptCode: "",
+    originalDeptCode: "",
     isActive: 1,
     stockinhand: "",
     taxCode: "",
@@ -119,6 +120,22 @@ export default function MasterMenuItemTabbedForm({
   const [filteredCategories, setFilteredCategories] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
 
+  // Time Event Configuration state
+  const [timeEvents, setTimeEvents] = useState<Array<{
+    event_name: string;
+    final_price: number;
+    eventCode?: string;
+    byFixedValue?: boolean;
+  }>>([]);
+  const [timeEventDetails, setTimeEventDetails] = useState<Record<string, {
+    eventCode: string;
+    eventName: string;
+    byFixedValue: boolean;
+  }>>({});
+  const [timeEventFormulas, setTimeEventFormulas] = useState<Record<string, number>>({});
+  const [loadingTimeEvents, setLoadingTimeEvents] = useState(false);
+  const [updatingEventCode, setUpdatingEventCode] = useState<string | null>(null);
+
   useEffect(() => {
     fetchModifiers();
     fetchTaxes();
@@ -172,7 +189,7 @@ export default function MasterMenuItemTabbedForm({
       const master = menuMasters.find(
         (m) => m.menuMasterCode === formData.menuMasterCode
       );
-      
+
       // Only auto-update if current deptCode is empty
       if (!formData.deptCode) {
         const newDeptCode = firstCategory?.deptCode || master?.deptCode || "";
@@ -197,7 +214,7 @@ export default function MasterMenuItemTabbedForm({
         );
         autoDeptCode = firstCategory?.deptCode || "";
       }
-      
+
       setFormData({
         ...formData,
         menuMasterCode: master.menuMasterCode,
@@ -237,8 +254,11 @@ export default function MasterMenuItemTabbedForm({
         retailPrice: menuItem.basePrice ?? menuItem.price ?? 0,
         isPrice: menuItem.isPrice ?? 1,
         menuMasterCode: menuItem.menuMasterCode || "",
-        menuCategoryCode: menuItem.menuCategoryCode || "",
+        menuCategoryCode: Array.isArray(menuItem.menuCategoryCode)
+          ? (menuItem.menuCategoryCode[0] || "")
+          : (menuItem.menuCategoryCode || ""),
         deptCode: menuItem.deptCode || "",
+        originalDeptCode: menuItem.deptCode || "",
         isActive: menuItem.isActive ?? 1,
         stockinhand: menuItem.stockinhand?.toString() || "",
         taxCode: menuItem.taxCode || "",
@@ -419,6 +439,149 @@ export default function MasterMenuItemTabbedForm({
     load();
   }, [inheritModifiers, selectedCategoriesKey]);
 
+  // Fetch time events when department is selected, price is enabled, and retail price is set
+  useEffect(() => {
+    const fetchTimeEvents = async () => {
+      // Check if all conditions are met
+      if (
+        formData.deptCode &&
+        formData.isPrice === 1 &&
+        formData.retailPrice > 0
+      ) {
+        setLoadingTimeEvents(true);
+        try {
+          const token = localStorage.getItem("master_admin_token");
+
+          // Call PostgreSQL function to get calculated prices
+          const functionResponse = await fetch(
+            `/api/master/menu-items/time-events?deptCode=${encodeURIComponent(
+              formData.deptCode
+            )}&basePrice=${formData.retailPrice}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          if (!functionResponse.ok) {
+            throw new Error("Failed to fetch time events");
+          }
+
+          const functionResults = await functionResponse.json();
+
+          // Fetch time event details to get eventCode and byFixedValue
+          const detailsResponse = await fetch(
+            `/api/master/time-event?deptCode=${encodeURIComponent(
+              formData.deptCode
+            )}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+
+          let eventDetailsMap: Record<string, {
+            eventCode: string;
+            eventName: string;
+            byFixedValue: boolean;
+            isDelete?: boolean;
+            isOverride?: boolean;
+          }> = {};
+
+          if (detailsResponse.ok) {
+            const eventDetails = await detailsResponse.json();
+            eventDetails.forEach((event: any) => {
+              eventDetailsMap[event.eventName] = {
+                eventCode: event.eventCode,
+                eventName: event.eventName,
+                byFixedValue: event.byFixedValue || false,
+              };
+            });
+          }
+
+          setTimeEventDetails(eventDetailsMap);
+
+          // Merge function results with event details
+          const mergedEvents = functionResults.map((result: any) => {
+            const details = eventDetailsMap[result.event_name];
+            return {
+              event_name: result.event_name,
+              final_price: result.final_price,
+              eventCode: details?.eventCode,
+              byFixedValue: details?.byFixedValue || false,
+            };
+          });
+
+          setTimeEvents(mergedEvents);
+
+          // Initialize formula values with calculated prices
+          const initialFormulas: Record<string, number> = {};
+          mergedEvents.forEach((event: any) => {
+            if (event.eventCode) {
+              initialFormulas[event.eventCode] = event.final_price;
+            }
+          });
+          setTimeEventFormulas(initialFormulas);
+
+          // If editing, fetch existing formula values and override calculated values
+          if (menuItem?.menuItemId || menuItem?.tblMenuItemId) {
+            try {
+              const itemId = menuItem.menuItemId || menuItem.tblMenuItemId;
+              const existingFormulasResponse = await fetch(
+                `/api/master/menu-items/${itemId}/time-events`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                  },
+                }
+              );
+
+              if (existingFormulasResponse.ok) {
+                const existingFormulas = await existingFormulasResponse.json();
+                // Override with saved values if they exist and update event details
+                Object.keys(existingFormulas).forEach((eventCode) => {
+                  if (initialFormulas[eventCode] !== undefined) {
+                    initialFormulas[eventCode] = existingFormulas[eventCode].formulaValue;
+                  }
+                  // Update event details with isDelete and isOverride if they exist
+                  if (eventDetailsMap[eventCode]) {
+                    const existing = eventDetailsMap[eventCode];
+                    eventDetailsMap[eventCode] = {
+                      ...existing,
+                      isDelete: existingFormulas[eventCode]?.isDelete || false,
+                      isOverride: existingFormulas[eventCode]?.isOverride || false,
+                    };
+                  }
+                });
+                setTimeEventFormulas(initialFormulas);
+                setTimeEventDetails(eventDetailsMap);
+              }
+            } catch (e) {
+              console.error("Error fetching existing formula values:", e);
+              // Continue with calculated values
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching time events:", error);
+          toast.error("Failed to load time events");
+          setTimeEvents([]);
+          setTimeEventFormulas({});
+        } finally {
+          setLoadingTimeEvents(false);
+        }
+      } else {
+        // Clear time events when conditions are not met
+        setTimeEvents([]);
+        setTimeEventFormulas({});
+        setTimeEventDetails({});
+      }
+    };
+
+    fetchTimeEvents();
+  }, [formData.deptCode, formData.isPrice, formData.retailPrice, menuItem?.menuItemId, menuItem?.tblMenuItemId]);
+
   const fetchModifiers = async () => {
     try {
       const token = localStorage.getItem("master_admin_token");
@@ -511,7 +674,9 @@ export default function MasterMenuItemTabbedForm({
       colorCode: formData.colorCode,
       forColorCode: formData.forColorCode,
       menuMasterCode: formData.menuMasterCode,
-      menuCategoryCode: formData.menuCategoryCode,
+      menuCategoryCode: Array.isArray(formData.menuCategoryCode)
+        ? (formData.menuCategoryCode[0] || "")
+        : (formData.menuCategoryCode || ""),
       calories: formData.calories,
       description: formData.description,
       itemSize: formData.itemSize,
@@ -547,15 +712,46 @@ export default function MasterMenuItemTabbedForm({
     validateOnChange: true,
     validateOnBlur: true,
     onSubmit: async (values, { setTouched, setFieldError }) => {
+      console.log("Form submission started!");
+      console.log("Form values:", values);
+      console.log("Form data:", formData);
+
+      // Check for category selection first, before validation
+      if (selectedCategories.size === 0) {
+        console.log("No categories selected, blocking submission");
+        setTouched({
+          name: true,
+          labelName: true,
+          colorCode: true,
+          forColorCode: true,
+          menuMasterCode: true,
+          menuCategoryCode: true,
+        });
+        setFieldError("menuCategoryCode", "Please select at least one category");
+        toast.error("Please select at least one category");
+        return;
+      }
+
       // Update Formik values from current formData before validation
+      const categoryCodeValue = Array.from(selectedCategories)[0] || "";
+
+      // Set all values - use validate: true for category to ensure it validates correctly
       formik.setFieldValue("name", formData.name, false);
       formik.setFieldValue("labelName", formData.labelName, false);
       formik.setFieldValue("kitchenName", formData.kitchenName, false);
       formik.setFieldValue("colorCode", formData.colorCode, false);
       formik.setFieldValue("forColorCode", formData.forColorCode, false);
       formik.setFieldValue("menuMasterCode", formData.menuMasterCode, false);
-      formik.setFieldValue("menuCategoryCode", Array.from(selectedCategories).length > 0 ? Array.from(selectedCategories)[0] : "", false);
-      
+
+      // Set category code and validate it immediately if categories are selected
+      if (selectedCategories.size > 0) {
+        await formik.setFieldValue("menuCategoryCode", categoryCodeValue, true);
+        // Clear any error after setting
+        setFieldError("menuCategoryCode", undefined);
+      } else {
+        formik.setFieldValue("menuCategoryCode", "", false);
+      }
+
       // Mark all fields as touched to show errors
       setTouched({
         name: true,
@@ -565,25 +761,63 @@ export default function MasterMenuItemTabbedForm({
         menuMasterCode: true,
         menuCategoryCode: true,
       });
-      
+
+      // Wait a moment for Formik state to update
+      await new Promise(resolve => setTimeout(resolve, 10));
+
       // Validate and check for errors
-      await formik.validateForm();
-      
-      // Check for category selection manually
-      if (selectedCategories.size === 0) {
-        setFieldError("menuCategoryCode", "Please select at least one category");
-        toast.error("Please select at least one category");
-        return;
+      const validationErrors = await formik.validateForm() || {};
+
+      // Force clear category error in Formik if categories are selected (before checking errors)
+      if (selectedCategories.size > 0) {
+        setFieldError("menuCategoryCode", undefined);
       }
-      
+
+      // Create a clean errors object, excluding category error if categories are selected
+      const finalErrors: Record<string, string> = {};
+      for (const key in validationErrors) {
+        // Skip category error entirely if categories are selected
+        if (key === "menuCategoryCode" && selectedCategories.size > 0) {
+          continue;
+        }
+        const errorValue = validationErrors[key as keyof typeof validationErrors];
+        // Only include non-empty error messages
+        if (errorValue && typeof errorValue === "string" && errorValue.trim() !== "") {
+          finalErrors[key] = errorValue;
+        }
+      }
+
+      // Double-check: if categories are selected, ensure no category error exists
+      if (selectedCategories.size > 0 && finalErrors.menuCategoryCode) {
+        delete finalErrors.menuCategoryCode;
+      }
+
       // If there are errors, don't submit
-      if (Object.keys(formik.errors).length > 0) {
-        toast.error("Please fix the validation errors");
+      const errorKeys = Object.keys(finalErrors);
+      if (errorKeys.length > 0) {
+        console.log("Validation errors preventing save:", finalErrors);
+        console.log("Error keys:", errorKeys);
+        console.log("Selected categories:", Array.from(selectedCategories));
+        console.log("Formik menuCategoryCode value:", formik.values.menuCategoryCode);
+        console.log("Category code value being set:", categoryCodeValue);
+        toast.error(`Please fix the validation errors: ${errorKeys.join(", ")}`);
         return;
       }
-      
+
+      console.log("Validation passed, proceeding with save...");
+      console.log("Form data:", formData);
+      console.log("Department code:", formData.deptCode);
+      console.log("Original department code:", formData.originalDeptCode);
+      console.log("Is edit mode:", !!menuItem);
+
       // No errors, proceed with submission
-      onSubmitForm();
+      try {
+        await onSubmitForm();
+      } catch (submitError) {
+        console.error("Error in onSubmitForm:", submitError);
+        toast.error("Failed to save menu item. Please try again.");
+        throw submitError; // Re-throw to prevent form from thinking it succeeded
+      }
     },
   });
 
@@ -597,6 +831,17 @@ export default function MasterMenuItemTabbedForm({
     formik.setFieldValue("forColorCode", formData.forColorCode);
     formik.setFieldValue("menuMasterCode", formData.menuMasterCode);
   }, [formData.name, formData.labelName, formData.kitchenName, formData.colorCode, formData.forColorCode, formData.menuMasterCode]);
+
+  // Clear category error when categories are selected
+  useEffect(() => {
+    if (selectedCategories.size > 0) {
+      // Update menuCategoryCode value
+      const categoryCodeValue = Array.from(selectedCategories)[0] || "";
+      formik.setFieldValue("menuCategoryCode", categoryCodeValue, false);
+      // Clear any error
+      formik.setFieldError("menuCategoryCode", undefined);
+    }
+  }, [selectedCategories.size]);
 
   // Auto-focus on first error field
   useFormikAutoFocus(formik, {
@@ -627,8 +872,8 @@ export default function MasterMenuItemTabbedForm({
               ? parseFloat(formData.retailPrice.toString())
               : null
             : formData.priceStrategy === 3
-            ? 0
-            : null,
+              ? 0
+              : null,
         // Keep cardPrice and cashPrice for backward compatibility (set to null)
         cardPrice: null,
         cashPrice: null,
@@ -667,9 +912,129 @@ export default function MasterMenuItemTabbedForm({
           : null,
       };
 
-      await onSave(submitData);
+      // Save menu item first
+      const savedMenuItem = await onSave(submitData);
+
+      // Get menuItemId - use savedMenuItem.menuItemId or fall back to existing menuItem
+      const menuItemId = savedMenuItem?.menuItemId || menuItem?.menuItemId || menuItem?.tblMenuItemId;
+      const menuItemCode = savedMenuItem?.menuItemCode || menuItem?.menuItemCode;
+
+      console.log("Menu item saved. menuItemId:", menuItemId, "menuItemCode:", menuItemCode);
+      console.log("Time events count:", timeEvents.length);
+      console.log("Department:", formData.deptCode, "Original:", formData.originalDeptCode);
+
+      // Check if department changed (for edit mode)
+      const departmentChanged = menuItem && formData.deptCode && formData.originalDeptCode &&
+        formData.deptCode !== formData.originalDeptCode;
+
+      console.log("Department changed:", departmentChanged);
+
+      // If department changed, mark old time events as deleted first (even if no new events)
+      if (departmentChanged && menuItemId && menuItemCode && formData.originalDeptCode) {
+        try {
+          const token = localStorage.getItem("master_admin_token");
+          const markDeletedResponse = await fetch(
+            `/api/master/menu-items/${menuItemId}/time-events/mark-deleted`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                menuItemCode: menuItemCode,
+                oldDeptCode: formData.originalDeptCode,
+              }),
+            }
+          );
+
+          if (markDeletedResponse.ok) {
+            const markResult = await markDeletedResponse.json();
+            console.log("Marked old time events as deleted:", markResult.markedDeleted);
+          } else {
+            console.warn("Failed to mark old time events as deleted");
+          }
+        } catch (markDeletedError) {
+          console.error("Error marking old time events as deleted:", markDeletedError);
+        }
+      }
+
+      // If menu item was saved successfully and we have time events, save them
+      if (menuItemId && menuItemCode && timeEvents.length > 0 && formData.deptCode && formData.isPrice === 1 && formData.retailPrice > 0) {
+        try {
+          const token = localStorage.getItem("master_admin_token");
+
+          // Prepare time events data for bulk save
+          const timeEventsData = timeEvents.map((event) => {
+            const eventCode = event.eventCode || "";
+            // Find event detail by event name (since timeEventDetails is keyed by event name)
+            const eventDetail = Object.values(timeEventDetails).find(d => d.eventCode === eventCode) as {
+              eventCode: string;
+              eventName: string;
+              byFixedValue: boolean;
+              isDelete?: boolean;
+              isOverride?: boolean;
+            } | undefined;
+
+            // Use updated formula value if user changed it, otherwise use calculated value
+            const formulaValue = timeEventFormulas[eventCode] !== undefined
+              ? timeEventFormulas[eventCode]
+              : event.final_price;
+
+            return {
+              timeEventCode: eventCode,
+              formulaValue: formulaValue,
+              isFixedValue: eventDetail?.byFixedValue || event.byFixedValue || false,
+              isDelete: false, // New events are not deleted
+              isOverride: eventDetail?.isOverride || false,
+            };
+          });
+
+          // Call bulk save endpoint
+          const bulkSaveResponse = await fetch(
+            `/api/master/menu-items/${menuItemId}/time-events/bulk`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                menuItemCode: menuItemCode,
+                timeEvents: timeEventsData,
+              }),
+            }
+          );
+
+          if (bulkSaveResponse.ok) {
+            const bulkResult = await bulkSaveResponse.json();
+            if (bulkResult.errors && bulkResult.errors.length > 0) {
+              console.warn("Some time events failed to save:", bulkResult.errors);
+              toast.error(`Menu item saved, but ${bulkResult.errors.length} time event(s) failed to save`);
+            } else {
+              toast.success(`Menu item and ${bulkResult.created} time event(s) saved successfully!`);
+            }
+          } else {
+            const errorData = await bulkSaveResponse.json();
+            console.error("Error saving time events:", errorData);
+            toast.error("Menu item saved, but failed to save time events");
+          }
+        } catch (timeEventError) {
+          console.error("Error saving time events:", timeEventError);
+          toast.error("Menu item saved, but failed to save time events");
+        }
+      } else {
+        // No time events to save, but menu item was saved successfully
+        console.log("No time events to save, but menu item saved");
+        if (menuItem) {
+          toast.success("Menu item updated successfully!");
+        } else {
+          toast.success("Menu item created successfully!");
+        }
+      }
     } catch (error) {
       console.error("Error:", error);
+      throw error; // Re-throw so parent can handle
     } finally {
       setLoading(false);
     }
@@ -717,7 +1082,39 @@ export default function MasterMenuItemTabbedForm({
   return (
     <LoadingOverlay isLoading={loading}>
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-        <form onSubmit={formik.handleSubmit} className="space-y-8">
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            console.log("Form onSubmit triggered!");
+
+            // Fix menuCategoryCode - convert array to string before validation
+            const categoryCodeValue = Array.from(selectedCategories)[0] || "";
+            if (categoryCodeValue) {
+              formik.setFieldValue("menuCategoryCode", categoryCodeValue, false);
+            }
+
+            // Update all formik values from formData before validation
+            formik.setFieldValue("name", formData.name, false);
+            formik.setFieldValue("labelName", formData.labelName, false);
+            formik.setFieldValue("kitchenName", formData.kitchenName, false);
+            formik.setFieldValue("colorCode", formData.colorCode, false);
+            formik.setFieldValue("forColorCode", formData.forColorCode, false);
+            formik.setFieldValue("menuMasterCode", formData.menuMasterCode, false);
+
+            // Wait a moment for formik to update
+            await new Promise(resolve => setTimeout(resolve, 10));
+
+            console.log("Calling formik.handleSubmit...");
+            console.log("Formik isValid:", formik.isValid);
+            console.log("Formik errors:", formik.errors);
+            console.log("Formik values:", formik.values);
+
+            // Now call handleSubmit
+            await formik.handleSubmit(e);
+            console.log("After formik.handleSubmit");
+          }}
+          className="space-y-8"
+        >
           {/* Basic Information Section */}
           <div className="p-6 border-b border-gray-200 dark:border-gray-700">
             <div className="mb-6">
@@ -754,11 +1151,10 @@ export default function MasterMenuItemTabbedForm({
                         formik.setFieldValue("labelName", e.target.value);
                       }
                     }}
-                    className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:outline-none transition-all ${
-                      formik.errors.name && formik.touched.name
-                        ? "border-red-500 dark:border-red-500 animate-shake focus:border-red-500"
-                        : "border-gray-300 dark:border-gray-600 focus:border-blue-500"
-                    }`}
+                    className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:outline-none transition-all ${formik.errors.name && formik.touched.name
+                      ? "border-red-500 dark:border-red-500 animate-shake focus:border-red-500"
+                      : "border-gray-300 dark:border-gray-600 focus:border-blue-500"
+                      }`}
                     placeholder="Enter item name"
                   />
                   {formik.errors.name && formik.touched.name && (
@@ -800,11 +1196,10 @@ export default function MasterMenuItemTabbedForm({
                       formik.setFieldValue("labelName", e.target.value);
                     }}
                     onBlur={formik.handleBlur}
-                    className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:outline-none transition-all ${
-                      formik.errors.labelName && formik.touched.labelName
-                        ? "border-red-500 dark:border-red-500 animate-shake focus:border-red-500"
-                        : "border-gray-300 dark:border-gray-600 focus:border-blue-500"
-                    }`}
+                    className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:outline-none transition-all ${formik.errors.labelName && formik.touched.labelName
+                      ? "border-red-500 dark:border-red-500 animate-shake focus:border-red-500"
+                      : "border-gray-300 dark:border-gray-600 focus:border-blue-500"
+                      }`}
                     placeholder="Enter display label"
                   />
                   {formik.errors.labelName && formik.touched.labelName && (
@@ -833,7 +1228,7 @@ export default function MasterMenuItemTabbedForm({
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Menu Master & Categories <span className="text-red-500">*</span>  
+                    Menu Master & Categories <span className="text-red-500">*</span>
                   </label>
                   <div className="space-y-2">
                     <button
@@ -842,20 +1237,17 @@ export default function MasterMenuItemTabbedForm({
                       className="w-full px-4 py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-left"
                     >
                       {selectedMenuMaster && selectedCategories.size > 0
-                        ? `${
-                            selectedMenuMaster.name ||
-                            selectedMenuMaster.labelName ||
-                            selectedMenuMaster.menuMasterCode
-                          } - ${selectedCategories.size} categor${
-                            selectedCategories.size === 1 ? "y" : "ies"
-                          } selected`
+                        ? `${selectedMenuMaster.name ||
+                        selectedMenuMaster.labelName ||
+                        selectedMenuMaster.menuMasterCode
+                        } - ${selectedCategories.size} categor${selectedCategories.size === 1 ? "y" : "ies"
+                        } selected`
                         : selectedMenuMaster
-                        ? `${
-                            selectedMenuMaster.name ||
-                            selectedMenuMaster.labelName ||
-                            selectedMenuMaster.menuMasterCode
+                          ? `${selectedMenuMaster.name ||
+                          selectedMenuMaster.labelName ||
+                          selectedMenuMaster.menuMasterCode
                           } - No categories selected`
-                        : "Click to select Menu Master & Categories"}
+                          : "Click to select Menu Master & Categories"}
                     </button>
 
                     {/* Display Selected Menu Master */}
@@ -872,7 +1264,7 @@ export default function MasterMenuItemTabbedForm({
                           </div>
                           {selectedMenuMaster.labelName &&
                             selectedMenuMaster.labelName !==
-                              selectedMenuMaster.name && (
+                            selectedMenuMaster.name && (
                               <div className="text-sm text-gray-500 dark:text-gray-400">
                                 {selectedMenuMaster.labelName}
                               </div>
@@ -935,11 +1327,11 @@ export default function MasterMenuItemTabbedForm({
                       </div>
                     )}
                   </div>
-                  {(formik.errors.menuMasterCode && formik.touched.menuMasterCode) || 
-                   (formik.errors.menuCategoryCode && formik.touched.menuCategoryCode) || 
-                   (selectedCategories.size === 0 && formik.touched.menuCategoryCode) ? (
+                  {((formik.errors.menuMasterCode && formik.touched.menuMasterCode) ||
+                    (formik.errors.menuCategoryCode && formik.touched.menuCategoryCode && selectedCategories.size === 0) ||
+                    (selectedCategories.size === 0 && formik.touched.menuCategoryCode)) ? (
                     <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                      {formik.errors.menuMasterCode || formik.errors.menuCategoryCode || "Please select at least one category"}
+                      {typeof formik.errors.menuMasterCode === 'string' ? formik.errors.menuMasterCode : (selectedCategories.size === 0 ? (typeof formik.errors.menuCategoryCode === 'string' ? formik.errors.menuCategoryCode : "Please select at least one category") : "")}
                     </p>
                   ) : null}
                 </div>
@@ -1054,19 +1446,17 @@ export default function MasterMenuItemTabbedForm({
                           [t.key]: (prev as any)[t.key] === 1 ? 0 : 1,
                         }))
                       }
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        (formData as any)[t.key] === 1
-                          ? "bg-blue-600"
-                          : "bg-gray-300 dark:bg-gray-600"
-                      }`}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${(formData as any)[t.key] === 1
+                        ? "bg-blue-600"
+                        : "bg-gray-300 dark:bg-gray-600"
+                        }`}
                       aria-pressed={(formData as any)[t.key] === 1}
                     >
                       <span
-                        className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                          (formData as any)[t.key] === 1
-                            ? "translate-x-5"
-                            : "translate-x-1"
-                        }`}
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${(formData as any)[t.key] === 1
+                          ? "translate-x-5"
+                          : "translate-x-1"
+                          }`}
                       />
                     </button>
                   </div>
@@ -1145,20 +1535,18 @@ export default function MasterMenuItemTabbedForm({
                                 }
                                 setSelectedPrepZones(updated);
                               }}
-                              className={`relative p-4 rounded-lg border-2 transition-all text-left ${
-                                isSelected
-                                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md"
-                                  : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
-                              }`}
+                              className={`relative p-4 rounded-lg border-2 transition-all text-left ${isSelected
+                                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 shadow-md"
+                                : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
+                                }`}
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex-1 min-w-0">
                                   <p
-                                    className={`text-sm font-medium truncate ${
-                                      isSelected
-                                        ? "text-blue-700 dark:text-blue-300"
-                                        : "text-gray-700 dark:text-gray-300"
-                                    }`}
+                                    className={`text-sm font-medium truncate ${isSelected
+                                      ? "text-blue-700 dark:text-blue-300"
+                                      : "text-gray-700 dark:text-gray-300"
+                                      }`}
                                     title={
                                       prepZone.prepZoneName || prepZoneValue
                                     }
@@ -1259,18 +1647,16 @@ export default function MasterMenuItemTabbedForm({
                         isPrice: formData.isPrice === 1 ? 0 : 1,
                       });
                     }}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                      formData.isPrice === 1
-                        ? "bg-blue-600"
-                        : "bg-gray-200 dark:bg-gray-700"
-                    }`}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${formData.isPrice === 1
+                      ? "bg-blue-600"
+                      : "bg-gray-200 dark:bg-gray-700"
+                      }`}
                     role="switch"
                     aria-checked={formData.isPrice === 1}
                   >
                     <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        formData.isPrice === 1 ? "translate-x-5" : "translate-x-0"
-                      }`}
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${formData.isPrice === 1 ? "translate-x-5" : "translate-x-0"
+                        }`}
                     />
                   </button>
                 </div>
@@ -1295,11 +1681,10 @@ export default function MasterMenuItemTabbedForm({
                             priceStrategy: 1,
                           });
                         }}
-                        className={`relative px-6 py-3 rounded-lg border-2 transition-all font-medium ${
-                          formData.priceStrategy === 1
-                            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
-                            : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                        }`}
+                        className={`relative px-6 py-3 rounded-lg border-2 transition-all font-medium ${formData.priceStrategy === 1
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                          : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                          }`}
                       >
                         Base Price
                         {formData.priceStrategy === 1 && (
@@ -1316,11 +1701,10 @@ export default function MasterMenuItemTabbedForm({
                             retailPrice: 0,
                           });
                         }}
-                        className={`relative px-6 py-3 rounded-lg border-2 transition-all font-medium ${
-                          formData.priceStrategy === 3
-                            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
-                            : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                        }`}
+                        className={`relative px-6 py-3 rounded-lg border-2 transition-all font-medium ${formData.priceStrategy === 3
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                          : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                          }`}
                       >
                         Open Price
                         {formData.priceStrategy === 3 && (
@@ -1402,6 +1786,173 @@ export default function MasterMenuItemTabbedForm({
             </div>
           </div>
 
+          {/* Time Event Configuration Section */}
+          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+            <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-6">
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  Time Event Configuration
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Menu Item Time Events
+                </p>
+              </div>
+
+              {!formData.deptCode || formData.isPrice !== 1 || formData.retailPrice <= 0 ? (
+                <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {!formData.deptCode && formData.isPrice !== 1 && formData.retailPrice <= 0
+                      ? "Please select Department and enable Pricing with base price to view time events"
+                      : !formData.deptCode
+                        ? "Please select Department to view time events"
+                        : formData.isPrice !== 1
+                          ? "Please enable Pricing to view time events"
+                          : "Please enter base price to view time events"}
+                  </p>
+                </div>
+              ) : loadingTimeEvents ? (
+                <div className="text-center py-8">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                    Loading time events...
+                  </p>
+                </div>
+              ) : timeEvents.length === 0 ? (
+                <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    No time events found for this department
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="overflow-hidden border border-gray-200 dark:border-gray-600 rounded-lg">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+                      <thead className="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Event Name
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Formula Value
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        {timeEvents.map((event, index) => {
+                          const eventCode = event.eventCode || "";
+                          const byFixedValue = event.byFixedValue || false;
+                          const currentFormulaValue = timeEventFormulas[eventCode] ?? event.final_price;
+                          const originalFormulaValue = event.final_price;
+                          const hasChanged = currentFormulaValue !== originalFormulaValue;
+                          const isUpdating = updatingEventCode === eventCode;
+
+                          return (
+                            <tr key={index}>
+                              <td className="px-4 py-3">
+                                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {event.event_name}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={currentFormulaValue}
+                                  onChange={(e) => {
+                                    const newValue = parseFloat(e.target.value) || 0;
+                                    setTimeEventFormulas((prev) => ({
+                                      ...prev,
+                                      [eventCode]: newValue,
+                                    }));
+                                  }}
+                                  disabled={!byFixedValue || isUpdating}
+                                  className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!byFixedValue
+                                    ? "opacity-50 cursor-not-allowed border-gray-300 dark:border-gray-600"
+                                    : "border-gray-300 dark:border-gray-600"
+                                    }`}
+                                  placeholder="0.00"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (!eventCode || !byFixedValue || !hasChanged) return;
+
+                                    const itemId = menuItem?.menuItemId || menuItem?.tblMenuItemId;
+                                    if (!itemId) {
+                                      toast.error("Please save the menu item first before updating formula values");
+                                      return;
+                                    }
+
+                                    setUpdatingEventCode(eventCode);
+                                    try {
+                                      const token = localStorage.getItem("master_admin_token");
+
+                                      const response = await fetch(
+                                        `/api/master/menu-items/${itemId}/time-events/${encodeURIComponent(eventCode)}`,
+                                        {
+                                          method: "PUT",
+                                          headers: {
+                                            "Content-Type": "application/json",
+                                            Authorization: `Bearer ${token}`,
+                                          },
+                                          body: JSON.stringify({
+                                            formulaValue: currentFormulaValue,
+                                          }),
+                                        }
+                                      );
+
+                                      if (response.ok) {
+                                        toast.success("Formula value updated successfully");
+                                        // Update the original value to reflect the change
+                                        setTimeEvents((prev) =>
+                                          prev.map((e) =>
+                                            e.eventCode === eventCode
+                                              ? { ...e, final_price: currentFormulaValue }
+                                              : e
+                                          )
+                                        );
+                                      } else {
+                                        const errorData = await response.json();
+                                        toast.error(
+                                          errorData.error || "Failed to update formula value"
+                                        );
+                                      }
+                                    } catch (error) {
+                                      console.error("Error updating formula value:", error);
+                                      toast.error("Failed to update formula value");
+                                    } finally {
+                                      setUpdatingEventCode(null);
+                                    }
+                                  }}
+                                  disabled={!byFixedValue || !hasChanged || isUpdating}
+                                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${byFixedValue && hasChanged && !isUpdating
+                                    ? "bg-yellow-500 hover:bg-yellow-600 text-white"
+                                    : "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                                    }`}
+                                >
+                                  {isUpdating ? "Updating..." : "Update"}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Note: Formula value can only be edited when 'Fixed Value' is enabled. Use the Update button to save changes.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Tax Configuration Section */}
           <div className="p-6 border-b border-gray-200 dark:border-gray-700">
             <div className="mb-6">
@@ -1423,11 +1974,10 @@ export default function MasterMenuItemTabbedForm({
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, taxCode: "" })}
-                      className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
-                        formData.taxCode === ""
-                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
-                          : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                      }`}
+                      className={`relative px-4 py-2 rounded-lg border-2 transition-all ${formData.taxCode === ""
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                        }`}
                     >
                       None
                       {formData.taxCode === "" && (
@@ -1441,11 +1991,10 @@ export default function MasterMenuItemTabbedForm({
                         onClick={() =>
                           setFormData({ ...formData, taxCode: t.taxCode })
                         }
-                        className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
-                          formData.taxCode === t.taxCode
-                            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
-                            : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                        }`}
+                        className={`relative px-4 py-2 rounded-lg border-2 transition-all ${formData.taxCode === t.taxCode
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                          : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                          }`}
                       >
                         {t.taxname}
                         {formData.taxCode === t.taxCode && (
@@ -1488,19 +2037,17 @@ export default function MasterMenuItemTabbedForm({
                           [t.key]: !(prev as any)[t.key],
                         }))
                       }
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        (formData as any)[t.key]
-                          ? "bg-blue-600"
-                          : "bg-gray-300 dark:bg-gray-600"
-                      }`}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${(formData as any)[t.key]
+                        ? "bg-blue-600"
+                        : "bg-gray-300 dark:bg-gray-600"
+                        }`}
                       aria-pressed={(formData as any)[t.key]}
                     >
                       <span
-                        className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                          (formData as any)[t.key]
-                            ? "translate-x-5"
-                            : "translate-x-1"
-                        }`}
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${(formData as any)[t.key]
+                          ? "translate-x-5"
+                          : "translate-x-1"
+                          }`}
                       />
                     </button>
                   </div>
@@ -1522,11 +2069,10 @@ export default function MasterMenuItemTabbedForm({
                           diningTaxEffect: effect,
                         })
                       }
-                      className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
-                        formData.diningTaxEffect === effect
-                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
-                          : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                      }`}
+                      className={`relative px-4 py-2 rounded-lg border-2 transition-all ${formData.diningTaxEffect === effect
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                        }`}
                     >
                       {effect}
                       {formData.diningTaxEffect === effect && (
@@ -1959,11 +2505,10 @@ export default function MasterMenuItemTabbedForm({
                   <button
                     type="button"
                     onClick={() => setInheritModifiers(true)}
-                    className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
-                      inheritModifiers
-                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
-                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                    }`}
+                    className={`relative px-4 py-2 rounded-lg border-2 transition-all ${inheritModifiers
+                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                      : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                      }`}
                   >
                     Yes, inherit modifiers set at the menu category-level.
                     {inheritModifiers && (
@@ -1974,11 +2519,10 @@ export default function MasterMenuItemTabbedForm({
                   <button
                     type="button"
                     onClick={() => setInheritModifiers(false)}
-                    className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
-                      !inheritModifiers
-                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
-                        : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                    }`}
+                    className={`relative px-4 py-2 rounded-lg border-2 transition-all ${!inheritModifiers
+                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                      : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                      }`}
                   >
                     No
                     {!inheritModifiers && (
@@ -2084,6 +2628,12 @@ export default function MasterMenuItemTabbedForm({
             <button
               type="submit"
               disabled={loading}
+              onClick={(e) => {
+                console.log("Submit button clicked!");
+                console.log("Loading state:", loading);
+                console.log("Form data:", formData);
+                // Let the form submit normally
+              }}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
             >
               {loading ? "Saving..." : menuItem ? "Update" : "Create"}

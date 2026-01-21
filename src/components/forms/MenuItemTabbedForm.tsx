@@ -122,6 +122,25 @@ export default function MenuItemTabbedForm({
   const [filteredCategories, setFilteredCategories] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
 
+  // Time Event Configuration state
+  const [timeEvents, setTimeEvents] = useState<Array<{
+    event_name: string;
+    final_price: number;
+    eventCode?: string;
+    byFixedValue?: boolean;
+  }>>([]);
+  const [timeEventDetails, setTimeEventDetails] = useState<Record<string, {
+    eventCode: string;
+    eventName: string;
+    byFixedValue: boolean;
+    isDelete?: boolean;
+    isOverride?: boolean;
+  }>>({});
+  const [timeEventFormulas, setTimeEventFormulas] = useState<Record<string, number>>({});
+  const [loadingTimeEvents, setLoadingTimeEvents] = useState(false);
+  const [updatingEventCode, setUpdatingEventCode] = useState<string | null>(null);
+  const [originalDeptCode, setOriginalDeptCode] = useState<string>('');
+
   useEffect(() => {
     if (selectedStoreCode) {
       fetchModifiers();
@@ -245,6 +264,7 @@ export default function MenuItemTabbedForm({
         menuMasterCode: menuItem.menuMasterCode || "",
         menuCategoryCode: menuItem.menuCategoryCode || "",
         deptCode: menuItem.deptCode || "",
+        originalDeptCode: menuItem.deptCode || "",
         isActive: menuItem.isActive ?? 1,
         stockinhand: menuItem.stockinhand?.toString() || "",
         taxCode: menuItem.taxCode || "",
@@ -360,8 +380,154 @@ export default function MenuItemTabbedForm({
         // Fallback to inheritModifierGroup if inheritModifiers is not set
         setInheritModifiers(menuItem.inheritModifierGroup);
       }
+      
+      // Set original department code for tracking changes
+      setOriginalDeptCode(menuItem.deptCode || "");
     }
   }, [menuItem]);
+
+  // Fetch time events when department is selected, price is enabled, and retail price is set
+  useEffect(() => {
+    const fetchTimeEvents = async () => {
+      // Check if all conditions are met
+      if (
+        formData.deptCode &&
+        formData.isPrice === 1 &&
+        formData.retailPrice > 0 &&
+        selectedStoreCode
+      ) {
+        setLoadingTimeEvents(true);
+        try {
+          // Call PostgreSQL function to get calculated prices (location dashboard endpoint)
+          const functionResponse = await fetch(
+            buildApiUrl(`/api/dashboard/menu-items/time-events?deptCode=${encodeURIComponent(
+              formData.deptCode
+            )}&basePrice=${formData.retailPrice}`)
+          );
+
+          if (!functionResponse.ok) {
+            throw new Error("Failed to fetch time events");
+          }
+
+          const functionResults = await functionResponse.json();
+
+          // Fetch time event details to get eventCode and byFixedValue (filtered by storeCode)
+          const detailsResponse = await fetch(
+            buildApiUrl(`/api/dashboard/events?storeCode=${encodeURIComponent(selectedStoreCode)}`)
+          );
+
+          let eventDetailsMap: Record<string, {
+            eventCode: string;
+            eventName: string;
+            byFixedValue: boolean;
+            isDelete?: boolean;
+            isOverride?: boolean;
+          }> = {};
+
+          if (detailsResponse.ok) {
+            const eventDetails = await detailsResponse.json();
+            // Filter events by department code (deptCode is JSON array)
+            const deptEvents = eventDetails.filter((event: any) => {
+              if (!event.deptCode) return false;
+              try {
+                const deptCodes = typeof event.deptCode === 'string' 
+                  ? JSON.parse(event.deptCode) 
+                  : event.deptCode;
+                if (Array.isArray(deptCodes)) {
+                  return deptCodes.includes(formData.deptCode) || event.overrideAllEvents;
+                }
+                return deptCodes === formData.deptCode || event.overrideAllEvents;
+              } catch {
+                return event.deptCode === formData.deptCode || event.overrideAllEvents;
+              }
+            });
+            
+            deptEvents.forEach((event: any) => {
+              eventDetailsMap[event.eventName] = {
+                eventCode: event.eventCode,
+                eventName: event.eventName,
+                byFixedValue: event.byFixedValue || false,
+                isDelete: event.isDelete || false,
+                isOverride: event.overrideAllEvents || false,
+              };
+            });
+          }
+
+          setTimeEventDetails(eventDetailsMap);
+
+          // Merge function results with event details
+          const mergedEvents = functionResults.map((result: any) => {
+            const details = eventDetailsMap[result.event_name];
+            return {
+              event_name: result.event_name,
+              final_price: result.final_price,
+              eventCode: details?.eventCode,
+              byFixedValue: details?.byFixedValue || false,
+            };
+          });
+
+          setTimeEvents(mergedEvents);
+
+          // Initialize formula values with calculated prices
+          const initialFormulas: Record<string, number> = {};
+          mergedEvents.forEach((event: any) => {
+            if (event.eventCode) {
+              initialFormulas[event.eventCode] = event.final_price;
+            }
+          });
+          setTimeEventFormulas(initialFormulas);
+
+          // If editing, fetch existing formula values and override calculated values
+          if (menuItem?.menuItemId || menuItem?.tblMenuItemId) {
+            try {
+              const itemId = menuItem.menuItemId || menuItem.tblMenuItemId;
+              const existingFormulasResponse = await fetch(
+                buildApiUrl(`/api/dashboard/menu-items/${itemId}/time-events?storeCode=${encodeURIComponent(selectedStoreCode)}`)
+              );
+
+              if (existingFormulasResponse.ok) {
+                const existingFormulas = await existingFormulasResponse.json();
+                // Override with saved values if they exist and update event details
+                Object.keys(existingFormulas).forEach((eventCode) => {
+                  if (initialFormulas[eventCode] !== undefined) {
+                    initialFormulas[eventCode] = existingFormulas[eventCode].formulaValue;
+                  }
+                  // Update event details with isDelete and isOverride if they exist
+                  if (eventDetailsMap[eventCode]) {
+                    const existing = eventDetailsMap[eventCode];
+                    eventDetailsMap[eventCode] = {
+                      ...existing,
+                      isDelete: existingFormulas[eventCode]?.isDelete || false,
+                      isOverride: existingFormulas[eventCode]?.isOverride || false,
+                    };
+                  }
+                });
+                setTimeEventFormulas(initialFormulas);
+                setTimeEventDetails(eventDetailsMap);
+              }
+            } catch (e) {
+              console.error("Error fetching existing formula values:", e);
+              // Continue with calculated values
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching time events:", error);
+          toast.error("Failed to load time events");
+          setTimeEvents([]);
+          setTimeEventFormulas({});
+          setTimeEventDetails({});
+        } finally {
+          setLoadingTimeEvents(false);
+        }
+      } else {
+        // Only clear state if it's not already empty to prevent unnecessary re-renders
+        setTimeEvents((prev) => prev.length > 0 ? [] : prev);
+        setTimeEventFormulas((prev) => Object.keys(prev).length > 0 ? {} : prev);
+        setTimeEventDetails((prev) => Object.keys(prev).length > 0 ? {} : prev);
+      }
+    };
+    fetchTimeEvents();
+  }, [formData.deptCode, formData.isPrice, formData.retailPrice, menuItem?.menuItemId, menuItem?.tblMenuItemId, selectedStoreCode, buildApiUrl]);
 
   // Create a stable dependency for selected categories
   const selectedCategoriesKey = useMemo(() => {
@@ -641,7 +807,136 @@ export default function MenuItemTabbedForm({
           : null,
       };
 
-      await onSave(submitData);
+      // Save menu item first
+      const savedMenuItem = await onSave(submitData);
+
+      // Get menuItemId - use savedMenuItem.menuItemId or fall back to existing menuItem
+      const menuItemId = savedMenuItem?.menuItemId || menuItem?.menuItemId || menuItem?.tblMenuItemId;
+      const menuItemCode = savedMenuItem?.menuItemCode || menuItem?.menuItemCode;
+
+      // Check if department changed (for edit mode)
+      const departmentChanged = menuItem && formData.deptCode && formData.originalDeptCode &&
+        formData.deptCode !== formData.originalDeptCode;
+
+      // If department changed, mark old time events as deleted first (even if no new events)
+      if (departmentChanged && menuItemId && menuItemCode && formData.originalDeptCode && selectedStoreCode) {
+        try {
+          const markDeletedResponse = await fetch(
+            buildApiUrl(`/api/dashboard/menu-items/${menuItemId}/time-events/mark-deleted?storeCode=${encodeURIComponent(selectedStoreCode)}`),
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                menuItemCode: menuItemCode,
+                oldDeptCode: formData.originalDeptCode,
+              }),
+            }
+          );
+
+          if (markDeletedResponse.ok) {
+            const markResult = await markDeletedResponse.json();
+            console.log("Marked old time events as deleted:", markResult.markedDeleted);
+          } else {
+            console.warn("Failed to mark old time events as deleted");
+          }
+        } catch (markDeletedError) {
+          console.error("Error marking old time events as deleted:", markDeletedError);
+        }
+      }
+
+      // If menu item was saved successfully and we have time events, save them
+      if (menuItemId && menuItemCode && timeEvents.length > 0 && formData.deptCode && formData.isPrice === 1 && formData.retailPrice > 0 && selectedStoreCode) {
+        try {
+          // Prepare time events data for bulk save
+          const timeEventsData = timeEvents.map((event) => {
+            const eventCode = event.eventCode || "";
+            const eventDetail = Object.values(timeEventDetails).find(d => d.eventCode === eventCode) as {
+              eventCode: string;
+              eventName: string;
+              byFixedValue: boolean;
+              isDelete?: boolean;
+              isOverride?: boolean;
+            } | undefined;
+
+            // Use updated formula value if user changed it, otherwise use calculated value
+            const formulaValue = timeEventFormulas[eventCode] !== undefined
+              ? timeEventFormulas[eventCode]
+              : event.final_price;
+
+            return {
+              timeEventCode: eventCode,
+              formulaValue: formulaValue,
+              isFixedValue: eventDetail?.byFixedValue || event.byFixedValue || false,
+              isDelete: false, // New events are not deleted
+              isOverride: eventDetail?.isOverride || false,
+            };
+          });
+
+          // Call bulk save endpoint
+          const bulkSaveResponse = await fetch(
+            buildApiUrl(`/api/dashboard/menu-items/${menuItemId}/time-events/bulk?storeCode=${encodeURIComponent(selectedStoreCode)}`),
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                menuItemCode: menuItemCode,
+                timeEvents: timeEventsData,
+              }),
+            }
+          );
+
+          if (bulkSaveResponse.ok) {
+            const bulkResult = await bulkSaveResponse.json();
+            console.log("Time events saved:", bulkResult);
+            if (bulkResult.errors && bulkResult.errors.length > 0) {
+              console.warn("Some time events failed to save:", bulkResult.errors);
+              toast.error(`Menu item saved, but ${bulkResult.errors.length} time event(s) failed to save`);
+            } else {
+              if (menuItem) {
+                toast.success(`Menu item and ${bulkResult.created || timeEvents.length} time event(s) updated successfully!`);
+              } else {
+                toast.success(`Menu item and ${bulkResult.created || timeEvents.length} time event(s) created successfully!`);
+              }
+            }
+            // Navigate after a short delay to allow toast to show
+            setTimeout(() => {
+              onCancel();
+            }, 1000);
+          } else {
+            const errorData = await bulkSaveResponse.json();
+            console.error("Failed to save time events:", errorData);
+            toast.error(errorData.error || "Menu item saved but failed to save time events");
+            // Still navigate even if time events failed
+            setTimeout(() => {
+              onCancel();
+            }, 1500);
+          }
+        } catch (timeEventError) {
+          console.error("Error saving time events:", timeEventError);
+          toast.error("Menu item saved but failed to save time events");
+          // Still navigate even if time events failed
+          setTimeout(() => {
+            onCancel();
+          }, 1500);
+        }
+      } else if (savedMenuItem) {
+        // Only show success toast if no time events were processed or if it's a new item without time events
+        if (!timeEvents.length || !formData.deptCode || formData.isPrice !== 1 || formData.retailPrice <= 0) {
+          if (menuItem) {
+            toast.success("Menu item updated successfully!");
+          } else {
+            toast.success("Menu item created successfully!");
+          }
+          // Navigate after a short delay
+          setTimeout(() => {
+            onCancel();
+          }, 1000);
+        }
+      }
     } catch (error) {
       // Error is already handled in onSave, just prevent it from propagating
       // No need to log here as it's already handled upstream
@@ -1373,6 +1668,171 @@ export default function MenuItemTabbedForm({
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Time Event Configuration Section */}
+          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+            <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-6">
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  Time Event Configuration
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Menu Item Time Events
+                </p>
+              </div>
+
+              {!formData.deptCode || formData.isPrice !== 1 || formData.retailPrice <= 0 ? (
+                <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {!formData.deptCode && formData.isPrice !== 1 && formData.retailPrice <= 0
+                      ? "Please select Department and enable Pricing with base price to view time events"
+                      : !formData.deptCode
+                        ? "Please select Department to view time events"
+                        : formData.isPrice !== 1
+                          ? "Please enable Pricing to view time events"
+                          : "Please enter base price to view time events"}
+                  </p>
+                </div>
+              ) : loadingTimeEvents ? (
+                <div className="text-center py-8">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                    Loading time events...
+                  </p>
+                </div>
+              ) : timeEvents.length === 0 ? (
+                <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    No time events found for this department
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="overflow-hidden border border-gray-200 dark:border-gray-600 rounded-lg">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+                      <thead className="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Event Name
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Formula Value
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        {timeEvents.map((event, index) => {
+                          const eventCode = event.eventCode || "";
+                          const eventDetail = Object.values(timeEventDetails).find(d => d.eventCode === eventCode);
+                          const byFixedValue = eventDetail?.byFixedValue ?? event.byFixedValue ?? false;
+                          const currentFormulaValue = timeEventFormulas[eventCode] ?? event.final_price;
+                          const originalFormulaValue = event.final_price;
+                          const hasChanged = currentFormulaValue !== originalFormulaValue;
+                          const isUpdating = updatingEventCode === eventCode;
+
+                          return (
+                            <tr key={index}>
+                              <td className="px-4 py-3">
+                                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {event.event_name}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={currentFormulaValue}
+                                  onChange={(e) => {
+                                    const newValue = parseFloat(e.target.value) || 0;
+                                    setTimeEventFormulas((prev) => ({
+                                      ...prev,
+                                      [eventCode]: newValue,
+                                    }));
+                                  }}
+                                  disabled={!byFixedValue || isUpdating}
+                                  className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!byFixedValue
+                                    ? "opacity-50 cursor-not-allowed border-gray-300 dark:border-gray-600"
+                                    : "border-gray-300 dark:border-gray-600"
+                                    }`}
+                                  placeholder="0.00"
+                                />
+                              </td>
+                              <td className="px-4 py-3">
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (!eventCode || !byFixedValue || !hasChanged) return;
+
+                                    const itemId = menuItem?.menuItemId || menuItem?.tblMenuItemId;
+                                    if (!itemId) {
+                                      toast.error("Please save the menu item first before updating formula values");
+                                      return;
+                                    }
+
+                                    setUpdatingEventCode(eventCode);
+                                    try {
+                                      const response = await fetch(
+                                        buildApiUrl(`/api/dashboard/menu-items/${itemId}/time-events/${encodeURIComponent(eventCode)}?storeCode=${encodeURIComponent(selectedStoreCode || '')}`),
+                                        {
+                                          method: "PUT",
+                                          headers: {
+                                            "Content-Type": "application/json",
+                                          },
+                                          body: JSON.stringify({
+                                            formulaValue: currentFormulaValue,
+                                          }),
+                                        }
+                                      );
+
+                                      if (response.ok) {
+                                        toast.success("Formula value updated successfully");
+                                        // Update the original value to reflect the change
+                                        setTimeEvents((prev) =>
+                                          prev.map((e) =>
+                                            e.eventCode === eventCode
+                                              ? { ...e, final_price: currentFormulaValue }
+                                              : e
+                                          )
+                                        );
+                                      } else {
+                                        const errorData = await response.json();
+                                        toast.error(
+                                          errorData.error || "Failed to update formula value"
+                                        );
+                                      }
+                                    } catch (error) {
+                                      console.error("Error updating formula value:", error);
+                                      toast.error("Failed to update formula value");
+                                    } finally {
+                                      setUpdatingEventCode(null);
+                                    }
+                                  }}
+                                  disabled={!byFixedValue || !hasChanged || isUpdating}
+                                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${byFixedValue && hasChanged && !isUpdating
+                                    ? "bg-yellow-500 hover:bg-yellow-600 text-white"
+                                    : "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                                    }`}
+                                >
+                                  {isUpdating ? "Updating..." : "Update"}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Note: Formula value can only be edited when 'Fixed Value' is enabled. Use the Update button to save changes.
+                  </p>
                 </div>
               )}
             </div>

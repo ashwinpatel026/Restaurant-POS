@@ -20,7 +20,7 @@ export const menuItemSchema = Yup.object({
 
   menuMasterCode: Yup.string().required("Menu Master is required"),
 
-  menuCategoryCode: Yup.string().required("Category is required"),
+  menuCategoryCode: Yup.string().nullable(),
 
   // Other optional fields
   calories: Yup.string(),

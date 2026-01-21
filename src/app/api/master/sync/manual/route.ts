@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper';
 import { syncService } from '@/lib/sync/syncService';
 import { SyncRequest, SYNC_TABLE_DEPENDENCIES } from '@/lib/sync/types';
+import { syncMenuItemTimeEvents } from '@/services/syncService';
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,6 +36,45 @@ export async function POST(request: NextRequest) {
         { error: 'locationCode is required' },
         { status: 400 }
       );
+    }
+
+    // Special handling for Menu Item Time Event table - use dedicated sync function
+    if (tableName === 'tbl_master_menuitem_timeevent') {
+      console.log('Using dedicated sync function for Menu Item Time Event');
+      const startTime = Date.now();
+      try {
+        const recordsSynced = await syncMenuItemTimeEvents(locationCode);
+        const duration = Date.now() - startTime;
+
+        return NextResponse.json({
+          success: true,
+          message: `Menu Item Time Event sync completed successfully for location ${locationCode}`,
+          data: {
+            locationCode,
+            tableName: 'tbl_master_menuitem_timeevent',
+            recordsProcessed: recordsSynced.recordsSynced,
+            recordsSucceeded: recordsSynced.recordsSynced,
+            recordsFailed: 0,
+            duration,
+            errors: [],
+          },
+        });
+      } catch (error: any) {
+        console.error('Error syncing Menu Item Time Event:', error);
+        return NextResponse.json({
+          success: false,
+          message: `Menu Item Time Event sync failed for location ${locationCode}`,
+          data: {
+            locationCode,
+            tableName: 'tbl_master_menuitem_timeevent',
+            recordsProcessed: 0,
+            recordsSucceeded: 0,
+            recordsFailed: 0,
+            duration: Date.now() - startTime,
+            errors: [{ recordId: '', operation: 'INSERT' as const, error: error.message || 'Unknown error', tableName: 'tbl_master_menuitem_timeevent' }],
+          },
+        });
+      }
     }
 
     // Build sync request

@@ -13,7 +13,7 @@ async function generateEventCode(): Promise<string> {
   })
 
   let nextNumber = 1
-  
+
   if (latestEvent?.eventCode) {
     // Extract number from code like "TE1", "TE2", etc.
     const match = latestEvent.eventCode.match(/^TE(\d+)$/)
@@ -21,7 +21,7 @@ async function generateEventCode(): Promise<string> {
       nextNumber = parseInt(match[1]) + 1
     }
   }
-  
+
   // Format as TE + number starting from 1
   return `TE${nextNumber}`
 }
@@ -29,12 +29,12 @@ async function generateEventCode(): Promise<string> {
 // Helper function to validate and store time string directly
 function validateTimeString(time: string | null): string | null {
   if (!time || time.trim() === "") return null
-  
+
   // Expect 24-hour format (HH:MM) - return as string
   if (/^\d{2}:\d{2}$/.test(time)) {
     return time
   }
-  
+
   // If format doesn't match HH:MM, return null
   return null
 }
@@ -42,9 +42,9 @@ function validateTimeString(time: string | null): string | null {
 // Helper function to convert deptCode JSON array to comma-separated string
 function deptCodeToCommaSeparated(deptCode: any): string {
   if (!deptCode) return ''
-  
+
   let deptArray: string[] = []
-  
+
   if (Array.isArray(deptCode)) {
     deptArray = deptCode
   } else if (typeof deptCode === 'string') {
@@ -55,7 +55,7 @@ function deptCodeToCommaSeparated(deptCode: any): string {
       deptArray = [deptCode]
     }
   }
-  
+
   return deptArray.filter(Boolean).join(',')
 }
 
@@ -79,14 +79,43 @@ function mapEventResponse(event: any) {
 export async function GET(request: NextRequest) {
   try {
     const admin = await verifyMasterAdmin(request)
-    
+
     if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const events = await masterPrisma.masterTimeEvent.findMany({
-      orderBy: { createdDate: 'desc' }
-    })
+    const { searchParams } = new URL(request.url)
+    const deptCode = searchParams.get('deptCode')
+
+    let events
+    if (deptCode) {
+      // Filter by department code - use raw SQL to check if deptCode exists in JSON array
+      // PostgreSQL JSONB @> operator checks if left JSONB contains right JSONB
+      events = await masterPrisma.$queryRawUnsafe<Array<{
+        eventCode: string
+        eventName: string
+        byFixedValue: boolean
+      }>>(
+        `SELECT "Event_code" as "eventCode", "EventName" as "eventName", "by_fixed_value" as "byFixedValue"
+         FROM tbl_master_time_events
+         WHERE is_active = 1
+           AND (
+             dept_code @> to_jsonb($1::text)
+             OR override_all_events = true
+           )
+         ORDER BY created_date DESC`,
+        deptCode
+      )
+    } else {
+      events = await masterPrisma.masterTimeEvent.findMany({
+        orderBy: { createdDate: 'desc' }
+      })
+    }
+
+    // If filtering by department, return simplified format
+    if (deptCode) {
+      return NextResponse.json(events)
+    }
 
     const eventsWithStringId = events.map(mapEventResponse)
 
@@ -103,13 +132,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const admin = await verifyMasterAdmin(request)
-    
+
     if (!admin || !['SUPER_ADMIN', 'COMPANY_ADMIN', 'DEALER_ADMIN'].includes(admin.role)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const body = await request.json()
-    
+
     // Validate required fields
     const eventName = body.eventName ? body.eventName.trim() : '';
     if (!eventName) {
@@ -118,7 +147,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-    
+
     // Check for duplicate event name (case-insensitive)
     // Get all events and check case-insensitively
     const allEvents = await masterPrisma.masterTimeEvent.findMany({
@@ -138,10 +167,10 @@ export async function POST(request: NextRequest) {
         { status: 409 }
       );
     }
-    
+
     // Auto-generate event code
     const eventCode = await generateEventCode()
-    
+
     const event = await masterPrisma.masterTimeEvent.create({
       data: {
         eventCode: eventCode,
@@ -180,17 +209,17 @@ export async function POST(request: NextRequest) {
         createdBy: admin.adminId
       }
     })
-    
+
     // Call stored procedure to apply time event to menu items
     try {
       const deptCodeList = deptCodeToCommaSeparated(event.deptCode)
       const priceAdjustValue = 0 // SP reads prices from table, but pass 0 for compatibility
       const isOverride = event.overrideAllEvents
-      
+
       // Escape single quotes in string parameters for SQL safety
       const escapedEventCode = eventCode.replace(/'/g, "''")
       const escapedDeptCodeList = deptCodeList.replace(/'/g, "''")
-      
+
       // Log parameters before calling stored procedure
       console.log('Calling stored procedure sp_apply_time_event_to_menuitems_webmaster with parameters:', {
         p_time_event_code: eventCode,
@@ -201,11 +230,11 @@ export async function POST(request: NextRequest) {
         escapedEventCode,
         escapedDeptCodeList
       })
-      
+
       await masterPrisma.$executeRawUnsafe(
         `CALL sp_apply_time_event_to_menuitems_webmaster('${escapedEventCode}', '${escapedDeptCodeList}', ${Boolean(body.byFixedValue)}, ${priceAdjustValue}, ${isOverride})`
       )
-      
+
       console.log(`Successfully applied time event ${eventCode} to menu items for departments: ${deptCodeList || 'none'}`)
     } catch (spError: any) {
       // Log error but continue - event is created successfully
@@ -217,18 +246,18 @@ export async function POST(request: NextRequest) {
       })
       // Continue execution - event creation succeeded even if SP failed
     }
-    
+
     return NextResponse.json(mapEventResponse(event), { status: 201 })
   } catch (error: any) {
     console.error('Error creating time event:', error)
-    
+
     if (error.code === 'P2002') {
       return NextResponse.json(
         { error: 'Event code already exists' },
         { status: 409 }
       )
     }
-    
+
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
