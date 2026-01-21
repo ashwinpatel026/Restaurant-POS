@@ -22,6 +22,7 @@ import {
 } from './types';
 import { syncProcessor } from './syncProcessor';
 import { syncValidator } from './syncValidator';
+import { syncMenuItemTimeEvents } from '@/services/syncService';
 
 export class SyncService {
   private config: SyncConfig;
@@ -134,6 +135,42 @@ export class SyncService {
     };
 
     try {
+      // Special handling for menu item time event table - use dedicated sync function
+      // Note: The dedicated function does a full sync, so we use it for both full and incremental
+      if (tableName === 'tbl_master_menuitem_timeevent') {
+        console.log(`[SYNC] Using dedicated sync function for ${tableName} (incremental sync)`);
+        try {
+          const syncResult = await syncMenuItemTimeEvents(locationCode);
+          result.recordsProcessed = syncResult.recordsSynced;
+          result.recordsSucceeded = syncResult.recordsSynced;
+          result.recordsFailed = 0;
+          result.success = true;
+          
+          // Update sync status
+          await this.updateSyncStatus(
+            locationCode,
+            tableName,
+            result.success ? 0 : 1,
+            null
+          );
+          
+          result.completedAt = new Date();
+          result.duration = Date.now() - startTime;
+          return result;
+        } catch (error: any) {
+          result.success = false;
+          result.errors.push({
+            recordId: '',
+            operation: 'INSERT',
+            error: error.message,
+            tableName,
+          });
+          result.completedAt = new Date();
+          result.duration = Date.now() - startTime;
+          return result;
+        }
+      }
+
       // Fetch pending sync log entries
       const pendingEntries = await this.getPendingSyncEntries(locationCode, tableName);
 
@@ -216,6 +253,41 @@ export class SyncService {
     };
 
     try {
+      // Special handling for menu item time event table - use dedicated sync function
+      if (tableName === 'tbl_master_menuitem_timeevent') {
+        console.log(`[SYNC] Using dedicated sync function for ${tableName}`);
+        try {
+          const syncResult = await syncMenuItemTimeEvents(locationCode);
+          result.recordsProcessed = syncResult.recordsSynced;
+          result.recordsSucceeded = syncResult.recordsSynced;
+          result.recordsFailed = 0;
+          result.success = true;
+          
+          // Update sync status
+          await this.updateSyncStatus(
+            locationCode,
+            tableName,
+            result.success ? 0 : 1,
+            null
+          );
+          
+          result.completedAt = new Date();
+          result.duration = Date.now() - startTime;
+          return result;
+        } catch (error: any) {
+          result.success = false;
+          result.errors.push({
+            recordId: '',
+            operation: 'INSERT',
+            error: error.message,
+            tableName,
+          });
+          result.completedAt = new Date();
+          result.duration = Date.now() - startTime;
+          return result;
+        }
+      }
+
       // Get all records from master table
       const masterRecords = await this.getMasterTableRecords(tableName);
 

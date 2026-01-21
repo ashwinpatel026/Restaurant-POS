@@ -120,6 +120,7 @@ export const SYNC_TABLE_MAP: Record<string, string> = {
   'tbl_master_menu_master_event': 'tbl_menu_master_event',
   'tbl_master_menu_category_modifier': 'tbl_menu_category_modifier',
   'tbl_master_menu_item_modifier_group': 'tbl_menu_item_modifier_group',
+  'tbl_master_menuitem_timeevent': 'tbl_menuitem_timeevent',
 };
 
 // Field mapping: Master table column -> Location table column
@@ -182,6 +183,7 @@ export const SYNC_FIELD_MAP: Record<string, Record<string, string>> = {
     'kitchen_name': 'kitchen_name',
     'label_name': 'label_name',
     'color_code': 'color_code',
+    'dept_code': 'dept_code',
     'forcolor_code': 'forcolor_code',
     'calories': 'calories',
     'description': 'description',
@@ -191,6 +193,7 @@ export const SYNC_FIELD_MAP: Record<string, Record<string, string>> = {
     'is_alcohol': 'is_alcohol',
     'menu_img': 'menu_img',
     'price_strategy': 'price_strategy',
+    'base_price': 'base_price',
     'card_price': 'card_price',
     'cash_price': 'cash_price',
     'is_price': 'is_price',
@@ -358,6 +361,15 @@ export const SYNC_FIELD_MAP: Record<string, Record<string, string>> = {
     'min_selection': 'min_selection',
     'max_selection': 'max_selection',
   },
+  'tbl_master_menuitem_timeevent': {
+    'menu_item_code': 'menu_item_code',
+    'time_event_code': 'time_event_code',
+    'is_fixed_value': 'is_fixed_value',
+    'is_delete': 'is_delete',
+    'is_override': 'is_override',
+    'formula_value': 'formula_value',
+    'is_active': 'is_active',
+  },
   // Permission system tables
   'tbl_permission': {
     'permission_code': 'permission_code',
@@ -406,6 +418,7 @@ export const SYNC_ORDER_BY_COLUMN: Record<string, string> = {
   'tbl_master_menu_master_event': 'createdon',
   'tbl_master_menu_category_modifier': 'createdon',
   'tbl_master_menu_item_modifier_group': 'createdon',
+  'tbl_master_menuitem_timeevent': 'createdon',
 };
 
 // List of tables that support syncing
@@ -445,6 +458,7 @@ export const SYNC_TABLE_ORDER: string[] = [
   'tbl_master_menu_master_event',        // Depends on menu_master and time_events
   'tbl_master_menu_category_modifier',   // Depends on menu_category and modifier_group
   'tbl_master_menu_item_modifier_group', // Depends on menu_item and modifier_group
+  'tbl_master_menuitem_timeevent',       // Depends on menu_item and time_events
 ];
 
 // Table dependencies: child table -> parent table(s)
@@ -462,5 +476,6 @@ export const SYNC_TABLE_DEPENDENCIES: Record<string, string[]> = {
   'tbl_master_menu_master_event': ['tbl_master_menu_master', 'tbl_master_time_events'],
   'tbl_master_menu_category_modifier': ['tbl_master_menu_category', 'tbl_master_modifier_group'],
   'tbl_master_menu_item_modifier_group': ['tbl_master_menu_item', 'tbl_master_modifier_group'],
+  'tbl_master_menuitem_timeevent': ['tbl_master_menu_item', 'tbl_master_time_events'],
 };
 
