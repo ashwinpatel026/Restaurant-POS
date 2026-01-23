@@ -183,6 +183,65 @@ export async function PUT(
         syncSource: 'location'
       }
     })
+
+    // Call stored procedure to apply time event to menu items
+    try {
+      // Helper function to convert deptCode to comma-separated string
+      const deptCodeToCommaSeparated = (deptCode: any): string => {
+        if (!deptCode) return ''
+        let deptArray: string[] = []
+        if (Array.isArray(deptCode)) {
+          deptArray = deptCode
+        } else if (typeof deptCode === 'string') {
+          try {
+            const parsed = JSON.parse(deptCode)
+            deptArray = Array.isArray(parsed) ? parsed : [parsed]
+          } catch {
+            deptArray = [deptCode]
+          }
+        }
+        return deptArray.filter(Boolean).join(',')
+      }
+
+      const eventStoreCode = existingEvent.storeCode || selectedStoreCode
+      const deptCodeList = deptCodeToCommaSeparated(event.deptCode)
+      const priceAdjustValue = 0 // SP reads prices from table, but pass 0 for compatibility
+      const isOverride = event.overrideAllEvents
+
+      // Escape single quotes in string parameters for SQL safety
+      const escapedEventCode = existingEvent.eventCode.replace(/'/g, "''")
+      const escapedStoreCode = eventStoreCode.replace(/'/g, "''")
+      const escapedDeptCodeList = deptCodeList.replace(/'/g, "''")
+
+      // Log parameters before calling stored procedure
+      console.log('Calling stored procedure sp_apply_time_event_to_menuitems_location with parameters:', {
+        p_time_event_code: existingEvent.eventCode,
+        p_store_code: eventStoreCode,
+        p_dept_code_list: deptCodeList,
+        p_is_fixed_value: Boolean(body.byFixedValue),
+        p_price_adjust_value: priceAdjustValue,
+        p_is_override: isOverride,
+        escapedEventCode,
+        escapedStoreCode,
+        escapedDeptCodeList
+      })
+
+      await prisma.$executeRawUnsafe(
+        `CALL sp_apply_time_event_to_menuitems_location('${escapedEventCode}', '${escapedStoreCode}', '${escapedDeptCodeList}', ${Boolean(body.byFixedValue)}, ${priceAdjustValue}, ${isOverride})`
+      )
+
+      console.log(`Successfully applied time event ${existingEvent.eventCode} to menu items for store ${eventStoreCode} and departments: ${deptCodeList || 'none'}`)
+    } catch (spError: any) {
+      // Log error but continue - event is updated successfully
+      console.error(`Error calling stored procedure for time event ${existingEvent.eventCode}:`, {
+        error: spError.message,
+        eventCode: existingEvent.eventCode,
+        storeCode: existingEvent.storeCode || selectedStoreCode,
+        deptCode: event.deptCode,
+        stack: spError.stack
+      })
+      // Continue execution - event update succeeded even if SP failed
+    }
     
     // Debug what was saved to database
     console.log('Saved to database:', {

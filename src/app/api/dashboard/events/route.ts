@@ -25,7 +25,7 @@ function convertEventForJson(event: any): any {
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id || !session?.user?.role) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -36,19 +36,19 @@ export async function GET(request: NextRequest) {
     }
 
     const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
-    
+
     // Get selected store from query
     const searchParams = request.nextUrl.searchParams
     const queryStoreCode = searchParams.get('storeCode')
     const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
-    
+
     if (!selectedStoreCode) {
       return NextResponse.json(
         { error: 'No accessible store selected' },
         { status: 403 }
       )
     }
-    
+
     // Filter by ONE store only
     const storeFilter = buildStoreFilter(accessInfo, selectedStoreCode)
 
@@ -60,10 +60,10 @@ export async function GET(request: NextRequest) {
         createdDate: 'desc'
       }
     })
-    
+
     // Convert BigInt and Decimal to string/number for JSON serialization
     const eventsWithStringId = events.map((event: any) => convertEventForJson(event))
-    
+
     return NextResponse.json(eventsWithStringId, { status: 200 })
   } catch (error) {
     console.error('Error fetching time events:', error)
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
 // Helper function to generate next event code
 async function generateEventCode(storeCode: string): Promise<string> {
   const prefix = `WL${storeCode}TE`
-  
+
   // Get all event codes that match the WL pattern for this store
   const events = await prisma.timeEvent.findMany({
     where: {
@@ -91,7 +91,7 @@ async function generateEventCode(storeCode: string): Promise<string> {
   })
 
   let nextNumber = 1
-  
+
   if (events.length > 0) {
     // Extract number from codes like "WLLOC01TE1", "WLLOC01TE2", etc.
     const numbers = events
@@ -100,12 +100,12 @@ async function generateEventCode(storeCode: string): Promise<string> {
         return match ? parseInt(match[1]) : 0
       })
       .filter((num: number) => num > 0)
-    
+
     if (numbers.length > 0) {
       nextNumber = Math.max(...numbers) + 1
     }
   }
-  
+
   // Format as WL + STORE_CODE + TE + number starting from 1
   return `${prefix}${nextNumber}`
 }
@@ -113,12 +113,12 @@ async function generateEventCode(storeCode: string): Promise<string> {
 // Helper function to validate and store time string directly
 function validateTimeString(time: string | null): string | null {
   if (!time || time.trim() === "") return null
-  
+
   // Expect 24-hour format (HH:MM) - return as string
   if (/^\d{2}:\d{2}$/.test(time)) {
     return time
   }
-  
+
   // If format doesn't match HH:MM, return null
   return null
 }
@@ -138,12 +138,12 @@ export async function POST(request: NextRequest) {
     }
 
     const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
-    
+
     // Get selected store from query
     const searchParams = request.nextUrl.searchParams
     const queryStoreCode = searchParams.get('storeCode')
     const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
-    
+
     if (!selectedStoreCode) {
       return NextResponse.json(
         { error: 'No accessible store selected' },
@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    
+
     // Check for duplicate event name
     if (body.eventName) {
       const isDuplicate = await checkDuplicate('timeEvent', 'eventName', body.eventName, {
@@ -166,10 +166,10 @@ export async function POST(request: NextRequest) {
         );
       }
     }
-    
+
     // Auto-generate event code for the selected store
     const eventCode = await generateEventCode(selectedStoreCode)
-    
+
     const event = await prisma.timeEvent.create({
       data: {
         eventCode: eventCode,
@@ -212,21 +212,79 @@ export async function POST(request: NextRequest) {
         syncSource: 'location' // Set sync_source to 'location' when created from dashboard
       }
     })
-    
+
+    // Call stored procedure to apply time event to menu items
+    try {
+      // Helper function to convert deptCode to comma-separated string
+      const deptCodeToCommaSeparated = (deptCode: any): string => {
+        if (!deptCode) return ''
+        let deptArray: string[] = []
+        if (Array.isArray(deptCode)) {
+          deptArray = deptCode
+        } else if (typeof deptCode === 'string') {
+          try {
+            const parsed = JSON.parse(deptCode)
+            deptArray = Array.isArray(parsed) ? parsed : [parsed]
+          } catch {
+            deptArray = [deptCode]
+          }
+        }
+        return deptArray.filter(Boolean).join(',')
+      }
+
+      const deptCodeList = deptCodeToCommaSeparated(event.deptCode)
+      const priceAdjustValue = 0 // SP reads prices from table, but pass 0 for compatibility
+      const isOverride = event.overrideAllEvents
+
+      // Escape single quotes in string parameters for SQL safety
+      const escapedEventCode = eventCode.replace(/'/g, "''")
+      const escapedStoreCode = selectedStoreCode.replace(/'/g, "''")
+      const escapedDeptCodeList = deptCodeList.replace(/'/g, "''")
+
+      // Log parameters before calling stored procedure
+      console.log('Calling stored procedure sp_apply_time_event_to_menuitems_location with parameters:', {
+        p_time_event_code: eventCode,
+        p_store_code: selectedStoreCode,
+        p_dept_code_list: deptCodeList,
+        p_is_fixed_value: Boolean(body.byFixedValue),
+        p_price_adjust_value: priceAdjustValue,
+        p_is_override: isOverride,
+        escapedEventCode,
+        escapedStoreCode,
+        escapedDeptCodeList
+      })
+
+      await prisma.$executeRawUnsafe(
+        `CALL sp_apply_time_event_to_menuitems_location('${escapedEventCode}', '${escapedStoreCode}', '${escapedDeptCodeList}', ${Boolean(body.byFixedValue)}, ${priceAdjustValue}, ${isOverride})`
+      )
+
+      console.log(`Successfully applied time event ${eventCode} to menu items for store ${selectedStoreCode} and departments: ${deptCodeList || 'none'}`)
+    } catch (spError: any) {
+      // Log error but continue - event is created successfully
+      console.error(`Error calling stored procedure for time event ${eventCode}:`, {
+        error: spError.message,
+        eventCode,
+        storeCode: selectedStoreCode,
+        deptCode: event.deptCode,
+        stack: spError.stack
+      })
+      // Continue execution - event creation succeeded even if SP failed
+    }
+
     // Convert BigInt and Decimal to string/number for JSON serialization
     const eventWithStringId = convertEventForJson(event)
-    
+
     return NextResponse.json(eventWithStringId, { status: 201 })
   } catch (error: any) {
     console.error('Error creating time event:', error)
-    
+
     if (error.code === 'P2002') {
       return NextResponse.json(
         { error: 'Event code already exists' },
         { status: 409 }
       )
     }
-    
+
     return NextResponse.json(
       { error: 'Failed to create time event' },
       { status: 500 }

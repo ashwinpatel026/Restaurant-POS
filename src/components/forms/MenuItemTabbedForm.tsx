@@ -21,7 +21,7 @@ interface MenuItemFormProps {
   menuItem?: any;
   menuMasters?: any[];
   categories: any[];
-  onSave: (data: any) => void;
+  onSave: (data: any) => Promise<any>;
   onCancel: () => void;
 }
 
@@ -41,6 +41,7 @@ export default function MenuItemTabbedForm({
   const forColorCodeRef = useRef<HTMLElement>(null);
   const menuMasterRef = useRef<HTMLElement>(null);
   const categoryRef = useRef<HTMLElement>(null);
+  const retailPriceRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -62,6 +63,7 @@ export default function MenuItemTabbedForm({
     menuMasterCode: "",
     menuCategoryCode: "",
     deptCode: "",
+    originalDeptCode: "",
     isActive: 1,
     stockinhand: "",
     taxCode: "",
@@ -258,8 +260,8 @@ export default function MenuItemTabbedForm({
           menuItem.itemContainAlcohol ?? menuItem.isAlcohol ?? 0,
         menuImg: menuItem.menuImg || "",
         priceStrategy: menuItem.priceStrategy || 1,
-        basePrice: menuItem.basePrice ?? menuItem.price ?? 0,
-        retailPrice: menuItem.basePrice ?? menuItem.price ?? 0,
+        basePrice: menuItem.basePrice != null ? Number(menuItem.basePrice) : (menuItem.price != null ? Number(menuItem.price) : 0),
+        retailPrice: menuItem.basePrice != null ? Number(menuItem.basePrice) : (menuItem.price != null ? Number(menuItem.price) : 0),
         isPrice: menuItem.isPrice ?? 1,
         menuMasterCode: menuItem.menuMasterCode || "",
         menuCategoryCode: menuItem.menuCategoryCode || "",
@@ -694,7 +696,8 @@ export default function MenuItemTabbedForm({
       formik.setFieldValue("colorCode", formData.colorCode, false);
       formik.setFieldValue("forColorCode", formData.forColorCode, false);
       formik.setFieldValue("menuMasterCode", formData.menuMasterCode, false);
-      formik.setFieldValue("menuCategoryCode", Array.from(selectedCategories).length > 0 ? Array.from(selectedCategories)[0] : "", false);
+      // Set menuCategoryCode as array for validation (to match what will be submitted)
+      formik.setFieldValue("menuCategoryCode", Array.from(selectedCategories).length > 0 ? Array.from(selectedCategories) : null, false);
       
       // Mark all fields as touched to show errors
       setTouched({
@@ -704,6 +707,9 @@ export default function MenuItemTabbedForm({
         forColorCode: true,
         menuMasterCode: true,
         menuCategoryCode: true,
+        priceStrategy: true,
+        retailPrice: true,
+        isPrice: true,
       });
       
       // Validate and check for errors
@@ -719,6 +725,23 @@ export default function MenuItemTabbedForm({
       // If there are errors, don't submit
       if (Object.keys(formik.errors).length > 0) {
         toast.error("Please fix the validation errors");
+        
+        // Ensure retailPrice is marked as touched if it has an error
+        if (formik.errors.retailPrice) {
+          formik.setFieldTouched("retailPrice", true);
+          // Scroll to and focus the retailPrice field
+          setTimeout(() => {
+            if (retailPriceRef.current) {
+              retailPriceRef.current.scrollIntoView({
+                behavior: "smooth",
+                block: "center",
+              });
+              setTimeout(() => {
+                retailPriceRef.current?.focus();
+              }, 300);
+            }
+          }, 100);
+        }
         return;
       }
       
@@ -736,7 +759,10 @@ export default function MenuItemTabbedForm({
     formik.setFieldValue("colorCode", formData.colorCode);
     formik.setFieldValue("forColorCode", formData.forColorCode);
     formik.setFieldValue("menuMasterCode", formData.menuMasterCode);
-  }, [formData.name, formData.labelName, formData.kitchenName, formData.colorCode, formData.forColorCode, formData.menuMasterCode]);
+    formik.setFieldValue("priceStrategy", formData.priceStrategy);
+    formik.setFieldValue("retailPrice", formData.retailPrice);
+    formik.setFieldValue("isPrice", formData.isPrice);
+  }, [formData.name, formData.labelName, formData.kitchenName, formData.colorCode, formData.forColorCode, formData.menuMasterCode, formData.priceStrategy, formData.retailPrice, formData.isPrice]);
 
   // Auto-focus on first error field
   useFormikAutoFocus(formik, {
@@ -746,6 +772,7 @@ export default function MenuItemTabbedForm({
     forColorCode: forColorCodeRef,
     menuMasterCode: menuMasterRef,
     menuCategoryCode: categoryRef,
+    retailPrice: retailPriceRef,
   });
 
   // Extract submission logic to separate function
@@ -1525,10 +1552,17 @@ export default function MenuItemTabbedForm({
                   <button
                     type="button"
                     onClick={() => {
+                      const newIsPrice = formData.isPrice === 1 ? 0 : 1;
                       setFormData({
                         ...formData,
-                        isPrice: formData.isPrice === 1 ? 0 : 1,
+                        isPrice: newIsPrice,
                       });
+                      // Update Formik and trigger validation
+                      formik.setFieldValue("isPrice", newIsPrice);
+                      if (newIsPrice === 1 && formData.priceStrategy === 1) {
+                        // Validate retailPrice when enabling pricing with Base Price
+                        formik.setFieldTouched("retailPrice", true);
+                      }
                     }}
                     className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
                       formData.isPrice === 1
@@ -1565,6 +1599,12 @@ export default function MenuItemTabbedForm({
                             ...formData,
                             priceStrategy: 1,
                           });
+                          // Update Formik and trigger validation
+                          formik.setFieldValue("priceStrategy", 1);
+                          if (formData.isPrice === 1) {
+                            // Validate retailPrice when Base Price is selected with pricing enabled
+                            formik.setFieldTouched("retailPrice", true);
+                          }
                         }}
                         className={`relative px-6 py-3 rounded-lg border-2 transition-all font-medium ${
                           formData.priceStrategy === 1
@@ -1586,6 +1626,10 @@ export default function MenuItemTabbedForm({
                             priceStrategy: 3,
                             retailPrice: 0,
                           });
+                          // Update Formik - retailPrice not required for Open Price
+                          formik.setFieldValue("priceStrategy", 3);
+                          formik.setFieldValue("retailPrice", 0);
+                          formik.setFieldTouched("retailPrice", false);
                         }}
                         className={`relative px-6 py-3 rounded-lg border-2 transition-all font-medium ${
                           formData.priceStrategy === 3
@@ -1622,22 +1666,41 @@ export default function MenuItemTabbedForm({
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Retail Price
+                          Retail Price {formData.isPrice === 1 && formData.priceStrategy === 1 && <span className="text-red-500">*</span>}
                         </label>
                         <input
+                          ref={retailPriceRef}
                           type="number"
                           step="0.01"
                           min="0"
                           value={formData.retailPrice || ""}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            const inputValue = e.target.value;
+                            // If input is empty, set to null for better validation, otherwise parse as float
+                            const value = inputValue === "" ? null : (parseFloat(inputValue) || 0);
                             setFormData({
                               ...formData,
-                              retailPrice: parseFloat(e.target.value) || 0,
-                            })
-                          }
-                          className="w-1/3 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              retailPrice: value ?? 0, // Keep 0 for display purposes
+                            });
+                            // Update Formik with actual value (null if empty) for validation
+                            formik.setFieldValue("retailPrice", value);
+                          }}
+                          onBlur={() => {
+                            // Trigger validation on blur
+                            formik.setFieldTouched("retailPrice", true);
+                          }}
+                          className={`w-1/3 px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                            formik.touched.retailPrice && formik.errors.retailPrice
+                              ? "border-red-500 dark:border-red-500"
+                              : "border-gray-300 dark:border-gray-600"
+                          }`}
                           placeholder="0.00"
                         />
+                        {formik.touched.retailPrice && formik.errors.retailPrice && (
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                            {formik.errors.retailPrice}
+                          </p>
+                        )}
                       </div>
                     </div>
                   ) : (

@@ -213,7 +213,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       created: results.length,
-      errors: errors.length,
+      errorCount: errors.length,
       results,
       errors: errors.length > 0 ? errors : undefined
     })

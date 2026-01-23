@@ -138,11 +138,14 @@ export async function GET(
       }
     }
 
-    // Convert IDs to strings for JSON response
+    // Convert IDs to strings for JSON response and convert Decimal fields to numbers
     const itemWithStringIds = {
       ...menuItem,
       menuItemId: (menuItem as any).menuItemId?.toString?.(),
       skuPlu: (menuItem as any).skuPlu ? (menuItem as any).skuPlu.toString() : null,
+      basePrice: (menuItem as any).basePrice ? Number((menuItem as any).basePrice) : null,
+      cardPrice: (menuItem as any).cardPrice ? Number((menuItem as any).cardPrice) : null,
+      cashPrice: (menuItem as any).cashPrice ? Number((menuItem as any).cashPrice) : null,
       assignedModifiers: assignedModifierGroups,
       inheritModifiers: inheritModifiersFlag,
       // Use prepZoneCode from MenuItem if available, otherwise from MenuItemPrepTime

@@ -14,24 +14,41 @@ export const useFormikAutoFocus = (
     // Also check if submitCount increased (for successful validation that still has errors somehow)
     const submitCountIncreased = formik.submitCount > 0;
     
-    if ((submissionJustCompleted || submitCountIncreased) && Object.keys(formik.errors).length > 0 && !hasScrolledRef.current) {
+    // Check if we have errors and should scroll
+    const hasErrors = Object.keys(formik.errors).length > 0;
+    
+    if ((submissionJustCompleted || submitCountIncreased) && hasErrors) {
       const firstErrorField = Object.keys(formik.errors)[0];
       const ref = fieldRefs[firstErrorField];
 
       if (ref?.current) {
+        // Reset scroll flag for new error
         hasScrolledRef.current = true;
-        ref.current.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
+        
+        // Use requestAnimationFrame to ensure DOM is updated
+        requestAnimationFrame(() => {
+          if (ref?.current) {
+            ref.current.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+            });
+            setTimeout(() => {
+              // Focus the field after scroll completes
+              if (ref?.current) {
+                (ref.current as HTMLElement).focus();
+                // For input elements, also select the text if applicable
+                if (ref.current instanceof HTMLInputElement) {
+                  ref.current.select();
+                }
+              }
+            }, 400);
+          }
         });
-        setTimeout(() => {
-          ref.current?.focus();
-        }, 300);
       }
     }
     
     // Reset scroll flag when errors are cleared
-    if (Object.keys(formik.errors).length === 0) {
+    if (!hasErrors) {
       hasScrolledRef.current = false;
     }
     
