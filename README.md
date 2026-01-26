@@ -1,6 +1,26 @@
 # Restaurant POS System
 
-A comprehensive Point of Sale (POS) system for restaurant chains built with Next.js 14, TypeScript, MongoDB, and Tailwind CSS. This system includes features for centralized management, multi-outlet operations, inventory tracking, QR-based ordering, and comprehensive reporting.
+A comprehensive Point of Sale (POS) system for restaurant chains built with Next.js 15, TypeScript, PostgreSQL, and Tailwind CSS. This system includes features for centralized management, multi-outlet operations, inventory tracking, QR-based ordering, and comprehensive reporting.
+
+## 📚 Documentation
+
+Comprehensive documentation is available in the [`docs/`](./docs/) directory:
+
+### Core Documentation
+- [**Architecture**](./docs/ARCHITECTURE.md) - System architecture, technology stack, and design decisions
+- [**Database Schema**](./docs/DATABASE_SCHEMA.md) - Complete database documentation with ERD diagrams
+- [**API Reference**](./docs/API_REFERENCE.md) - Complete API endpoint documentation
+- [**Diagram Viewing Guide**](./docs/DIAGRAM_VIEWING_GUIDE.md) - How to view Mermaid diagrams in documentation
+
+### System Documentation
+- [**Event Pricing System**](./docs/EVENT_PRICING_SYSTEM.md) - Time-based event pricing system
+- [**Functions Reference**](./docs/FUNCTIONS_REFERENCE.md) - Database functions and stored procedures
+- [**Sync System**](./docs/SYNC_SYSTEM_SUMMARY.md) - Data synchronization system
+
+### Additional Documentation
+- [**Multi-Tenant Architecture**](./docs/SIMPLIFIED_TWO_DATABASE_ARCHITECTURE.md) - Multi-tenant design
+- [**POS API Routes**](./docs/POS_API_ROUTES.md) - POS sync API documentation
+- [**Migration Instructions**](./docs/MIGRATION_INSTRUCTIONS.md) - Database migration guide
 
 ## 🚀 Features
 
@@ -86,23 +106,23 @@ A comprehensive Point of Sale (POS) system for restaurant chains built with Next
 
 ## 🛠️ Tech Stack
 
-- **Frontend:** Next.js 14, React 18, TypeScript
-- **Styling:** Tailwind CSS, Headless UI
-- **Backend:** Next.js API Routes
-- **Database:** MongoDB with Mongoose ODM
-- **Authentication:** NextAuth.js
-- **Real-time:** Polling (can be upgraded to WebSockets/Pusher)
-- **QR Codes:** qrcode library
-- **Charts:** Recharts
-- **State Management:** Zustand
-- **HTTP Client:** Axios, SWR
+- **Frontend:** Next.js 15.5.7, React 18.3.1, TypeScript 5.5.3
+- **Styling:** Tailwind CSS 3.4.4, Headless UI 2.2.9
+- **Backend:** Next.js API Routes (App Router)
+- **Database:** PostgreSQL with Prisma ORM 6.16.3
+- **Authentication:** NextAuth.js 4.24.7 + JWT
+- **Real-time:** Socket.io 4.7.5 (optional)
+- **QR Codes:** qrcode 1.5.3
+- **Forms:** Formik 2.4.9 + Yup 1.7.1
+- **State Management:** Zustand 4.5.4
+- **Notifications:** React Hot Toast 2.4.1
 
 ## 📋 Prerequisites
 
 Before you begin, ensure you have the following installed:
 
 - **Node.js 18+** and npm/yarn
-- **MongoDB** (local or cloud via MongoDB Atlas)
+- **PostgreSQL 12+** (local or managed database)
 - **Git**
 
 ## 🔧 Installation
@@ -119,35 +139,40 @@ cd C:\xampp\htdocs\restaurants_pos
 npm install
 ```
 
-### 3. Set up MongoDB
+### 3. Set up PostgreSQL Databases
 
-#### Option A: Local MongoDB
+The system uses **two PostgreSQL databases**:
 
-1. **Install MongoDB Community Server** from [mongodb.com/download-center/community](https://www.mongodb.com/try/download/community)
-2. **Start MongoDB service**:
-   - Windows: MongoDB usually runs as a service automatically
-   - Mac/Linux: `mongod` or `brew services start mongodb-community`
+1. **Master Database**: For templates and tenant management
+2. **Location Database**: For operational data (all stores)
 
-#### Option B: MongoDB Atlas (Recommended - Free & Easy!)
+#### Option A: Local PostgreSQL
 
-1. Go to [mongodb.com/cloud/atlas](https://www.mongodb.com/cloud/atlas)
-2. Sign up for free
-3. Create a free cluster (M0)
-4. Click "Connect" → "Connect your application"
-5. Copy the connection string
+1. **Install PostgreSQL** from [postgresql.org/download](https://www.postgresql.org/download/)
+2. **Create databases**:
+   ```sql
+   CREATE DATABASE restaurant_pos_master;
+   CREATE DATABASE restaurant_pos_location;
+   ```
+
+#### Option B: Managed PostgreSQL (Recommended)
+
+Use services like:
+- **Supabase** (Free tier available)
+- **Neon** (Free tier available)
+- **AWS RDS**
+- **Google Cloud SQL**
 
 ### 4. Set up environment variables
 
 Create a `.env` file in the root directory:
 
 ```env
-# MongoDB Connection (choose one)
+# Master Database (PostgreSQL)
+MASTER_DATABASE_URL="postgresql://user:password@localhost:5432/restaurant_pos_master"
 
-# Local MongoDB:
-MONGODB_URI="mongodb://localhost:27017/restaurant_pos"
-
-# OR MongoDB Atlas (cloud):
-# MONGODB_URI="mongodb+srv://username:password@cluster.mongodb.net/restaurant_pos?retryWrites=true&w=majority"
+# Location Database (PostgreSQL)
+DATABASE_URL="postgresql://user:password@localhost:5432/restaurant_pos_location"
 
 # NextAuth (generate random secrets)
 NEXTAUTH_SECRET="your-super-secret-key-at-least-32-characters-long"
@@ -170,22 +195,28 @@ NEXT_PUBLIC_API_URL="http://localhost:3000/api"
 openssl rand -base64 32
 ```
 
-### 5. Seed the database
+### 5. Run database migrations
+
+```bash
+# Generate Prisma clients
+npm run db:generate
+
+# Push schema to databases
+npm run db:push
+
+# Or run migrations
+npm run db:migrate
+```
+
+### 6. Seed the database (Optional)
 
 ```bash
 npm run seed
 ```
 
-This creates sample data:
+This creates sample data in the databases.
 
-- ✓ 2 Outlets (Main Branch, Airport Branch)
-- ✓ 3 Users (Admin, Manager, Captain)
-- ✓ 4 Categories with 13 Menu Items
-- ✓ 10 Raw Materials
-- ✓ Inventory for both outlets
-- ✓ 18 Tables with QR codes
-
-### 6. Run the development server
+### 7. Run the development server
 
 ```bash
 npm run dev
@@ -207,32 +238,32 @@ restaurants_pos/
 ├── src/
 │   ├── app/
 │   │   ├── api/              # API routes
-│   │   ├── dashboard/        # Dashboard pages
-│   │   ├── login/            # Login page
-│   │   ├── qr-order/         # QR ordering pages
-│   │   ├── globals.css       # Global styles
-│   │   ├── layout.tsx        # Root layout
-│   │   └── page.tsx          # Home page
-│   ├── components/           # Reusable components
-│   │   ├── layouts/          # Layout components
-│   │   ├── menu/             # Menu components
-│   │   ├── orders/           # Order components
-│   │   └── tables/           # Table components
-│   ├── lib/                  # Utility libraries
-│   │   ├── auth.ts           # Authentication config
-│   │   ├── mongodb.ts        # MongoDB connection
-│   │   └── utils.ts          # Helper functions
-│   ├── models/               # Mongoose models
-│   │   ├── User.ts
-│   │   ├── Outlet.ts
-│   │   ├── Category.ts
-│   │   ├── MenuItem.ts
-│   │   ├── Order.ts
-│   │   ├── Table.ts
+│   │   │   ├── master/       # Master dashboard APIs
+│   │   │   ├── dashboard/    # Location dashboard APIs
+│   │   │   └── pos/          # POS sync APIs
+│   │   ├── dashboard/        # Location dashboard pages
+│   │   ├── master/           # Master dashboard pages
+│   │   ├── qr-order/         # QR ordering pages (public)
 │   │   └── ...
+│   ├── components/           # Reusable components
+│   │   ├── forms/            # Form components
+│   │   ├── layouts/          # Layout components
+│   │   ├── modals/           # Modal components
+│   │   └── ui/               # UI components
+│   ├── lib/                  # Utility libraries
+│   │   ├── auth/             # Authentication
+│   │   ├── sync/             # Sync system
+│   │   ├── database.ts       # Location DB client
+│   │   └── databaseManager.ts # Both DB clients
+│   ├── hooks/                # Custom React hooks
 │   └── types/                # TypeScript types
-├── scripts/
-│   └── seed.js               # Database seed script
+├── prisma/
+│   ├── schema.prisma         # Location database schema
+│   └── master-schema.prisma  # Master database schema
+├── scripts/                  # Database scripts
+│   ├── *.sql                 # SQL functions/procedures
+│   └── *.mjs                 # Migration scripts
+├── docs/                     # Documentation
 ├── .env                      # Environment variables
 ├── next.config.js            # Next.js configuration
 ├── tailwind.config.ts        # Tailwind configuration
@@ -255,59 +286,37 @@ After installation:
 
 ## 📝 API Documentation
 
-### Authentication
+See [API Reference](./docs/API_REFERENCE.md) for complete API documentation.
 
-- `POST /api/auth/signin` - User login
-- `POST /api/auth/signout` - User logout
+### API Categories
 
-### Menu
+1. **Master Dashboard APIs** (`/api/master/*`)
+   - Tenant management (Companies, Dealers, Locations)
+   - Master menu templates
+   - Sync management
+   - User and role management
 
-- `GET /api/menu` - Get all menu items with categories
-- `GET /api/menu/categories` - Get all categories
-- `POST /api/menu/categories` - Create category
-- `POST /api/menu/items` - Create menu item
-- `PUT /api/menu/items/[id]` - Update menu item
-- `PATCH /api/menu/items/[id]` - Partial update
-- `DELETE /api/menu/items/[id]` - Delete menu item
+2. **Location Dashboard APIs** (`/api/dashboard/*`)
+   - Store-specific menu management
+   - Orders and tables
+   - Time events
+   - Reports and statistics
 
-### Orders
-
-- `GET /api/orders` - Get all orders (with filters)
-- `POST /api/orders` - Create new order
-- `GET /api/orders/[id]` - Get order details
-- `PATCH /api/orders/[id]` - Update order status
-
-### Tables
-
-- `GET /api/tables` - Get all tables
-- `POST /api/tables` - Create new table
-- `PUT /api/tables/[id]` - Update table
-- `PATCH /api/tables/[id]` - Update table status
-- `DELETE /api/tables/[id]` - Delete table
-- `GET /api/tables/qr/[qrCode]` - Get table by QR code
-
-### Inventory
-
-- `GET /api/inventory` - Get inventory levels
-
-### Reports
-
-- `GET /api/reports` - Get analytics data
-
-### Users
-
-- `GET /api/users` - Get all users
-- `PATCH /api/users/[id]` - Update user
+3. **POS Sync APIs** (`/api/pos/sync/*`)
+   - External POS client synchronization
+   - Menu items, orders, tables
+   - Incremental sync support
 
 ## 🔒 Security Features
 
-- Secure password hashing with bcrypt
-- JWT-based authentication
-- Role-based access control (RBAC)
-- Protected API routes
-- Session management with NextAuth
-- MongoDB injection prevention with Mongoose
-- XSS protection
+- Secure password hashing with bcryptjs
+- JWT-based authentication for master dashboard
+- NextAuth.js session management for location dashboard
+- Role-based access control (RBAC) with granular permissions
+- Protected API routes with middleware
+- SQL injection prevention with Prisma ORM
+- XSS protection with React
+- Store code filtering for data isolation
 
 ## 🚀 Deployment
 
@@ -315,15 +324,22 @@ After installation:
 
 1. Push code to GitHub
 2. Import project in Vercel
-3. Add environment variables (including MONGODB_URI)
-4. Deploy
+3. Add environment variables:
+   - `MASTER_DATABASE_URL`
+   - `DATABASE_URL`
+   - `NEXTAUTH_SECRET`
+   - `NEXTAUTH_URL`
+   - `JWT_SECRET`
+4. Run build command: `npm run build`
+5. Deploy
 
-### MongoDB Atlas for Production
+### PostgreSQL for Production
 
-1. Create production cluster in MongoDB Atlas
-2. Get connection string
+1. Set up managed PostgreSQL databases (Supabase, Neon, AWS RDS, etc.)
+2. Get connection strings for both databases
 3. Add to Vercel environment variables
-4. Whitelist Vercel IPs or allow from anywhere (0.0.0.0/0)
+4. Run migrations: `npm run db:migrate`
+5. Create sync triggers: `npm run sync:triggers`
 
 ## 🧪 Development
 
@@ -389,4 +405,12 @@ For support, open an issue in the repository.
 
 ---
 
-**Built with ❤️ using Next.js, TypeScript, and MongoDB**
+**Built with ❤️ using Next.js, TypeScript, and PostgreSQL**
+
+## 📖 Additional Resources
+
+- [Architecture Documentation](./docs/ARCHITECTURE.md)
+- [Database Schema](./docs/DATABASE_SCHEMA.md)
+- [API Reference](./docs/API_REFERENCE.md)
+- [Event Pricing System](./docs/EVENT_PRICING_SYSTEM.md)
+- [Sync System](./docs/SYNC_SYSTEM_SUMMARY.md)
