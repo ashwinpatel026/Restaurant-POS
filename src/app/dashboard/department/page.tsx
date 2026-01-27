@@ -285,11 +285,10 @@ export default function DepartmentPage() {
                   accessor: "isActive",
                   cell: (dept: Department) => (
                     <span
-                      className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        dept.isActive === 1
+                      className={`px-2 py-1 text-xs font-medium rounded-full ${dept.isActive === 1
                           ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400"
                           : "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400"
-                      }`}
+                        }`}
                     >
                       {dept.isActive === 1 ? "Active" : "Inactive"}
                     </span>

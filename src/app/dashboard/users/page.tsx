@@ -293,11 +293,10 @@ export default function UsersPage() {
                   cell: (user: User) => (
                     <button
                       onClick={() => handleToggleStatus(user)}
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        user.isActive
+                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.isActive
                           ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
                           : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                      }`}
+                        }`}
                     >
                       {user.isActive ? "Active" : "Inactive"}
                     </button>

@@ -69,14 +69,20 @@ export default function EmployeePage() {
 
     try {
       setLoading(true);
+      const employeeUrl = buildApiUrl("/api/dashboard/employee");
+      console.log("[EmployeePage] Fetching from URL:", employeeUrl);
+      console.log("[EmployeePage] Selected storeCode:", selectedStoreCode);
+      
       const [employeesRes, employeeTypesRes] = await Promise.all([
-        fetch(buildApiUrl("/api/dashboard/employee"), {
+        fetch(employeeUrl, {
           cache: "no-store",
         }),
         fetch(buildApiUrl("/api/dashboard/employee-type"), {
           cache: "no-store",
         }),
       ]);
+
+      console.log("[EmployeePage] Response status:", employeesRes.status);
 
       if (employeesRes.status === 403) {
         router.push("/dashboard/access-denied");
@@ -85,9 +91,12 @@ export default function EmployeePage() {
 
       if (employeesRes.ok) {
         const data = await employeesRes.json();
+        console.log("[EmployeePage] Received employees:", data.length);
         setEmployees(Array.isArray(data) ? data : []);
       } else {
-        toast.error("Error loading employees");
+        const errorData = await employeesRes.json().catch(() => ({}));
+        console.error("[EmployeePage] Error response:", errorData);
+        toast.error(errorData.error || "Error loading employees");
       }
 
       if (employeeTypesRes.ok) {
@@ -304,11 +313,10 @@ export default function EmployeePage() {
                   accessor: "isActive",
                   cell: (emp: Employee) => (
                     <span
-                      className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        emp.isActive === 1
+                      className={`px-2 py-1 text-xs font-medium rounded-full ${emp.isActive === 1
                           ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400"
                           : "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400"
-                      }`}
+                        }`}
                     >
                       {emp.isActive === 1 ? "Active" : "Inactive"}
                     </span>
@@ -355,22 +363,19 @@ export default function EmployeePage() {
         title="Delete Employee"
         itemName={
           employeeToDelete
-            ? `${employeeToDelete.firstName || ""} ${
-                employeeToDelete.lastName || ""
+            ? `${employeeToDelete.firstName || ""} ${employeeToDelete.lastName || ""
               }`.trim() ||
-              employeeToDelete.employeeCode ||
-              ""
+            employeeToDelete.employeeCode ||
+            ""
             : ""
         }
-        description={`Are you sure you want to delete the employee "${
-          employeeToDelete
-            ? `${employeeToDelete.firstName || ""} ${
-                employeeToDelete.lastName || ""
+        description={`Are you sure you want to delete the employee "${employeeToDelete
+            ? `${employeeToDelete.firstName || ""} ${employeeToDelete.lastName || ""
               }`.trim() ||
-              employeeToDelete.employeeCode ||
-              ""
+            employeeToDelete.employeeCode ||
+            ""
             : ""
-        }"? This action cannot be undone.`}
+          }"? This action cannot be undone.`}
       />
     </DashboardLayout>
   );

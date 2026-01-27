@@ -85,6 +85,14 @@ export async function GET(request: NextRequest) {
     // Filter by ONE store only
     const storeFilter = buildStoreFilter(accessInfo, selectedStoreCode)
 
+    // Debug logging
+    console.log('[Employee API] Selected storeCode:', selectedStoreCode)
+    console.log('[Employee API] Store filter:', JSON.stringify(storeFilter))
+    console.log('[Employee API] Access info:', {
+      role: accessInfo.role,
+      accessibleStoreCodes: accessInfo.accessibleStoreCodes
+    })
+
     const employees = await prisma.employee.findMany({
       where: {
         isDelete: false,
@@ -92,6 +100,11 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { createdOn: 'desc' }
     })
+
+    console.log('[Employee API] Found employees:', employees.length)
+    if (employees.length > 0) {
+      console.log('[Employee API] First employee storeCode:', employees[0].storeCode)
+    }
 
     const employeesWithStringId = employees.map(mapEmployeeResponse)
 
