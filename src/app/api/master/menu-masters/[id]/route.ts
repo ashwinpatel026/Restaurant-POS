@@ -69,8 +69,7 @@ export async function PUT(
       forColorCode,
       prepZoneCodes,
       stationCodes,
-      eventCode,
-      currentEventCode,
+      eventCodes,
       isEventMenu,
       isActive,
       deptCode
@@ -105,28 +104,17 @@ export async function PUT(
       data: updateData
     })
 
-    // Handle event associations
-    if (currentEventCode && currentEventCode !== eventCode) {
-      // Remove old event association
-      await masterPrisma.masterMenuMasterEvent.deleteMany({
-        where: {
-          menuMasterCode: existingMaster.menuMasterCode,
-          eventCode: currentEventCode
-        }
-      })
-    }
+    // Handle event associations - delete all existing and create new ones
+    // Delete all existing event associations
+    await masterPrisma.masterMenuMasterEvent.deleteMany({
+      where: {
+        menuMasterCode: existingMaster.menuMasterCode
+      }
+    })
 
-    if (eventCode && isEventMenu === 1) {
-      // Check if association already exists
-      const existingAssoc = await masterPrisma.masterMenuMasterEvent.findFirst({
-        where: {
-          menuMasterCode: existingMaster.menuMasterCode,
-          eventCode: eventCode
-        }
-      })
-
-      // Create new association if it doesn't exist
-      if (!existingAssoc) {
+    // Create new associations for all provided event codes
+    if (eventCodes && Array.isArray(eventCodes) && eventCodes.length > 0 && isEventMenu === 1) {
+      for (const eventCode of eventCodes) {
         await masterPrisma.masterMenuMasterEvent.create({
           data: {
             menuMasterCode: existingMaster.menuMasterCode,
@@ -135,13 +123,6 @@ export async function PUT(
           }
         })
       }
-    } else if (!eventCode && currentEventCode) {
-      // Remove all event associations if no event is selected
-      await masterPrisma.masterMenuMasterEvent.deleteMany({
-        where: {
-          menuMasterCode: existingMaster.menuMasterCode
-        }
-      })
     }
 
     return NextResponse.json(mapMenuMasterResponse(menuMaster))
@@ -183,8 +164,8 @@ export async function DELETE(
 
     // If menu master has categories, prevent deletion
     if (categoriesCount > 0) {
-      return NextResponse.json({ 
-        error: `Cannot delete menu master "${menuMaster.name}" because it contains ${categoriesCount} categor(ies). Please delete all categories first.` 
+      return NextResponse.json({
+        error: `Cannot delete menu master "${menuMaster.name}" because it contains ${categoriesCount} categor(ies). Please delete all categories first.`
       }, { status: 400 })
     }
 
@@ -201,14 +182,14 @@ export async function DELETE(
     return NextResponse.json({ message: 'Menu master deleted successfully' })
   } catch (error) {
     console.error('Error deleting menu master:', error)
-    
+
     // Handle foreign key constraint error specifically
     if (error instanceof Error && error.message.includes('Foreign key constraint')) {
-      return NextResponse.json({ 
-        error: 'Cannot delete this menu master because it has related categories and menu items. Please delete all categories and items first.' 
+      return NextResponse.json({
+        error: 'Cannot delete this menu master because it has related categories and menu items. Please delete all categories and items first.'
       }, { status: 400 })
     }
-    
+
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

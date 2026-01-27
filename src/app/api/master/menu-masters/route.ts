@@ -11,7 +11,7 @@ async function generateMenuMasterCode(): Promise<string> {
   })
 
   let nextNumber = 1
-  
+
   if (latestMaster?.menuMasterCode) {
     // Extract number from code like "MM1", "MM2", etc.
     const match = latestMaster.menuMasterCode.match(/^MM(\d+)$/)
@@ -19,7 +19,7 @@ async function generateMenuMasterCode(): Promise<string> {
       nextNumber = parseInt(match[1]) + 1
     }
   }
-  
+
   // Format as MM + number starting from 1
   return `MM${nextNumber}`
 }
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       forColorCode,
       prepZoneCodes,
       stationCodes,
-      eventCode,
+      eventCodes,
       isEventMenu,
       isActive,
       deptCode
@@ -117,15 +117,17 @@ export async function POST(request: NextRequest) {
       data: createData
     })
 
-    // If this is an event menu, create the association
-    if (eventCode && isEventMenu === 1) {
-      await masterPrisma.masterMenuMasterEvent.create({
-        data: {
-          menuMasterCode: menuMasterCode,
-          eventCode: eventCode,
-          createdBy: admin.adminId,
-        }
-      })
+    // If this is an event menu, create associations for all event codes
+    if (eventCodes && Array.isArray(eventCodes) && eventCodes.length > 0 && isEventMenu === 1) {
+      for (const eventCode of eventCodes) {
+        await masterPrisma.masterMenuMasterEvent.create({
+          data: {
+            menuMasterCode: menuMasterCode,
+            eventCode: eventCode,
+            createdBy: admin.adminId,
+          }
+        })
+      }
     }
 
     return NextResponse.json(mapMenuMasterResponse(menuMaster), { status: 201 })

@@ -131,7 +131,7 @@ export class SyncProcessor {
     for (const entry of entries) {
       try {
         console.log(`Processing location-to-location sync entry: ${entry.recordId}, operation: ${entry.operation}, table: ${tableName}`);
-        
+
         // Validate entry
         const validation = await syncValidator.validateEntry(entry, locationTableName);
         if (!validation.valid) {
@@ -223,7 +223,7 @@ export class SyncProcessor {
     for (const entry of entries) {
       try {
         console.log(`Processing sync entry: ${entry.recordId}, operation: ${entry.operation}, table: ${tableName}`);
-        
+
         // Validate entry
         const validation = await syncValidator.validateEntry(entry, locationTableName);
         if (!validation.valid) {
@@ -305,13 +305,13 @@ export class SyncProcessor {
       sourceLocationCode,
       targetLocationCode
     );
-    
+
     // Set target store_code (skip for users table and global tables - they don't use store_code)
     const isGlobalTable = this.GLOBAL_TABLES.has(tableName) || this.GLOBAL_TABLES.has(locationTableName);
     if (locationTableName !== 'users' && !isGlobalTable) {
       mappedData.store_code = targetLocationCode;
     }
-    
+
     console.log(`Mapped data for ${tableName} -> ${locationTableName} (${sourceLocationCode} -> ${targetLocationCode}):`, Object.keys(mappedData));
 
     // For location-to-location clone sync, SKIP foreign key validation
@@ -325,7 +325,7 @@ export class SyncProcessor {
     // 3. Other tables: check by code + store_code
     const isUserTable = tableName === 'tbl_user';
     let existing;
-    
+
     if (isUserTable && tableName === 'tbl_user') {
       // For users table, check by email (since it's the unique identifier)
       // Users table doesn't have store_code column
@@ -348,7 +348,7 @@ export class SyncProcessor {
       if (locationTableName === 'role_permissions' && mappedData.role_code && mappedData.permission_code) {
         const escapedRoleCode = String(mappedData.role_code).replace(/'/g, "''");
         const escapedPermissionCode = String(mappedData.permission_code).replace(/'/g, "''");
-        
+
         existing = await locationPrisma.$queryRawUnsafe(`
           SELECT sync_id FROM ${locationTableName}
           WHERE "role_code" = '${escapedRoleCode}'::VARCHAR
@@ -501,12 +501,12 @@ export class SyncProcessor {
           return;
         } catch (error: any) {
           lastError = error;
-          
+
           // Check if it's a deadlock error (PostgreSQL error code 40P01 or Prisma error P2010 with deadlock message)
-          const isDeadlock = error.code === 'P2010' || error.code === '40P01' || 
-              (error.message && (error.message.includes('deadlock') || error.message.includes('40P01'))) ||
-              (error.meta && error.meta.code === '40P01');
-          
+          const isDeadlock = error.code === 'P2010' || error.code === '40P01' ||
+            (error.message && (error.message.includes('deadlock') || error.message.includes('40P01'))) ||
+            (error.meta && error.meta.code === '40P01');
+
           if (isDeadlock) {
             retryCount++;
             if (retryCount < maxRetries) {
@@ -517,7 +517,7 @@ export class SyncProcessor {
               continue;
             }
           }
-          
+
           // Not a deadlock or max retries reached - throw the error
           throw error;
         }
@@ -532,7 +532,7 @@ export class SyncProcessor {
 
     // Map field names from master table to location table
     const mappedData = this.mapFieldsToLocationTable(tableName, recordData, locationCode);
-    
+
     // Add store_code from locationCode (most location tables have store_code column)
     // Exceptions: 
     // - users table doesn't have store_code
@@ -541,7 +541,7 @@ export class SyncProcessor {
     if (locationTableName !== 'users' && !isGlobalTable) {
       mappedData.store_code = locationCode;
     }
-    
+
     console.log(`Mapped data for ${tableName} -> ${locationTableName}:`, Object.keys(mappedData));
 
     // Validate foreign key references before syncing (skip for global tables as they're synced in order)
@@ -555,7 +555,7 @@ export class SyncProcessor {
     // 3. Other tables: sync by code + store_code
     const isUserTable = tableName === 'tbl_user';
     let existingRecordSyncId: string | null = null;
-    
+
     // Get primary code field for use in DELETE case and other operations
     const primaryCodeField = this.getPrimaryCodeField(tableName);
 
@@ -579,9 +579,9 @@ export class SyncProcessor {
       const codeFieldForMaster = this.getPrimaryCodeField(tableName);
       const codeFieldForLocation = this.getPrimaryCodeField(locationTableName);
       const primaryCodeField = codeFieldForLocation || codeFieldForMaster;
-      
+
       console.log(`[applySyncOperation] Global table check: tableName=${tableName}, locationTableName=${locationTableName}, primaryCodeField=${primaryCodeField}, mappedData keys:`, Object.keys(mappedData));
-      
+
       if (primaryCodeField && mappedData[primaryCodeField]) {
         const primaryCodeValue = mappedData[primaryCodeField];
         const escapedCode = String(primaryCodeValue).replace(/'/g, "''");
@@ -590,7 +590,7 @@ export class SyncProcessor {
         if (locationTableName === 'role_permissions' && mappedData.role_code && mappedData.permission_code) {
           const escapedRoleCode = String(mappedData.role_code).replace(/'/g, "''");
           const escapedPermissionCode = String(mappedData.permission_code).replace(/'/g, "''");
-          
+
           const existing = await locationPrisma.$queryRawUnsafe<any[]>(`
             SELECT sync_id FROM ${locationTableName}
             WHERE "role_code" = '${escapedRoleCode}'::VARCHAR
@@ -625,8 +625,40 @@ export class SyncProcessor {
       }
     } else {
       // For other tables, check by primary code + store_code
-      
-      if (primaryCodeField && mappedData[primaryCodeField]) {
+      // Special handling for composite key tables like menu_master_event
+      if (tableName === 'tbl_master_menu_master_event' && mappedData['menu_master_code'] && mappedData['event_code']) {
+        // For menu master events, check by menu_master_code + event_code + store_code (or sync_id)
+        const escapedMenuMasterCode = String(mappedData['menu_master_code']).replace(/'/g, "''");
+        const escapedEventCode = String(mappedData['event_code']).replace(/'/g, "''");
+        const escapedStoreCode = locationCode.replace(/'/g, "''");
+        const escapedSyncId = String(recordId).replace(/'/g, "''");
+
+        // First check by sync_id (most reliable)
+        const existingBySyncId = await locationPrisma.$queryRawUnsafe<any[]>(`
+          SELECT sync_id FROM ${locationTableName}
+          WHERE sync_id = '${escapedSyncId}'::UUID
+          LIMIT 1
+        `);
+
+        if (existingBySyncId && existingBySyncId.length > 0) {
+          existingRecordSyncId = existingBySyncId[0].sync_id;
+          console.log(`Found existing record by sync_id = ${recordId} for ${locationTableName}`);
+        } else {
+          // If not found by sync_id, check by composite key: menu_master_code + event_code + store_code
+          const existing = await locationPrisma.$queryRawUnsafe<any[]>(`
+            SELECT sync_id FROM ${locationTableName}
+            WHERE "menu_master_code" = '${escapedMenuMasterCode}'::VARCHAR
+              AND "event_code" = '${escapedEventCode}'::VARCHAR
+              AND store_code = '${escapedStoreCode}'::VARCHAR
+            LIMIT 1
+          `);
+
+          if (existing && existing.length > 0) {
+            existingRecordSyncId = existing[0].sync_id;
+            console.log(`Found existing record with menu_master_code = ${mappedData['menu_master_code']}, event_code = ${mappedData['event_code']} for store_code = ${locationCode}, sync_id = ${existingRecordSyncId}`);
+          }
+        }
+      } else if (primaryCodeField && mappedData[primaryCodeField]) {
         // Check if record with same code already exists for this store_code
         const primaryCodeValue = mappedData[primaryCodeField];
         const escapedCode = String(primaryCodeValue).replace(/'/g, "''");
@@ -716,7 +748,7 @@ export class SyncProcessor {
           // Special handling for different table types
           const isUserTable = tableName === 'tbl_user';
           const isGlobalTable = this.GLOBAL_TABLES.has(tableName) || this.GLOBAL_TABLES.has(locationTableName);
-          
+
           if (isUserTable) {
             // For user tables, check if sync_id exists globally (no store_code check)
             const syncIdExists = await locationPrisma.$queryRawUnsafe<any[]>(`
@@ -826,7 +858,7 @@ export class SyncProcessor {
       case 'DELETE':
         // For DELETE, find record by code (and store_code for non-global tables)
         const isGlobalTableForDelete = this.GLOBAL_TABLES.has(tableName) || this.GLOBAL_TABLES.has(locationTableName);
-        
+
         if (primaryCodeField && mappedData[primaryCodeField]) {
           const primaryCodeValue = mappedData[primaryCodeField];
           const escapedCode = String(primaryCodeValue).replace(/'/g, "''");
@@ -837,7 +869,7 @@ export class SyncProcessor {
             if (locationTableName === 'role_permissions' && mappedData.role_code && mappedData.permission_code) {
               const escapedRoleCode = String(mappedData.role_code).replace(/'/g, "''");
               const escapedPermissionCode = String(mappedData.permission_code).replace(/'/g, "''");
-              
+
               const recordToDelete = await locationPrisma.$queryRawUnsafe<any[]>(`
                 SELECT sync_id FROM ${locationTableName}
                 WHERE "role_code" = '${escapedRoleCode}'::VARCHAR
@@ -897,15 +929,15 @@ export class SyncProcessor {
     // Handle various prefixes: WM, LS, WL, etc. + LOCATION_CODE + CODE
     // Examples: WMLOC009TAX1, LSLOC009MM1, WLLOC009DPT1
     // Pattern: [PREFIX][LOCATION_CODE][CODE]
-    
+
     // Common prefixes used in the system
     const prefixes = ['WM', 'LS', 'WL', 'ML', 'SM'];
-    
+
     // Try each prefix pattern
     for (const prefix of prefixes) {
       const sourcePattern = `${prefix}${sourceLocationCode}`;
       const targetPattern = `${prefix}${targetLocationCode}`;
-      
+
       // If code starts with source prefix pattern, replace with target prefix pattern
       if (code.startsWith(sourcePattern)) {
         return code.replace(sourcePattern, targetPattern);
@@ -974,23 +1006,23 @@ export class SyncProcessor {
 
       // Skip ID fields
       if (key === 'tbl_tax_id' || key === 'printer_id' || key === 'prep_zone_id' ||
-          key === 'menu_master_id' || key === 'menu_category_id' || key === 'menu_item_id' ||
-          key === 'tbl_station_id' || key === 'dept_type_id' || key === 'dept_id' || 
-          key === 'discount_id' || key === 'id') {
+        key === 'menu_master_id' || key === 'menu_category_id' || key === 'menu_item_id' ||
+        key === 'tbl_station_id' || key === 'dept_type_id' || key === 'dept_id' ||
+        key === 'discount_id' || key === 'id') {
         continue;
       }
 
       // Skip audit fields
       if (key === 'created_date' || key === 'created_on' || key === 'createdon' ||
-          key === 'updated_on' || key === 'updatedon' ||
-          key === 'created_by' || key === 'createdby' ||
-          key === 'updated_by' || key === 'updatedby') {
+        key === 'updated_on' || key === 'updatedon' ||
+        key === 'created_by' || key === 'createdby' ||
+        key === 'updated_by' || key === 'updatedby') {
         continue;
       }
 
       // Skip store-specific fields (we'll set store_code from targetLocationCode)
       if (key === 'store_code' || key === 'storecode' ||
-          key === 'is_sync_to_web' || key === 'is_sync_to_local') {
+        key === 'is_sync_to_web' || key === 'is_sync_to_local') {
         continue;
       }
 
@@ -1017,14 +1049,14 @@ export class SyncProcessor {
 
         // Check if this is a code field (case-insensitive check)
         const isCodeField = codeFields.some(cf => cf.toLowerCase() === key.toLowerCase()) ||
-                           key.toLowerCase() === 'event_code'; // Handle Event_code (case-sensitive in DB)
+          key.toLowerCase() === 'event_code'; // Handle Event_code (case-sensitive in DB)
 
         if (isCodeField) {
           // Special handling for dept_code in time events (JSON array)
           if (key === 'dept_code' && masterTableName === 'tbl_master_time_events') {
             // First normalize to ensure it's a JSON array (handles old string format)
             const normalizedDeptCode = normalizeDeptCode(value);
-            
+
             // If it's an array, transform each department code
             if (Array.isArray(normalizedDeptCode)) {
               mappedData[mappedKey] = normalizedDeptCode.map((deptCode: any) => {
@@ -1042,7 +1074,7 @@ export class SyncProcessor {
           } else {
             // Handle arrays (JSON fields) for other code fields
             if (Array.isArray(value)) {
-              mappedData[mappedKey] = value.map((v: any) => 
+              mappedData[mappedKey] = value.map((v: any) =>
                 this.transformLocationCode(String(v || ''), sourceLocationCode, targetLocationCode)
               );
             } else {
@@ -1091,30 +1123,30 @@ export class SyncProcessor {
 
       // Skip ID fields (auto-increment primary keys)
       if (key === 'tbl_tax_id' || key === 'printer_id' || key === 'prep_zone_id' ||
-          key === 'menu_master_id' || key === 'menu_category_id' || key === 'menu_item_id' ||
-          key === 'tbl_station_id' || key === 'dept_type_id' || key === 'dept_id' || 
-          key === 'discount_id' || key === 'id') {
+        key === 'menu_master_id' || key === 'menu_category_id' || key === 'menu_item_id' ||
+        key === 'tbl_station_id' || key === 'dept_type_id' || key === 'dept_id' ||
+        key === 'discount_id' || key === 'id') {
         continue;
       }
 
       // Skip audit fields (check various case variations)
       if (key === 'created_date' || key === 'created_on' || key === 'createdon' ||
-          key === 'updated_on' || key === 'updatedon' ||
-          key === 'created_by' || key === 'createdby' ||
-          key === 'updated_by' || key === 'updatedby' ||
-          key === 'created_date' || key === 'created_by' ) {
+        key === 'updated_on' || key === 'updatedon' ||
+        key === 'created_by' || key === 'createdby' ||
+        key === 'updated_by' || key === 'updatedby' ||
+        key === 'created_date' || key === 'created_by') {
         continue;
       }
 
       // Skip store-specific fields (we'll set store_code from locationCode)
       if (key === 'store_code' || key === 'storecode' ||
-          key === 'is_sync_to_web' || key === 'is_sync_to_local') {
+        key === 'is_sync_to_web' || key === 'is_sync_to_local') {
         continue;
       }
 
       // Try exact match first (for case-sensitive columns like Event_code)
       let mappedKey = fieldMap[key];
-      
+
       // If no exact match, try with original case from fieldMap keys
       if (!mappedKey) {
         // Check if any fieldMap key matches (case-insensitive)
@@ -1125,7 +1157,7 @@ export class SyncProcessor {
           }
         }
       }
-      
+
       // Only include if field is in the sync map (whitelist)
       if (mappedKey) {
         // Special handling for code fields: transform from master format to dashboard format
@@ -1191,7 +1223,7 @@ export class SyncProcessor {
           // For other code fields, convert to string first
           else {
             const codeValue = String(value || '');
-            
+
             // Transform tax_code (in any table)
             if (key === 'tax_code') {
               const taxMatch = codeValue.match(/^(TAX\d+)$/);
@@ -1289,7 +1321,7 @@ export class SyncProcessor {
               if (masterTableName === 'tbl_master_time_events') {
                 // First normalize to ensure it's a JSON array (handles old string format)
                 const normalizedDeptCode = normalizeDeptCode(value);
-                
+
                 // If it's an array, transform each department code
                 if (Array.isArray(normalizedDeptCode)) {
                   mappedData[mappedKey] = normalizedDeptCode.map((deptCode: any) => {
@@ -1413,8 +1445,8 @@ export class SyncProcessor {
       }
 
       // Check if parent record exists in location database
-      const valuesToCheck = Array.isArray(foreignKeyValue) 
-        ? foreignKeyValue 
+      const valuesToCheck = Array.isArray(foreignKeyValue)
+        ? foreignKeyValue
         : [foreignKeyValue];
 
       for (const value of valuesToCheck) {
@@ -1503,8 +1535,8 @@ export class SyncProcessor {
 
       // Check if parent record exists in location database
       // Handle both single values and arrays (for JSON fields)
-      const valuesToCheck = Array.isArray(foreignKeyValue) 
-        ? foreignKeyValue 
+      const valuesToCheck = Array.isArray(foreignKeyValue)
+        ? foreignKeyValue
         : [foreignKeyValue];
 
       for (const value of valuesToCheck) {
@@ -1522,12 +1554,12 @@ export class SyncProcessor {
 
         const count = parentExists[0]?.count || BigInt(0);
         if (count === BigInt(0)) {
-          const errorMsg = 
+          const errorMsg =
             `Parent record not found: ${parentLocationTable}.${foreignKeyField} = '${value}' ` +
             `for store_code = '${locationCode}'. ` +
             `Parent table ${parentTable} must be synced before ${masterTableName}. ` +
             `Skipping this record - it will be retried after parent is synced.`;
-          
+
           console.warn(errorMsg);
           throw new Error(errorMsg);
         }
@@ -1553,7 +1585,7 @@ export class SyncProcessor {
     const isUserTable = tableName === 'users';
     const isGlobalTable = this.GLOBAL_TABLES.has(tableName);
     let existing: any[] = [];
-    
+
     if (isUserTable || isGlobalTable) {
       // For user tables and global tables, check by sync_id only (no store_code)
       existing = await locationPrisma.$queryRawUnsafe(`
@@ -1587,7 +1619,7 @@ export class SyncProcessor {
         if (tableName === 'role_permissions' && data.role_code && data.permission_code) {
           const escapedRoleCode = String(data.role_code).replace(/'/g, "''");
           const escapedPermissionCode = String(data.permission_code).replace(/'/g, "''");
-          
+
           const existingByCode = await locationPrisma.$queryRawUnsafe<any[]>(`
             SELECT sync_id FROM ${tableName}
             WHERE "role_code" = '${escapedRoleCode}'::VARCHAR
@@ -1662,31 +1694,31 @@ export class SyncProcessor {
     for (const [key, value] of Object.entries(insertData)) {
       // Skip undefined values
       if (value === undefined) continue;
-      
+
       // Skip store_code for users table and global tables (they don't use store_code)
       if ((tableName === 'users' || isGlobalTable) && (key === 'store_code' || key === 'storecode')) {
         continue;
       }
-      
+
       // Use double quotes for column names to handle case sensitivity
       columns.push(`"${key}"`);
-      
+
       // Type value as any to handle Prisma Decimal and other complex types
       const val: any = value;
-      
+
       // Check table-specific column types first
       const isTableBoolean = this.TABLE_BOOLEAN_COLUMNS[tableName]?.has(key);
       const isTableInteger = this.TABLE_INTEGER_COLUMNS[tableName]?.has(key);
       const isBooleanColumn = isTableBoolean || (!isTableInteger && this.BOOLEAN_COLUMNS.has(key));
       const isIntegerColumn = isTableInteger || this.INTEGER_COLUMNS.has(key);
       const isJsonColumn = this.JSON_COLUMNS[tableName]?.has(key);
-      
+
       // Normalize JSON columns (e.g., dept_code) - convert string to JSON array
       let normalizedVal = val;
       if (isJsonColumn && val !== null && val !== undefined) {
         normalizedVal = normalizeDeptCode(val);
       }
-      
+
       if (normalizedVal === null) {
         values.push('NULL');
       } else if (isJsonColumn) {
@@ -1785,7 +1817,7 @@ export class SyncProcessor {
 
     // For global tables, use ON CONFLICT DO UPDATE to handle existing records
     let conflictClause = '';
-    
+
     if (isGlobalTable) {
       // For role_permissions, use composite unique constraint
       if (tableName === 'role_permissions' && insertData.role_code && insertData.permission_code) {
@@ -1802,15 +1834,15 @@ export class SyncProcessor {
           // Build update clause for all columns except the primary code field and ID fields
           const updateColumns = columns
             .map(col => col.replace(/"/g, ''))
-            .filter(colName => 
-              colName !== primaryCodeField && 
-              colName !== 'role_id' && 
+            .filter(colName =>
+              colName !== primaryCodeField &&
+              colName !== 'role_id' &&
               colName !== 'permission_id' &&
               colName !== 'role_permission_id'
             )
             .map(colName => `"${colName}" = EXCLUDED."${colName}"`)
             .join(', ');
-          
+
           if (updateColumns) {
             conflictClause = `
               ON CONFLICT ("${primaryCodeField}") DO UPDATE SET
@@ -1832,7 +1864,7 @@ export class SyncProcessor {
           INSERT INTO ${tableName} (${columnsStr})
           VALUES (${valuesStr})
         `;
-      
+
       console.log(`[INSERT] Using ON CONFLICT: ${conflictClause ? 'YES' : 'NO'}`);
       await locationPrisma.$executeRawUnsafe(insertQuery);
     } catch (error: any) {
@@ -1844,41 +1876,41 @@ export class SyncProcessor {
         // Don't throw - let it be retried later when parent records are synced
         return;
       }
-      
+
       // Handle unique constraint violations (23505) - record already exists
       // For location-to-location sync, update existing record instead of failing
       if (error.code === '23505') {
         console.log(`[ERROR HANDLER] Unique constraint violation for ${tableName}, attempting to update existing record...`);
         console.log(`[ERROR HANDLER] Error message: ${error.message}`);
-        
+
         // Try to find existing record by primary code field
         const isGlobalTable = this.GLOBAL_TABLES.has(tableName);
         console.log(`[ERROR HANDLER] isGlobalTable=${isGlobalTable}, insertData keys:`, Object.keys(insertData));
-        
+
         // Try both table name variations for getPrimaryCodeField
         let primaryCodeField = this.getPrimaryCodeField(tableName);
         if (!primaryCodeField) {
           // Try master table name
-          const masterTableName = tableName === 'roles' ? 'tbl_role' : 
-                                  tableName === 'permissions' ? 'tbl_permission' :
-                                  tableName === 'role_permissions' ? 'tbl_role_permission' : null;
+          const masterTableName = tableName === 'roles' ? 'tbl_role' :
+            tableName === 'permissions' ? 'tbl_permission' :
+              tableName === 'role_permissions' ? 'tbl_role_permission' : null;
           if (masterTableName) {
             primaryCodeField = this.getPrimaryCodeField(masterTableName);
           }
         }
-        
+
         console.log(`[ERROR HANDLER] primaryCodeField=${primaryCodeField}, hasCodeField=${primaryCodeField ? !!insertData[primaryCodeField] : false}`);
-        
+
         // For global tables, try to find by code field
         if (isGlobalTable && primaryCodeField && insertData[primaryCodeField]) {
           const primaryCodeValue = insertData[primaryCodeField];
           const escapedCode = String(primaryCodeValue).replace(/'/g, "''");
-          
+
           // For role_permissions, check by composite key (role_code + permission_code)
           if (tableName === 'role_permissions' && insertData.role_code && insertData.permission_code) {
             const escapedRoleCode = String(insertData.role_code).replace(/'/g, "''");
             const escapedPermissionCode = String(insertData.permission_code).replace(/'/g, "''");
-            
+
             console.log(`[ERROR HANDLER] Checking role_permissions with role_code='${insertData.role_code}', permission_code='${insertData.permission_code}'`);
             const existing = await locationPrisma.$queryRawUnsafe<any[]>(`
               SELECT sync_id FROM ${tableName}
@@ -1886,9 +1918,9 @@ export class SyncProcessor {
                 AND "permission_code" = '${escapedPermissionCode}'::VARCHAR
               LIMIT 1
             `);
-            
+
             console.log(`[ERROR HANDLER] Query result:`, existing);
-            
+
             if (existing && existing.length > 0) {
               const existingSyncId = existing[0].sync_id || syncId;
               console.log(`[ERROR HANDLER] Found existing role_permission, updating with sync_id=${existingSyncId}`);
@@ -1904,9 +1936,9 @@ export class SyncProcessor {
               WHERE "${primaryCodeField}" = '${escapedCode}'::VARCHAR
               LIMIT 1
             `);
-            
+
             console.log(`[ERROR HANDLER] Query result:`, existing);
-            
+
             if (existing && existing.length > 0) {
               const existingSyncId = existing[0].sync_id || syncId;
               console.log(`[ERROR HANDLER] Found existing ${tableName} by ${primaryCodeField}=${primaryCodeValue}, updating with sync_id=${existingSyncId}`);
@@ -1927,7 +1959,7 @@ export class SyncProcessor {
             }
           }
         }
-        
+
         // If we can't find by code, try to update by sync_id (for users table)
         if (tableName === 'users' && insertData.email) {
           const escapedEmail = String(insertData.email).replace(/'/g, "''");
@@ -1936,7 +1968,7 @@ export class SyncProcessor {
             WHERE email = '${escapedEmail}'::VARCHAR
             LIMIT 1
           `);
-          
+
           if (existing && existing.length > 0) {
             const existingSyncId = existing[0].sync_id || syncId;
             await this.handleUpdate(tableName, existingSyncId, insertData, syncSource, locationCode);
@@ -1944,12 +1976,12 @@ export class SyncProcessor {
             return; // Successfully handled
           }
         }
-        
+
         // If we get here, we couldn't handle the error
         console.error(`[ERROR HANDLER] Could not resolve unique constraint violation for ${tableName}`);
         console.error(`[ERROR HANDLER] Error details:`, error);
       }
-      
+
       // Re-throw error if we couldn't handle it
       console.error(`Failed to insert into ${tableName}:`, error);
       console.error('Columns:', columns);
@@ -1974,7 +2006,7 @@ export class SyncProcessor {
     // 3. Other tables: check by sync_id and store_code
     const isUserTable = tableName === 'users';
     const isGlobalTable = this.GLOBAL_TABLES.has(tableName);
-    
+
     // Check if record exists
     let existing;
     if (isUserTable || isGlobalTable) {
@@ -2004,13 +2036,13 @@ export class SyncProcessor {
     for (const [key, value] of Object.entries(data)) {
       // Skip undefined values
       if (value === undefined) continue;
-      
+
       // Use double quotes for column names to handle case sensitivity
       const quotedKey = `"${key}"`;
-      
+
       // Type value as any to handle Prisma Decimal and other complex types
       const val: any = value;
-      
+
       // Check table-specific column types first
       const isTableBoolean = this.TABLE_BOOLEAN_COLUMNS[tableName]?.has(key);
       const isTableInteger = this.TABLE_INTEGER_COLUMNS[tableName]?.has(key);
@@ -2018,13 +2050,13 @@ export class SyncProcessor {
       const isBooleanColumn = isTableBoolean || (!isTableInteger && this.BOOLEAN_COLUMNS.has(key));
       const isIntegerColumn = isTableInteger || this.INTEGER_COLUMNS.has(key);
       const isJsonColumn = this.JSON_COLUMNS[tableName]?.has(key);
-      
+
       // Normalize JSON columns (e.g., dept_code) - convert string to JSON array
       let normalizedVal = val;
       if (isJsonColumn && val !== null && val !== undefined) {
         normalizedVal = normalizeDeptCode(val);
       }
-      
+
       if (normalizedVal === null) {
         setParts.push(`${quotedKey} = NULL`);
       } else if (isJsonColumn) {
@@ -2165,7 +2197,7 @@ export class SyncProcessor {
   ): Promise<void> {
     // For global tables and user tables, don't use store_code in WHERE clause
     const isUserTable = tableName === 'users';
-    
+
     // Explicit dependency cleanup for roles -> role_permissions
     if (tableName === 'roles') {
       try {
@@ -2286,32 +2318,32 @@ export class SyncProcessor {
     for (const [key, value] of Object.entries(insertData)) {
       // Skip undefined values
       if (value === undefined) continue;
-      
+
       // Skip store_code for users table
       if (locationTableName === 'users' && (key === 'store_code' || key === 'storecode')) {
         continue;
       }
-      
+
       // Use double quotes for column names to handle case sensitivity
       const quotedKey = `"${key}"`;
       columns.push(quotedKey);
-      
+
       // Type value as any to handle Prisma Decimal and other complex types
       const val: any = value;
-      
+
       // Check table-specific column types first
       const isTableBoolean = this.TABLE_BOOLEAN_COLUMNS[locationTableName]?.has(key);
       const isTableInteger = this.TABLE_INTEGER_COLUMNS[locationTableName]?.has(key);
       const isBooleanColumn = isTableBoolean || (!isTableInteger && this.BOOLEAN_COLUMNS.has(key));
       const isIntegerColumn = isTableInteger || this.INTEGER_COLUMNS.has(key);
       const isJsonColumn = this.JSON_COLUMNS[locationTableName]?.has(key);
-      
+
       // Normalize JSON columns (e.g., dept_code) - convert string to JSON array
       let normalizedVal = val;
       if (isJsonColumn && val !== null && val !== undefined) {
         normalizedVal = normalizeDeptCode(val);
       }
-      
+
       let valueStr: string;
       if (normalizedVal === null) {
         valueStr = 'NULL';
@@ -2423,7 +2455,7 @@ export class SyncProcessor {
         if (primaryCodeField && (data as any)[primaryCodeField]) {
           const codeValue = (data as any)[primaryCodeField];
           const escapedCode = String(codeValue).replace(/'/g, "''");
-          
+
           // First try to find by code + store_code (for tables with composite unique)
           const escapedStoreCode = locationCode.replace(/'/g, "''");
           let existing = await locationPrisma.$queryRawUnsafe<any[]>(`
@@ -2432,7 +2464,7 @@ export class SyncProcessor {
               AND store_code = '${escapedStoreCode}'::VARCHAR
             LIMIT 1
           `);
-          
+
           // If not found, try by code only (for tables with unique on code only)
           if (!existing || existing.length === 0) {
             existing = await locationPrisma.$queryRawUnsafe<any[]>(`
@@ -2441,7 +2473,7 @@ export class SyncProcessor {
               LIMIT 1
             `);
           }
-          
+
           if (existing && existing.length > 0) {
             recordExists = true;
             existingSyncId = existing[0].sync_id || syncId;
@@ -2457,7 +2489,7 @@ export class SyncProcessor {
         // Record doesn't exist - try INSERT
         // For tables without unique constraint on code field, use sync_id for conflict resolution
         const primaryCodeField = isUserTable ? 'email' : this.getPrimaryCodeField(masterTableName);
-        
+
         try {
           if (isUserTable) {
             // Users table: use email for conflict
@@ -2542,7 +2574,7 @@ export class SyncProcessor {
       if (error.code === '23505') {
         // Unique constraint violation - record exists, try to update
         console.log(`Insert failed due to unique constraint, attempting to update existing record...`);
-        
+
         // First try to find by sync_id (most reliable, always unique)
         try {
           const escapedSyncId = syncId.replace(/'/g, "''");
@@ -2551,7 +2583,7 @@ export class SyncProcessor {
             WHERE sync_id = '${escapedSyncId}'::UUID
             LIMIT 1
           `);
-          
+
           if (existingBySyncId && existingBySyncId.length > 0) {
             const existingSyncId = existingBySyncId[0].sync_id || syncId;
             await this.handleUpdate(locationTableName, existingSyncId, data, syncSource, locationCode);
@@ -2561,7 +2593,7 @@ export class SyncProcessor {
         } catch (syncIdError) {
           // Continue to other methods if sync_id check fails
         }
-        
+
         // Try to find existing record by code/email and update it
         if (isUserTable) {
           const email = (data as Record<string, any>).email;
@@ -2572,7 +2604,7 @@ export class SyncProcessor {
               WHERE email = '${escapedEmail}'::VARCHAR
               LIMIT 1
             `);
-            
+
             if (existing && existing.length > 0) {
               const existingSyncId = existing[0].sync_id || syncId;
               await this.handleUpdate(locationTableName, existingSyncId, data, syncSource, locationCode);
@@ -2587,7 +2619,7 @@ export class SyncProcessor {
             if (codeValue) {
               const escapedCode = String(codeValue).replace(/'/g, "''");
               const escapedStoreCode = locationCode.replace(/'/g, "''");
-              
+
               // Try code + store_code first
               let existing = await locationPrisma.$queryRawUnsafe<any[]>(`
                 SELECT sync_id FROM ${locationTableName}
@@ -2595,7 +2627,7 @@ export class SyncProcessor {
                   AND store_code = '${escapedStoreCode}'::VARCHAR
                 LIMIT 1
               `);
-              
+
               // If not found, try code only (for tables with unique on code only)
               if (!existing || existing.length === 0) {
                 existing = await locationPrisma.$queryRawUnsafe<any[]>(`
@@ -2604,7 +2636,7 @@ export class SyncProcessor {
                   LIMIT 1
                 `);
               }
-              
+
               if (existing && existing.length > 0) {
                 const existingSyncId = existing[0].sync_id || syncId;
                 await this.handleUpdate(locationTableName, existingSyncId, data, syncSource, locationCode);
@@ -2614,7 +2646,7 @@ export class SyncProcessor {
             }
           }
         }
-        
+
         // If we couldn't find the record, re-throw the error
         throw error;
       } else if (error.code === '42P10') {
@@ -2622,7 +2654,7 @@ export class SyncProcessor {
         // This means the table doesn't have the unique constraint we tried to use
         // Fall back to checking if record exists by sync_id and update, or insert
         console.log(`ON CONFLICT failed - no matching constraint. Checking by sync_id...`);
-        
+
         try {
           const escapedSyncId = syncId.replace(/'/g, "''");
           const existing = await locationPrisma.$queryRawUnsafe<any[]>(`
@@ -2630,7 +2662,7 @@ export class SyncProcessor {
             WHERE sync_id = '${escapedSyncId}'::UUID
             LIMIT 1
           `);
-          
+
           if (existing && existing.length > 0) {
             // Record exists - update it
             const existingSyncId = existing[0].sync_id || syncId;
@@ -2651,7 +2683,7 @@ export class SyncProcessor {
           throw error;
         }
       }
-      
+
       console.error(`Failed to upsert ${locationTableName}:`, error);
       console.error('Columns:', columns);
       console.error('Values count:', values.length);
@@ -2686,14 +2718,14 @@ export class SyncProcessor {
     for (const [key, value] of Object.entries(insertData)) {
       // Skip undefined values
       if (value === undefined) continue;
-      
+
       // Use double quotes for column names to handle case sensitivity
       const quotedKey = `"${key}"`;
       columns.push(quotedKey);
-      
+
       // Type value as any to handle Prisma Decimal and other complex types
       const val: any = value;
-      
+
       let valueStr: string;
       if (val === null) {
         valueStr = 'NULL';
@@ -2834,13 +2866,13 @@ export class SyncProcessor {
     for (const [key, value] of Object.entries(data)) {
       // Skip undefined values
       if (value === undefined) continue;
-      
+
       // Use double quotes for column names to handle case sensitivity
       const quotedKey = `"${key}"`;
-      
+
       // Type value as any to handle Prisma Decimal and other complex types
       const val: any = value;
-      
+
       if (val === null) {
         setParts.push(`${quotedKey} = NULL`);
       } else if (typeof val === 'boolean') {
@@ -2848,7 +2880,7 @@ export class SyncProcessor {
         const isTableBoolean = this.TABLE_BOOLEAN_COLUMNS[tableName]?.has(key);
         const isTableInteger = this.TABLE_INTEGER_COLUMNS[tableName]?.has(key);
         const isBooleanColumn = isTableBoolean || (!isTableInteger && this.BOOLEAN_COLUMNS.has(key));
-        
+
         if (isBooleanColumn) {
           setParts.push(`${quotedKey} = ${val ? 'true' : 'false'}`);
         } else {
@@ -2913,7 +2945,7 @@ export class SyncProcessor {
       // Skip store_code in WHERE clause for tables that don't have it (like users table)
       const locationTableName = SYNC_TABLE_MAP[tableName] || tableName;
       const isUserTable = locationTableName === 'users';
-      
+
       let whereClause: string;
       if (isUserTable) {
         // For users table, don't use store_code in WHERE clause
@@ -2923,7 +2955,7 @@ export class SyncProcessor {
         whereClause = `"${codeField}" = '${escapedCode}'::VARCHAR
           AND store_code = '${escapedLocationCode}'::VARCHAR`;
       }
-      
+
       await locationPrisma.$executeRawUnsafe(`
         UPDATE ${locationTableName}
         SET ${setClause}

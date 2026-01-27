@@ -58,6 +58,9 @@ export default function AddMenuMasterPage() {
   const [selectedStations, setSelectedStations] = useState<Set<string>>(
     new Set()
   );
+  const [selectedEvents, setSelectedEvents] = useState<Set<string>>(
+    new Set()
+  );
 
   // Refs for auto-focus on validation errors
   const nameRef = useRef<HTMLInputElement>(null);
@@ -72,6 +75,7 @@ export default function AddMenuMasterPage() {
       const token = localStorage.getItem("master_admin_token");
       const prepZoneCodes = Array.from(selectedPrepZones);
       const stationCodes = Array.from(selectedStations);
+      const eventCodes = Array.from(selectedEvents);
       const response = await fetch("/api/master/menu-masters", {
         method: "POST",
         headers: {
@@ -86,8 +90,8 @@ export default function AddMenuMasterPage() {
           deptCode: values.deptCode || null,
           prepZoneCodes: prepZoneCodes.length > 0 ? prepZoneCodes : null,
           stationCodes: stationCodes.length > 0 ? stationCodes : null,
-          eventCode: values.eventCode || null,
-          isEventMenu: values.eventCode ? 1 : 0,
+          eventCodes: eventCodes.length > 0 ? eventCodes : null,
+          isEventMenu: eventCodes.length > 0 ? 1 : 0,
           isActive: values.isActive,
         }),
       });
@@ -125,7 +129,6 @@ export default function AddMenuMasterPage() {
       colorCode: getPrimaryColor(),
       forColorCode: "#FFFFFF",
       deptCode: "",
-      eventCode: "",
       isEventMenu: 0,
       isActive: 1,
     },
@@ -138,17 +141,16 @@ export default function AddMenuMasterPage() {
         colorCode: true,
         forColorCode: true,
         deptCode: true,
-        eventCode: true,
       });
-      
+
       // Validate and check for errors
       await formik.validateForm();
-      
+
       // If there are errors, don't submit
       if (Object.keys(formik.errors).length > 0) {
         return;
       }
-      
+
       // No errors, proceed with submission
       onSubmitForm(values);
     },
@@ -267,6 +269,25 @@ export default function AddMenuMasterPage() {
     }
   };
 
+  const handleEventToggle = (eventCode: string) => {
+    const updated = new Set(selectedEvents);
+    if (updated.has(eventCode)) {
+      updated.delete(eventCode);
+    } else {
+      updated.add(eventCode);
+    }
+    setSelectedEvents(updated);
+  };
+
+  const handleSelectAllEvents = () => {
+    if (selectedEvents.size === timeEvents.length) {
+      setSelectedEvents(new Set());
+    } else {
+      const allCodes = new Set(timeEvents.map((e) => e.eventCode));
+      setSelectedEvents(allCodes);
+    }
+  };
+
 
   return (
     <MasterDashboardLayout>
@@ -320,11 +341,10 @@ export default function AddMenuMasterPage() {
                             formik.setFieldValue("labelName", e.target.value);
                           }
                         }}
-                        className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:outline-none transition-all ${
-                          formik.errors.name && formik.touched.name
+                        className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:outline-none transition-all ${formik.errors.name && formik.touched.name
                             ? "border-red-500 dark:border-red-500 animate-shake focus:border-red-500"
                             : "border-gray-300 dark:border-gray-600 focus:border-blue-500"
-                        }`}
+                          }`}
                         placeholder="Enter menu master name"
                       />
                       {formik.errors.name && formik.touched.name && (
@@ -343,11 +363,10 @@ export default function AddMenuMasterPage() {
                         type="text"
                         maxLength={30}
                         {...formik.getFieldProps("labelName")}
-                        className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:outline-none transition-all ${
-                          formik.errors.labelName && formik.touched.labelName
+                        className={`w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:outline-none transition-all ${formik.errors.labelName && formik.touched.labelName
                             ? "border-red-500 dark:border-red-500 animate-shake focus:border-red-500"
                             : "border-gray-300 dark:border-gray-600 focus:border-blue-500"
-                        }`}
+                          }`}
                         placeholder="Enter display label"
                       />
                       {formik.errors.labelName && formik.touched.labelName && (
@@ -465,11 +484,10 @@ export default function AddMenuMasterPage() {
                                 onClick={() =>
                                   handlePrepZoneToggle(zone.prepZoneCode)
                                 }
-                                className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
-                                  isSelected
+                                className={`relative px-4 py-2 rounded-lg border-2 transition-all ${isSelected
                                     ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
                                     : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                                }`}
+                                  }`}
                               >
                                 {zone.prepZoneName}
                                 {isSelected && (
@@ -523,11 +541,10 @@ export default function AddMenuMasterPage() {
                                 onClick={() =>
                                   handleStationToggle(station.stationCode)
                                 }
-                                className={`relative px-4 py-2 rounded-lg border-2 transition-all ${
-                                  isSelected
+                                className={`relative px-4 py-2 rounded-lg border-2 transition-all ${isSelected
                                     ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
                                     : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
-                                }`}
+                                  }`}
                               >
                                 {station.stationname || station.stationCode}
                                 {isSelected && (
@@ -548,33 +565,58 @@ export default function AddMenuMasterPage() {
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
                   Time Event Configuration
                 </h3>
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Time Event
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Select Time Events
                     </label>
-                    <select
-                      name="eventCode"
-                      value={formik.values.eventCode}
-                      onChange={(e) => {
-                        formik.setFieldValue("eventCode", e.target.value);
-                        formik.setFieldValue("isEventMenu", e.target.value ? 1 : 0);
-                      }}
-                      onBlur={formik.handleBlur}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">No Time Event (Available Always)</option>
-                      {timeEvents.map((event) => (
-                        <option key={event.id} value={event.eventCode}>
-                          {event.eventName} ({event.eventCode})
-                        </option>
-                      ))}
-                    </select>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      Select a time event to restrict menu availability to
-                      specific times/days
-                    </p>
+                    {timeEvents.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleSelectAllEvents}
+                        className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium px-3 py-1 border border-blue-600 dark:border-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                      >
+                        {selectedEvents.size === timeEvents.length
+                          ? "Deselect All"
+                          : "Select All"}
+                      </button>
+                    )}
                   </div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                    Select one or more time events to restrict menu availability to
+                    specific times/days
+                  </p>
+                  {timeEvents.length === 0 ? (
+                    <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700">
+                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                        No time events available
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-700">
+                      <div className="flex flex-wrap gap-2">
+                        {timeEvents.map((event) => {
+                          const isSelected = selectedEvents.has(event.eventCode);
+                          return (
+                            <button
+                              key={event.id}
+                              type="button"
+                              onClick={() => handleEventToggle(event.eventCode)}
+                              className={`relative px-4 py-2 rounded-lg border-2 transition-all ${isSelected
+                                  ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium"
+                                  : "border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-gray-400 dark:hover:border-gray-500"
+                                }`}
+                            >
+                              {event.eventName} ({event.eventCode})
+                              {isSelected && (
+                                <CheckIcon className="w-4 h-4 inline-block ml-2" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

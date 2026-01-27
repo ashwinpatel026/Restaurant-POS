@@ -8,7 +8,7 @@ import { checkDuplicate } from '@/lib/validation'
 // Helper function to generate unique menu master code
 async function generateMenuMasterCode(storeCode: string): Promise<string> {
   const prefix = `WL${storeCode}MM`
-  
+
   // Get all menu master codes that match the WL pattern for this store
   const menuMasters = await prisma.menuMaster.findMany({
     where: {
@@ -22,7 +22,7 @@ async function generateMenuMasterCode(storeCode: string): Promise<string> {
   })
 
   let nextNumber = 1
-  
+
   if (menuMasters.length > 0) {
     // Extract number from codes like "WLLOC01MM1", "WLLOC01MM2", etc.
     const numbers = menuMasters
@@ -31,12 +31,12 @@ async function generateMenuMasterCode(storeCode: string): Promise<string> {
         return match ? parseInt(match[1]) : 0
       })
       .filter((num: number) => num > 0)
-    
+
     if (numbers.length > 0) {
       nextNumber = Math.max(...numbers) + 1
     }
   }
-  
+
   // Format as WL + STORE_CODE + MM + number starting from 1
   return `${prefix}${nextNumber}`
 }
@@ -46,34 +46,34 @@ export async function GET(request: NextRequest) {
     // Check if this is a public request (for QR orders) by checking referer or query param
     const url = new URL(request.url)
     const isPublic = url.searchParams.get('public') === 'true'
-    
-      // Only require auth if not a public request
-      if (!isPublic) {
-        const session = await getServerSession(authOptions)
-        
-        if (!session?.user?.id || !session?.user?.role) {
-          return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-        }
 
-        // Check permission to view menu masters
-        if (!(await checkLocationPermission(session.user.role, 'menu.view'))) {
-          return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-        }
+    // Only require auth if not a public request
+    if (!isPublic) {
+      const session = await getServerSession(authOptions)
+
+      if (!session?.user?.id || !session?.user?.role) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+
+      // Check permission to view menu masters
+      if (!(await checkLocationPermission(session.user.role, 'menu.view'))) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
 
       const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
-      
+
       // Get selected store from query
       const searchParams = request.nextUrl.searchParams
       const queryStoreCode = searchParams.get('storeCode')
       const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
-      
+
       if (!selectedStoreCode) {
         return NextResponse.json(
           { error: 'No accessible store selected' },
           { status: 403 }
         )
       }
-      
+
       // Filter by ONE store only for authenticated requests
       const storeFilter = buildStoreFilter(accessInfo, selectedStoreCode)
 
@@ -179,7 +179,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    
+
     if (!session?.user?.id || !session?.user?.role) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -190,12 +190,12 @@ export async function POST(request: NextRequest) {
     }
 
     const accessInfo = await getUserAccessInfo(parseInt(session.user.id))
-    
+
     // Get selected store from query
     const searchParams = request.nextUrl.searchParams
     const queryStoreCode = searchParams.get('storeCode')
     const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
-    
+
     if (!selectedStoreCode) {
       return NextResponse.json(
         { error: 'No accessible store selected' },
@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
       forColorCode,
       prepZoneCodes,
       stationCodes,
-      eventCode,
+      eventCodes,
       isEventMenu,
       isActive,
       deptCode
@@ -254,17 +254,19 @@ export async function POST(request: NextRequest) {
       data: createData
     })
 
-    // If this is an event menu, create the association
-    if (eventCode && isEventMenu === 1) {
-      await prisma.menuMasterEvent.create({
-        data: {
-          menuMasterCode: menuMasterCode,
-          eventCode: eventCode,
-          createdBy: parseInt(session.user.id),
-          storeCode: selectedStoreCode,
-          syncSource: 'location' // Set sync_source to 'location' when created from dashboard
-        }
-      })
+    // If this is an event menu, create associations for all event codes
+    if (eventCodes && Array.isArray(eventCodes) && eventCodes.length > 0 && isEventMenu === 1) {
+      for (const eventCode of eventCodes) {
+        await prisma.menuMasterEvent.create({
+          data: {
+            menuMasterCode: menuMasterCode,
+            eventCode: eventCode,
+            createdBy: parseInt(session.user.id),
+            storeCode: selectedStoreCode,
+            syncSource: 'location' // Set sync_source to 'location' when created from dashboard
+          }
+        })
+      }
     }
 
     // Convert BigInt to string for JSON serialization
