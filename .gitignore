@@ -43,3 +43,7 @@ node_modules
 apidoc/
 public/apidoc/
 
+# drawio
+drawio/
+/drawio
+
