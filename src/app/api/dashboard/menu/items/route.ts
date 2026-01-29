@@ -239,6 +239,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Filter by ONE store only
+    const storeFilter = buildStoreFilter(accessInfo, selectedStoreCode)
+
     const body = await request.json()
     const {
       name,
