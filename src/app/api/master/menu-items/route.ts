@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { masterPrisma } from '@/lib/databaseManager'
+import { Prisma } from '@prisma/master-client'
 import { checkDuplicate } from '@/lib/validation'
+import { normalizeToStructuredFormat, MenuCategoryMapping, isStructuredFormat, convertToSimpleFormat } from '@/lib/utils/menuItemFormat'
 
 // Helper function to generate unique menu item code
 async function generateMenuItemCode(): Promise<string> {
@@ -25,7 +27,41 @@ async function generateMenuItemCode(): Promise<string> {
 }
 
 // Helper function to map menu item response
-function mapMenuItemResponse(item: any) {
+function mapMenuItemResponse(item: any, categories?: Array<{ menuCategoryCode: string; menuMasterCode: string }>): any {
+  // Parse menuCategoryCode
+  let menuCategoryCodeParsed: any = null;
+  if (item.menuCategoryCode) {
+    if (typeof item.menuCategoryCode === 'string') {
+      try {
+        menuCategoryCodeParsed = JSON.parse(item.menuCategoryCode);
+      } catch {
+        menuCategoryCodeParsed = item.menuCategoryCode;
+      }
+    } else {
+      menuCategoryCodeParsed = item.menuCategoryCode;
+    }
+  }
+  
+  // If it's old format (simple array), convert to structured format if we have menuMasterCode and categories
+  if (menuCategoryCodeParsed && Array.isArray(menuCategoryCodeParsed) && menuCategoryCodeParsed.length > 0) {
+    const firstItem = menuCategoryCodeParsed[0];
+    // Check if it's structured format
+    if (!(firstItem && typeof firstItem === 'object' && 'menuMasterCode' in firstItem && 'menuCategoryCode' in firstItem)) {
+      // Old format - convert to structured format
+      const menuMasterCodeParsed = item.menuMasterCode 
+        ? (Array.isArray(item.menuMasterCode) ? item.menuMasterCode : [item.menuMasterCode])
+        : [];
+      
+      if (menuMasterCodeParsed.length > 0 && categories && categories.length > 0) {
+        menuCategoryCodeParsed = normalizeToStructuredFormat(
+          menuCategoryCodeParsed as string[],
+          menuMasterCodeParsed,
+          categories
+        );
+      }
+    }
+  }
+  
   return {
     ...item,
     menuItemId: item.menuItemId.toString(),
@@ -40,7 +76,17 @@ function mapMenuItemResponse(item: any) {
     updatedOn: item.updatedOn?.toISOString() || null,
     // Handle JSON fields
     prepZoneCode: item.prepZoneCode ? (typeof item.prepZoneCode === 'string' ? JSON.parse(item.prepZoneCode) : item.prepZoneCode) : null,
-    menuCategoryCode: item.menuCategoryCode ? (typeof item.menuCategoryCode === 'string' ? JSON.parse(item.menuCategoryCode) : item.menuCategoryCode) : null,
+    menuCategoryCode: menuCategoryCodeParsed, // Return structured format
+    menuMasterCode: item.menuMasterCode ? (() => {
+      // Handle JSON field - can be array or single value
+      if (Array.isArray(item.menuMasterCode)) {
+        return item.menuMasterCode;
+      }
+      if (typeof item.menuMasterCode === 'string') {
+        return [item.menuMasterCode];
+      }
+      return [item.menuMasterCode];
+    })() : null,
   }
 }
 
@@ -57,10 +103,24 @@ export async function GET(request: NextRequest) {
     const isActive = searchParams.get('isActive')
 
     const where: any = {}
-    if (menuCategoryCode || categoryCode) {
-      // menuCategoryCode is stored as JSON array, so we need to use array_contains filter
+    const searchCode = menuCategoryCode || categoryCode
+    
+    if (searchCode) {
+      // For structured format, we need to search within the JSON array
+      // Use raw SQL query to handle both old and new formats
+      // This will search for the category code in both:
+      // - Old format: ["MC1", "MC2"] 
+      // - New format: [{"menuMasterCode": "MM1", "menuCategoryCode": "MC1"}, ...]
+      const escapedCode = searchCode.replace(/'/g, "''")
+      const rawWhere = `(
+        menu_category_code::text LIKE '%"${escapedCode}"%' OR
+        menu_category_code::text LIKE '%"menuCategoryCode":"${escapedCode}"%'
+      )`
+      // Use $queryRaw for complex JSON queries, but for now use simpler approach
+      // We'll filter after fetching if needed, or use Prisma's JSON filtering
       where.menuCategoryCode = {
-        array_contains: menuCategoryCode || categoryCode
+        // This will work for old format, for new format we'll filter in memory
+        array_contains: searchCode
       }
     }
     if (isActive !== null) {
@@ -72,7 +132,49 @@ export async function GET(request: NextRequest) {
       orderBy: { createdOn: 'desc' }
     })
 
-    const itemsWithStringIds = menuItems.map(mapMenuItemResponse)
+    // Fetch all categories once for conversion (if needed)
+    const allCategories = await masterPrisma.masterMenuCategory.findMany({
+      select: {
+        menuCategoryCode: true,
+        menuMasterCode: true,
+      },
+    })
+
+    // Map items and filter if needed (for structured format category filtering)
+    let itemsWithStringIds = menuItems.map(item => mapMenuItemResponse(item, allCategories))
+    
+    // If filtering by category code and we have results, also check structured format
+    if (searchCode && itemsWithStringIds.length > 0) {
+      // Check if any items have structured format that matches
+      const structuredMatches = menuItems.filter(item => {
+        if (!item.menuCategoryCode) return false
+        let parsed: any = item.menuCategoryCode
+        if (typeof parsed === 'string') {
+          try {
+            parsed = JSON.parse(parsed)
+          } catch {
+            return false
+          }
+        }
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const first = parsed[0]
+          // Structured format
+          if (first && typeof first === 'object' && 'menuCategoryCode' in first) {
+            return parsed.some((p: any) => p.menuCategoryCode === searchCode)
+          }
+        }
+        return false
+      })
+      
+      // Merge results (avoid duplicates)
+      if (structuredMatches.length > 0) {
+        const existingIds = new Set(itemsWithStringIds.map(i => i.menuItemId))
+        const additionalItems = structuredMatches
+          .filter(item => !existingIds.has(item.menuItemId.toString()))
+          .map(item => mapMenuItemResponse(item, allCategories))
+        itemsWithStringIds = [...itemsWithStringIds, ...additionalItems]
+      }
+    }
 
     return NextResponse.json(itemsWithStringIds)
   } catch (error) {
@@ -155,13 +257,87 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Handle menuMasterCode - can be string or array (JSON field)
+    let processedMenuMasterCode: string[] | null = null;
+    if (menuMasterCode) {
+      if (Array.isArray(menuMasterCode)) {
+        processedMenuMasterCode = menuMasterCode.length > 0 ? menuMasterCode : null;
+      } else if (typeof menuMasterCode === 'string') {
+        processedMenuMasterCode = [menuMasterCode];
+      }
+    }
+
+    // Handle menuCategoryCode - supports both structured format and old format
+    let processedMenuCategoryCode: MenuCategoryMapping[] | null = null;
+    
+    if (menuCategoryCode) {
+      // Check if it's already in structured format
+      if (isStructuredFormat(menuCategoryCode)) {
+        processedMenuCategoryCode = menuCategoryCode as MenuCategoryMapping[];
+      } else {
+        // Old format: need to convert to structured format
+        // Fetch categories to get their menuMasterCode mapping
+        const allCategories = await masterPrisma.masterMenuCategory.findMany({
+          select: {
+            menuCategoryCode: true,
+            menuMasterCode: true,
+          },
+        });
+        
+        if (processedMenuMasterCode && allCategories.length > 0) {
+          // Convert old format to structured format
+          let categoryCodes: string[] = [];
+          if (Array.isArray(menuCategoryCode)) {
+            categoryCodes = menuCategoryCode;
+          } else if (typeof menuCategoryCode === 'string') {
+            try {
+              const parsed = JSON.parse(menuCategoryCode);
+              categoryCodes = Array.isArray(parsed) ? parsed : [menuCategoryCode];
+            } catch {
+              categoryCodes = [menuCategoryCode];
+            }
+          }
+          
+          processedMenuCategoryCode = normalizeToStructuredFormat(
+            categoryCodes,
+            processedMenuMasterCode,
+            allCategories
+          );
+        }
+      }
+    }
+
+    // Validate: if menuMasterCode is array, menuCategoryCode must have at least one entry per master
+    if (processedMenuMasterCode && processedMenuCategoryCode) {
+      const masterCodesSet = new Set(processedMenuMasterCode);
+      const categoryMasterCodes = new Set(processedMenuCategoryCode.map(item => item.menuMasterCode));
+      
+      // Check that each master has at least one category
+      for (const masterCode of masterCodesSet) {
+        if (!categoryMasterCodes.has(masterCode)) {
+          return NextResponse.json(
+            { error: 'At least one category required for each menu master' },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
+    // Store menuMasterCode as JSON array (always array format, even for single selection)
+    const storedMenuMasterCode = processedMenuMasterCode && processedMenuMasterCode.length > 0
+      ? processedMenuMasterCode
+      : Prisma.JsonNull;
+
+    // Store menuCategoryCode as structured format or JsonNull
+    const storedMenuCategoryCode = processedMenuCategoryCode && processedMenuCategoryCode.length > 0
+      ? processedMenuCategoryCode
+      : Prisma.JsonNull;
+
     const menuItem = await masterPrisma.masterMenuItem.create({
       data: {
         menuItemCode,
-        menuMasterCode: menuMasterCode || null,
-        menuCategoryCode: Array.isArray(menuCategoryCode) && menuCategoryCode.length > 0 
-          ? menuCategoryCode 
-          : menuCategoryCode || null,
+        menuMasterCode: storedMenuMasterCode as any,
+        menuCategoryCode: storedMenuCategoryCode as any, // Store as structured format
         name: name || null,
         kitchenName: kitchenName || null,
         labelName: labelName || null,

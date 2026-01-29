@@ -56,7 +56,7 @@ export default function MasterMenuItemTabbedForm({
     basePrice: 0,
     retailPrice: 0,
     isPrice: 1,
-    menuMasterCode: "",
+    menuMasterCode: [] as string[],
     menuCategoryCode: "",
     deptCode: "",
     originalDeptCode: "",
@@ -106,7 +106,7 @@ export default function MasterMenuItemTabbedForm({
   const [showModifierModal, setShowModifierModal] = useState(false);
   const [showMenuMasterCategoryModal, setShowMenuMasterCategoryModal] =
     useState(false);
-  const [selectedMenuMaster, setSelectedMenuMaster] = useState<any>(null);
+  const [selectedMenuMasters, setSelectedMenuMasters] = useState<any[]>([]);
   const [inheritModifiers, setInheritModifiers] = useState(true);
   const [taxes, setTaxes] = useState<any[]>([]);
   const [inheritedModifiers, setInheritedModifiers] = useState<any[]>([]);
@@ -114,8 +114,8 @@ export default function MasterMenuItemTabbedForm({
   const [selectedPrepZones, setSelectedPrepZones] = useState<Set<string>>(
     new Set()
   );
-  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
-    new Set()
+  const [selectedCategoryMap, setSelectedCategoryMap] = useState<Map<string, string[]>>(
+    new Map()
   );
   const [filteredCategories, setFilteredCategories] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
@@ -143,51 +143,61 @@ export default function MasterMenuItemTabbedForm({
     fetchDepartments();
   }, []);
 
-  // Update selectedMenuMaster when menuMasterCode changes
+  // Update selectedMenuMasters when menuMasterCode changes
   useEffect(() => {
-    if (formData.menuMasterCode) {
-      const master = menuMasters.find(
-        (m) => m.menuMasterCode === formData.menuMasterCode
+    if (Array.isArray(formData.menuMasterCode) && formData.menuMasterCode.length > 0) {
+      const masters = menuMasters.filter((m) =>
+        formData.menuMasterCode.includes(m.menuMasterCode)
       );
-      setSelectedMenuMaster(master || null);
+      setSelectedMenuMasters(masters);
     } else {
-      setSelectedMenuMaster(null);
+      setSelectedMenuMasters([]);
     }
   }, [formData.menuMasterCode, menuMasters]);
 
-  // Filter categories when menu master changes
+  // Filter categories when menu masters change
   useEffect(() => {
-    if (formData.menuMasterCode) {
-      const filtered = categories.filter(
-        (cat) => cat.menuMasterCode === formData.menuMasterCode
+    if (Array.isArray(formData.menuMasterCode) && formData.menuMasterCode.length > 0) {
+      const filtered = categories.filter((cat) =>
+        formData.menuMasterCode.includes(cat.menuMasterCode || "")
       );
       setFilteredCategories(filtered);
-      // Clear selected categories if they don't belong to the new menu master
-      setSelectedCategories((prev) => {
-        const valid = new Set<string>();
-        prev.forEach((code) => {
-          if (filtered.some((cat) => cat.menuCategoryCode === code)) {
-            valid.add(code);
+      // Clear selected categories if they don't belong to any selected menu master
+      setSelectedCategoryMap((prev) => {
+        const valid = new Map<string, string[]>();
+        prev.forEach((categoryCodes, masterCode) => {
+          if (formData.menuMasterCode.includes(masterCode)) {
+            const validCategories = categoryCodes.filter((categoryCode) => {
+              const category = categories.find(
+                (cat) => cat.menuCategoryCode === categoryCode
+              );
+              return category && formData.menuMasterCode.includes(category.menuMasterCode || "");
+            });
+            if (validCategories.length > 0) {
+              valid.set(masterCode, validCategories);
+            }
           }
         });
         return valid;
       });
     } else {
       setFilteredCategories([]);
-      setSelectedCategories(new Set());
+      setSelectedCategoryMap(new Map());
     }
   }, [formData.menuMasterCode, categories]);
 
   // Auto-update department when categories change
   useEffect(() => {
-    if (selectedCategories.size > 0 && formData.menuMasterCode) {
+    if (selectedCategoryMap.size > 0 && Array.isArray(formData.menuMasterCode) && formData.menuMasterCode.length > 0) {
       // Get department from first selected category or menu master
-      const firstCategoryCode = Array.from(selectedCategories)[0];
-      const firstCategory = categories.find(
+      const firstMasterCode = Array.from(selectedCategoryMap.keys())[0];
+      const firstCategoryCodes = selectedCategoryMap.get(firstMasterCode);
+      const firstCategoryCode = firstCategoryCodes && firstCategoryCodes.length > 0 ? firstCategoryCodes[0] : null;
+      const firstCategory = firstCategoryCode ? categories.find(
         (cat) => cat.menuCategoryCode === firstCategoryCode
-      );
+      ) : null;
       const master = menuMasters.find(
-        (m) => m.menuMasterCode === formData.menuMasterCode
+        (m) => m.menuMasterCode === firstMasterCode
       );
 
       // Only auto-update if current deptCode is empty
@@ -198,38 +208,43 @@ export default function MasterMenuItemTabbedForm({
         }
       }
     }
-  }, [selectedCategories, formData.menuMasterCode, categories, menuMasters]);
+  }, [selectedCategoryMap, formData.menuMasterCode, categories, menuMasters]);
 
   // Handle menu master and category selection from modal
   const handleMenuMasterCategorySelect = (
-    master: any,
-    categoryCodes: string[]
+    masters: any[],
+    categoryMap: Map<string, string[]>
   ) => {
-    if (master) {
-      // Auto-select department from menu master or first selected category
-      let autoDeptCode = master.deptCode || "";
-      if (!autoDeptCode && categoryCodes.length > 0) {
+    if (masters.length > 0 && categoryMap.size > 0) {
+      // Auto-select department from first menu master or first selected category
+      const firstMaster = masters[0];
+      const firstMasterCode = firstMaster.menuMasterCode;
+      const firstCategoryCodes = categoryMap.get(firstMasterCode);
+      const firstCategoryCode = firstCategoryCodes && firstCategoryCodes.length > 0 ? firstCategoryCodes[0] : null;
+      let autoDeptCode = firstMaster.deptCode || "";
+      if (!autoDeptCode && firstCategoryCode) {
         const firstCategory = categories.find(
-          (cat) => cat.menuCategoryCode === categoryCodes[0]
+          (cat) => cat.menuCategoryCode === firstCategoryCode
         );
         autoDeptCode = firstCategory?.deptCode || "";
       }
 
-      setFormData({
-        ...formData,
-        menuMasterCode: master.menuMasterCode,
+      const masterCodes = masters.map((m) => m.menuMasterCode);
+      setFormData((prev) => ({
+        ...prev,
+        menuMasterCode: masterCodes as any,
         deptCode: autoDeptCode,
-      });
-      setSelectedMenuMaster(master);
-      setSelectedCategories(new Set(categoryCodes));
+      }));
+      setSelectedMenuMasters(masters);
+      setSelectedCategoryMap(categoryMap);
     } else {
-      setFormData({
-        ...formData,
-        menuMasterCode: "",
+      setFormData((prev) => ({
+        ...prev,
+        menuMasterCode: [] as any,
         deptCode: "",
-      });
-      setSelectedMenuMaster(null);
-      setSelectedCategories(new Set());
+      }));
+      setSelectedMenuMasters([]);
+      setSelectedCategoryMap(new Map());
     }
   };
 
@@ -253,7 +268,21 @@ export default function MasterMenuItemTabbedForm({
         basePrice: menuItem.basePrice ?? menuItem.price ?? 0,
         retailPrice: menuItem.basePrice ?? menuItem.price ?? 0,
         isPrice: menuItem.isPrice ?? 1,
-        menuMasterCode: menuItem.menuMasterCode || "",
+        menuMasterCode: (() => {
+          // Handle menuMasterCode - could be string, array, or JSON string
+          if (Array.isArray(menuItem.menuMasterCode)) {
+            return menuItem.menuMasterCode;
+          }
+          if (typeof menuItem.menuMasterCode === "string") {
+            try {
+              const parsed = JSON.parse(menuItem.menuMasterCode);
+              return Array.isArray(parsed) ? parsed : [menuItem.menuMasterCode];
+            } catch {
+              return menuItem.menuMasterCode ? [menuItem.menuMasterCode] : [];
+            }
+          }
+          return [];
+        })(),
         menuCategoryCode: Array.isArray(menuItem.menuCategoryCode)
           ? (menuItem.menuCategoryCode[0] || "")
           : (menuItem.menuCategoryCode || ""),
@@ -307,26 +336,68 @@ export default function MasterMenuItemTabbedForm({
       }
       setSelectedPrepZones(new Set(prepZoneCodes));
 
-      // Parse menuCategoryCode from JSON if it exists
-      let categoryCodes: string[] = [];
+      // Parse menuCategoryCode and menuMasterCode to build category map
+      // Handle menuCategoryCode - supports both structured format and old format
+      const categoryMap = new Map<string, string[]>();
+      
       if (menuItem.menuCategoryCode) {
+        let structuredArray: Array<{ menuMasterCode: string; menuCategoryCode: string }> = [];
+        
         try {
-          if (typeof menuItem.menuCategoryCode === "string") {
-            // Try to parse if it's a JSON string
-            categoryCodes = JSON.parse(menuItem.menuCategoryCode);
-          } else if (Array.isArray(menuItem.menuCategoryCode)) {
-            // Already an array
-            categoryCodes = menuItem.menuCategoryCode;
-          } else {
-            // Single value (backward compatibility)
-            categoryCodes = [menuItem.menuCategoryCode];
+          let parsed: any = menuItem.menuCategoryCode;
+          if (typeof parsed === "string") {
+            parsed = JSON.parse(parsed);
+          }
+          
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const firstItem = parsed[0];
+            // Check if it's structured format
+            if (firstItem && typeof firstItem === 'object' && 'menuMasterCode' in firstItem && 'menuCategoryCode' in firstItem) {
+              // Structured format - use directly
+              structuredArray = parsed;
+            } else {
+              // Old format - convert to structured format using categories lookup
+              const masterCodes = Array.isArray(formData.menuMasterCode) 
+                ? formData.menuMasterCode 
+                : (formData.menuMasterCode ? [formData.menuMasterCode] : []);
+              
+              parsed.forEach((categoryCode: string) => {
+                const category = categories.find(cat => cat.menuCategoryCode === categoryCode);
+                if (category) {
+                  const masterCode = category.menuMasterCode;
+                  if (masterCodes.includes(masterCode)) {
+                    structuredArray.push({ menuMasterCode: masterCode, menuCategoryCode: categoryCode });
+                  } else if (masterCodes.length > 0) {
+                    // Fallback to first master if unmatched
+                    structuredArray.push({ menuMasterCode: masterCodes[0], menuCategoryCode: categoryCode });
+                  }
+                }
+              });
+            }
           }
         } catch (e) {
-          // If parsing fails, treat as single value (backward compatibility)
-          categoryCodes = [menuItem.menuCategoryCode];
+          // If parsing fails, try to handle as single value (backward compatibility)
+          const masterCodes = Array.isArray(formData.menuMasterCode) 
+            ? formData.menuMasterCode 
+            : (formData.menuMasterCode ? [formData.menuMasterCode] : []);
+          if (masterCodes.length > 0) {
+            structuredArray.push({ 
+              menuMasterCode: masterCodes[0], 
+              menuCategoryCode: String(menuItem.menuCategoryCode) 
+            });
+          }
         }
+        
+        // Build category map from structured array
+        structuredArray.forEach(({ menuMasterCode, menuCategoryCode }) => {
+          if (!categoryMap.has(menuMasterCode)) {
+            categoryMap.set(menuMasterCode, []);
+          }
+          categoryMap.get(menuMasterCode)!.push(menuCategoryCode);
+        });
       }
-      setSelectedCategories(new Set(categoryCodes));
+
+      setSelectedCategoryMap(categoryMap);
 
       // Set selected modifiers if editing (ONLY explicit rows: inherit_from_menu_group = 0)
       if (
@@ -377,19 +448,22 @@ export default function MasterMenuItemTabbedForm({
 
   // Create a stable dependency for selected categories
   const selectedCategoriesKey = useMemo(() => {
-    return Array.from(selectedCategories).sort().join(",");
-  }, [selectedCategories]);
+    return Array.from(selectedCategoryMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([master, categories]) => `${master}:${categories.sort().join(",")}`)
+      .join("|");
+  }, [selectedCategoryMap]);
 
   // Load inherited modifiers list when inheritance is enabled
   useEffect(() => {
     const load = async () => {
       try {
-        if (!inheritModifiers || selectedCategories.size === 0) {
+        if (!inheritModifiers || selectedCategoryMap.size === 0) {
           setInheritedModifiers([]);
           return;
         }
         // Load modifiers for all selected categories and combine them
-        const categoryCodes = Array.from(selectedCategories);
+        const categoryCodes = Array.from(selectedCategoryMap.values()).flat();
         const allModifiers: any[] = [];
         const seenCodes = new Set<string>();
         const token = localStorage.getItem("master_admin_token");
@@ -673,10 +747,13 @@ export default function MasterMenuItemTabbedForm({
       kitchenName: formData.kitchenName,
       colorCode: formData.colorCode,
       forColorCode: formData.forColorCode,
-      menuMasterCode: formData.menuMasterCode,
-      menuCategoryCode: Array.isArray(formData.menuCategoryCode)
-        ? (formData.menuCategoryCode[0] || "")
-        : (formData.menuCategoryCode || ""),
+      menuMasterCode: Array.isArray(formData.menuMasterCode) 
+        ? (formData.menuMasterCode.length > 0 ? formData.menuMasterCode.join(",") : "")
+        : (formData.menuMasterCode || ""),
+      menuCategoryCode: (() => {
+        const firstMasterCategories = Array.from(selectedCategoryMap.values())[0];
+        return firstMasterCategories && firstMasterCategories.length > 0 ? firstMasterCategories[0] : "";
+      })(),
       calories: formData.calories,
       description: formData.description,
       itemSize: formData.itemSize,
@@ -717,8 +794,8 @@ export default function MasterMenuItemTabbedForm({
       console.log("Form data:", formData);
 
       // Check for category selection first, before validation
-      if (selectedCategories.size === 0) {
-        console.log("No categories selected, blocking submission");
+      if (selectedCategoryMap.size === 0 || !Array.isArray(formData.menuMasterCode) || formData.menuMasterCode.length === 0) {
+        console.log("No menu masters or categories selected, blocking submission");
         setTouched({
           name: true,
           labelName: true,
@@ -727,13 +804,32 @@ export default function MasterMenuItemTabbedForm({
           menuMasterCode: true,
           menuCategoryCode: true,
         });
-        setFieldError("menuCategoryCode", "Please select at least one category");
-        toast.error("Please select at least one category");
+        setFieldError("menuCategoryCode", "Please select at least one menu master and category");
+        toast.error("Please select at least one menu master and category");
+        return;
+      }
+
+      // Validate that each master has at least one category
+      const missingCategories = formData.menuMasterCode.filter(
+        (masterCode) => {
+          const categories = selectedCategoryMap.get(masterCode);
+          return !categories || categories.length === 0;
+        }
+      );
+      if (missingCategories.length > 0) {
+        setTouched({
+          menuMasterCode: true,
+          menuCategoryCode: true,
+        });
+        setFieldError("menuCategoryCode", "Please select at least one category for each menu master");
+        toast.error("Please select at least one category for each menu master");
         return;
       }
 
       // Update Formik values from current formData before validation
-      const categoryCodeValue = Array.from(selectedCategories)[0] || "";
+      // Get first category from first master for formik validation
+      const firstMasterCategories = Array.from(selectedCategoryMap.values())[0];
+      const categoryCodeValue = firstMasterCategories && firstMasterCategories.length > 0 ? firstMasterCategories[0] : "";
 
       // Set all values - use validate: true for category to ensure it validates correctly
       formik.setFieldValue("name", formData.name, false);
@@ -741,10 +837,12 @@ export default function MasterMenuItemTabbedForm({
       formik.setFieldValue("kitchenName", formData.kitchenName, false);
       formik.setFieldValue("colorCode", formData.colorCode, false);
       formik.setFieldValue("forColorCode", formData.forColorCode, false);
-      formik.setFieldValue("menuMasterCode", formData.menuMasterCode, false);
+      formik.setFieldValue("menuMasterCode", Array.isArray(formData.menuMasterCode) 
+        ? formData.menuMasterCode.join(",") 
+        : formData.menuMasterCode, false);
 
       // Set category code and validate it immediately if categories are selected
-      if (selectedCategories.size > 0) {
+      if (selectedCategoryMap.size > 0) {
         await formik.setFieldValue("menuCategoryCode", categoryCodeValue, true);
         // Clear any error after setting
         setFieldError("menuCategoryCode", undefined);
@@ -769,7 +867,7 @@ export default function MasterMenuItemTabbedForm({
       const validationErrors = await formik.validateForm() || {};
 
       // Force clear category error in Formik if categories are selected (before checking errors)
-      if (selectedCategories.size > 0) {
+      if (selectedCategoryMap.size > 0) {
         setFieldError("menuCategoryCode", undefined);
       }
 
@@ -777,7 +875,7 @@ export default function MasterMenuItemTabbedForm({
       const finalErrors: Record<string, string> = {};
       for (const key in validationErrors) {
         // Skip category error entirely if categories are selected
-        if (key === "menuCategoryCode" && selectedCategories.size > 0) {
+        if (key === "menuCategoryCode" && selectedCategoryMap.size > 0) {
           continue;
         }
         const errorValue = validationErrors[key as keyof typeof validationErrors];
@@ -788,7 +886,7 @@ export default function MasterMenuItemTabbedForm({
       }
 
       // Double-check: if categories are selected, ensure no category error exists
-      if (selectedCategories.size > 0 && finalErrors.menuCategoryCode) {
+      if (selectedCategoryMap.size > 0 && finalErrors.menuCategoryCode) {
         delete finalErrors.menuCategoryCode;
       }
 
@@ -797,7 +895,7 @@ export default function MasterMenuItemTabbedForm({
       if (errorKeys.length > 0) {
         console.log("Validation errors preventing save:", finalErrors);
         console.log("Error keys:", errorKeys);
-        console.log("Selected categories:", Array.from(selectedCategories));
+        console.log("Selected categories:", Array.from(selectedCategoryMap.entries()));
         console.log("Formik menuCategoryCode value:", formik.values.menuCategoryCode);
         console.log("Category code value being set:", categoryCodeValue);
         toast.error(`Please fix the validation errors: ${errorKeys.join(", ")}`);
@@ -834,14 +932,15 @@ export default function MasterMenuItemTabbedForm({
 
   // Clear category error when categories are selected
   useEffect(() => {
-    if (selectedCategories.size > 0) {
-      // Update menuCategoryCode value
-      const categoryCodeValue = Array.from(selectedCategories)[0] || "";
+    if (selectedCategoryMap.size > 0) {
+      // Update menuCategoryCode value - use first category from first master
+      const firstMasterCategories = Array.from(selectedCategoryMap.values())[0];
+      const categoryCodeValue = firstMasterCategories && firstMasterCategories.length > 0 ? firstMasterCategories[0] : "";
       formik.setFieldValue("menuCategoryCode", categoryCodeValue, false);
       // Clear any error
       formik.setFieldError("menuCategoryCode", undefined);
     }
-  }, [selectedCategories.size]);
+  }, [selectedCategoryMap.size]);
 
   // Auto-focus on first error field
   useFormikAutoFocus(formik, {
@@ -877,10 +976,17 @@ export default function MasterMenuItemTabbedForm({
         // Keep cardPrice and cashPrice for backward compatibility (set to null)
         cardPrice: null,
         cashPrice: null,
-        menuMasterCode: formData.menuMasterCode || null,
+        menuMasterCode: Array.isArray(formData.menuMasterCode) && formData.menuMasterCode.length > 0
+          ? formData.menuMasterCode
+          : null,
         menuCategoryCode:
-          Array.from(selectedCategories).length > 0
-            ? Array.from(selectedCategories)
+          selectedCategoryMap.size > 0
+            ? Array.from(selectedCategoryMap.entries()).flatMap(([menuMasterCode, categoryCodes]) =>
+                categoryCodes.map(menuCategoryCode => ({
+                  menuMasterCode,
+                  menuCategoryCode,
+                }))
+              )
             : null,
         itemContainAlcohol: formData.itemContainAlcohol === 1 ? 1 : 0,
         isPrice: formData.isPrice === 1 ? 1 : 0,
@@ -1088,7 +1194,8 @@ export default function MasterMenuItemTabbedForm({
             console.log("Form onSubmit triggered!");
 
             // Fix menuCategoryCode - convert array to string before validation
-            const categoryCodeValue = Array.from(selectedCategories)[0] || "";
+            const firstMasterCategories = Array.from(selectedCategoryMap.values())[0];
+            const categoryCodeValue = firstMasterCategories && firstMasterCategories.length > 0 ? firstMasterCategories[0] : "";
             if (categoryCodeValue) {
               formik.setFieldValue("menuCategoryCode", categoryCodeValue, false);
             }
@@ -1236,102 +1343,129 @@ export default function MasterMenuItemTabbedForm({
                       onClick={() => setShowMenuMasterCategoryModal(true)}
                       className="w-full px-4 py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-left"
                     >
-                      {selectedMenuMaster && selectedCategories.size > 0
-                        ? `${selectedMenuMaster.name ||
-                        selectedMenuMaster.labelName ||
-                        selectedMenuMaster.menuMasterCode
-                        } - ${selectedCategories.size} categor${selectedCategories.size === 1 ? "y" : "ies"
-                        } selected`
-                        : selectedMenuMaster
-                          ? `${selectedMenuMaster.name ||
-                          selectedMenuMaster.labelName ||
-                          selectedMenuMaster.menuMasterCode
-                          } - No categories selected`
-                          : "Click to select Menu Master & Categories"}
+                      {selectedMenuMasters.length > 0 && selectedCategoryMap.size > 0
+                        ? `${selectedMenuMasters.length} menu master${selectedMenuMasters.length === 1 ? "" : "s"} - ${Array.from(selectedCategoryMap.values()).reduce((sum, cats) => sum + cats.length, 0)} categor${Array.from(selectedCategoryMap.values()).reduce((sum, cats) => sum + cats.length, 0) === 1 ? "y" : "ies"} selected`
+                        : selectedMenuMasters.length > 0
+                          ? `${selectedMenuMasters.length} menu master${selectedMenuMasters.length === 1 ? "" : "s"} - No categories selected`
+                          : "Click to select Menu Masters & Categories"}
                     </button>
 
-                    {/* Display Selected Menu Master */}
-                    {selectedMenuMaster && (
-                      <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                        <div className="flex-1">
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                            Menu Master:
-                          </div>
-                          <div className="font-medium text-gray-900 dark:text-white">
-                            {selectedMenuMaster.name ||
-                              selectedMenuMaster.labelName ||
-                              selectedMenuMaster.menuMasterCode}
-                          </div>
-                          {selectedMenuMaster.labelName &&
-                            selectedMenuMaster.labelName !==
-                            selectedMenuMaster.name && (
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
-                                {selectedMenuMaster.labelName}
-                              </div>
-                            )}
-                          <div className="text-xs text-gray-400 dark:text-gray-500">
-                            Code: {selectedMenuMaster.menuMasterCode}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleMenuMasterCategorySelect(null, [])
-                          }
-                          className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                        >
-                          <XMarkIcon className="w-5 h-5" />
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Display Selected Categories */}
-                    {selectedCategories.size > 0 && (
-                      <div className="space-y-2">
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          Selected Categories ({selectedCategories.size}):
-                        </div>
-                        <div className="flex flex-wrap gap-2 p-3 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
-                          {Array.from(selectedCategories).map(
-                            (categoryCode) => {
-                              const category = categories.find(
+                    {/* Display Selected Menu Masters and Categories */}
+                    {selectedMenuMasters.length > 0 && (
+                      <div className="space-y-3">
+                        {selectedMenuMasters.map((master) => {
+                          const categoryCodes = selectedCategoryMap.get(master.menuMasterCode) || [];
+                          const selectedCategories = categoryCodes
+                            .map((code) =>
+                              categories.find(
                                 (c) =>
-                                  c.menuCategoryCode === categoryCode ||
-                                  c.menuCategoryId?.toString() === categoryCode
-                              );
-                              if (!category) return null;
-                              return (
-                                <div
-                                  key={categoryCode}
-                                  className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded-lg text-sm font-medium"
-                                >
-                                  <span>{category.name}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const updated = new Set(
-                                        selectedCategories
-                                      );
-                                      updated.delete(categoryCode);
-                                      setSelectedCategories(updated);
-                                    }}
-                                    className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
-                                  >
-                                    <XMarkIcon className="w-4 h-4" />
-                                  </button>
+                                  c.menuCategoryCode === code ||
+                                  c.menuCategoryId?.toString() === code
+                              )
+                            )
+                            .filter(Boolean);
+
+                          return (
+                            <div
+                              key={master.menuMasterCode}
+                              className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1">
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                    Menu Master:
+                                  </div>
+                                  <div className="font-medium text-gray-900 dark:text-white">
+                                    {master.name || master.labelName || master.menuMasterCode}
+                                  </div>
+                                  {master.labelName &&
+                                    master.labelName !== master.name && (
+                                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                                        {master.labelName}
+                                      </div>
+                                    )}
+                                  <div className="text-xs text-gray-400 dark:text-gray-500">
+                                    Code: {master.menuMasterCode}
+                                  </div>
+                                  {selectedCategories.length > 0 && (
+                                    <div className="mt-2 pt-2 border-t border-blue-200 dark:border-blue-700">
+                                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                        Selected Categories ({selectedCategories.length}):
+                                      </div>
+                                      <div className="flex flex-wrap gap-2">
+                                        {selectedCategories.map((category) => (
+                                          <div
+                                            key={category.menuCategoryCode || category.menuCategoryId}
+                                            className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded text-sm font-medium"
+                                          >
+                                            {category.name}
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                const updatedMap = new Map(selectedCategoryMap);
+                                                const currentCategories = updatedMap.get(master.menuMasterCode) || [];
+                                                const updatedCategories = currentCategories.filter(
+                                                  (code) => code !== (category.menuCategoryCode || category.menuCategoryId?.toString())
+                                                );
+                                                if (updatedCategories.length > 0) {
+                                                  updatedMap.set(master.menuMasterCode, updatedCategories);
+                                                } else {
+                                                  updatedMap.delete(master.menuMasterCode);
+                                                }
+                                                setSelectedCategoryMap(updatedMap);
+                                              }}
+                                              className="ml-1 text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-200"
+                                            >
+                                              <XMarkIcon className="w-3 h-3" />
+                                            </button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {selectedCategories.length === 0 && (
+                                    <div className="mt-2 pt-2 border-t border-red-200 dark:border-red-700">
+                                      <div className="text-xs text-red-600 dark:text-red-400">
+                                        ⚠ At least one category required for this menu master
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
-                              );
-                            }
-                          )}
-                        </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updatedMasters = selectedMenuMasters.filter(
+                                      (m) => m.menuMasterCode !== master.menuMasterCode
+                                    );
+                                    const updatedMap = new Map(selectedCategoryMap);
+                                    updatedMap.delete(master.menuMasterCode);
+                                    handleMenuMasterCategorySelect(updatedMasters, updatedMap);
+                                  }}
+                                  className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                >
+                                  <XMarkIcon className="w-5 h-5" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
                   {((formik.errors.menuMasterCode && formik.touched.menuMasterCode) ||
-                    (formik.errors.menuCategoryCode && formik.touched.menuCategoryCode && selectedCategories.size === 0) ||
-                    (selectedCategories.size === 0 && formik.touched.menuCategoryCode)) ? (
+                    (formik.errors.menuCategoryCode && formik.touched.menuCategoryCode && selectedCategoryMap.size === 0) ||
+                    (selectedCategoryMap.size === 0 && formik.touched.menuCategoryCode) ||
+                    (selectedMenuMasters.length > 0 && Array.from(selectedMenuMasters).some(m => {
+                      const categories = selectedCategoryMap.get(m.menuMasterCode);
+                      return !categories || categories.length === 0;
+                    }))) ? (
                     <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                      {typeof formik.errors.menuMasterCode === 'string' ? formik.errors.menuMasterCode : (selectedCategories.size === 0 ? (typeof formik.errors.menuCategoryCode === 'string' ? formik.errors.menuCategoryCode : "Please select at least one category") : "")}
+                      {typeof formik.errors.menuMasterCode === 'string' ? formik.errors.menuMasterCode : 
+                       (selectedCategoryMap.size === 0 ? (typeof formik.errors.menuCategoryCode === 'string' ? formik.errors.menuCategoryCode : "Please select at least one menu master and category") :
+                       (Array.from(selectedMenuMasters).some(m => {
+                         const categories = selectedCategoryMap.get(m.menuMasterCode);
+                         return !categories || categories.length === 0;
+                       }) ? "Please select at least one category for each menu master" : ""))}
                     </p>
                   ) : null}
                 </div>
@@ -1346,7 +1480,11 @@ export default function MasterMenuItemTabbedForm({
                     onChange={(e) =>
                       setFormData({ ...formData, deptCode: e.target.value })
                     }
-                    disabled={!formData.menuMasterCode || selectedCategories.size === 0}
+                    disabled={!Array.isArray(formData.menuMasterCode) || formData.menuMasterCode.length === 0 || 
+                      Array.from(selectedMenuMasters).some(m => {
+                        const categories = selectedCategoryMap.get(m.menuMasterCode);
+                        return !categories || categories.length === 0;
+                      })}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <option value="">Select Department</option>
@@ -1356,9 +1494,13 @@ export default function MasterMenuItemTabbedForm({
                       </option>
                     ))}
                   </select>
-                  {(!formData.menuMasterCode || selectedCategories.size === 0) && (
+                  {(!Array.isArray(formData.menuMasterCode) || formData.menuMasterCode.length === 0 || 
+                    Array.from(selectedMenuMasters).some(m => {
+                      const categories = selectedCategoryMap.get(m.menuMasterCode);
+                      return !categories || categories.length === 0;
+                    })) && (
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      Please select a menu master and category first
+                      Please select menu masters and at least one category for each master
                     </p>
                   )}
                 </div>
@@ -2538,7 +2680,8 @@ export default function MasterMenuItemTabbedForm({
                       its menu categories:
                       <span className="font-medium">
                         {" "}
-                        {Array.from(selectedCategories)
+                        {Array.from(selectedCategoryMap.values())
+                          .flat()
                           .map(
                             (code) =>
                               filteredCategories.find(
@@ -2654,8 +2797,15 @@ export default function MasterMenuItemTabbedForm({
           isOpen={showMenuMasterCategoryModal}
           onClose={() => setShowMenuMasterCategoryModal(false)}
           onConfirm={handleMenuMasterCategorySelect}
-          selectedMenuMasterCode={formData.menuMasterCode}
-          selectedCategoryCodes={Array.from(selectedCategories)}
+          selectedMenuMasterCodes={Array.isArray(formData.menuMasterCode) ? formData.menuMasterCode : (formData.menuMasterCode ? [formData.menuMasterCode] : [])}
+          selectedCategoryMap={(() => {
+            // Convert Map<string, string[]> to Map<string, string[]> for modal (it expects this format)
+            const mapForModal = new Map<string, string[]>();
+            selectedCategoryMap.forEach((categories, masterCode) => {
+              mapForModal.set(masterCode, categories);
+            });
+            return mapForModal;
+          })()}
           menuMasters={menuMasters}
           categories={categories}
         />

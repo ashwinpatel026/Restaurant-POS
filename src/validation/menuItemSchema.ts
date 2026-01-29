@@ -18,7 +18,19 @@ export const menuItemSchema = Yup.object({
 
   forColorCode: Yup.string().required("Text color is required"),
 
-  menuMasterCode: Yup.string().required("Menu Master is required"),
+  menuMasterCode: Yup.mixed<string | string[]>()
+    .required("Menu Master is required")
+    .test('menuMasterCode', 'Please select at least one menu master', function(value) {
+      // If it's an array, check if it has at least one item
+      if (Array.isArray(value)) {
+        return value.length > 0;
+      }
+      // If it's a string, check if it's not empty
+      if (typeof value === 'string') {
+        return value.length > 0;
+      }
+      return false;
+    }),
 
   menuCategoryCode: Yup.mixed<string | string[]>()
     .nullable()

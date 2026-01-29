@@ -29,7 +29,15 @@ export async function GET(
       where: { menuMasterCode: menuMaster.menuMasterCode }
     })
 
-    return NextResponse.json(events)
+    // Convert BigInt to string for JSON serialization
+    const eventsWithStringId = events.map((event: any) => ({
+      ...event,
+      id: event.id.toString(),
+      createdBy: event.createdBy ? event.createdBy.toString() : null,
+      createdOn: event.createdOn ? event.createdOn.toISOString() : null,
+    }))
+
+    return NextResponse.json(eventsWithStringId)
   } catch (error) {
     console.error('Error fetching menu master events:', error)
     return NextResponse.json(

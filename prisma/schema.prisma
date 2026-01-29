@@ -236,7 +236,7 @@ model MenuCategoryModifier {
 model MenuItem {
   menuItemId                     BigInt    @id @default(autoincrement()) @map("menu_item_id")
   menuItemCode                   String?   @map("menu_item_code") @db.VarChar(100)
-  menuMasterCode                 String?   @map("menu_master_code") @db.VarChar(100)
+  menuMasterCode                 Json?     @map("menu_master_code")
   menuCategoryCode               Json?     @map("menu_category_code")
   name                           String?   @map("name") @db.VarChar(500)
   kitchenName                    String?   @map("kitchen_name") @db.VarChar(150)

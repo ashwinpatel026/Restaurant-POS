@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { getUserAccessInfo, getSelectedStoreCode, buildStoreFilter, checkLocationPermission } from '@/lib/auth/accessControl'
 import { prisma, checkConnection } from '@/lib/database'
 import { checkDuplicate } from '@/lib/validation'
+import { normalizeToStructuredFormat, MenuCategoryMapping, isStructuredFormat } from '@/lib/utils/menuItemFormat'
 
 // Helper function to generate unique menu item code
 async function generateMenuItemCode(storeCode: string): Promise<string> {
@@ -108,9 +109,9 @@ export async function GET(request: NextRequest) {
     const where: any = {
       ...storeFilter
     }
-    if (menuCategoryCode || categoryCode) {
-      where.menuCategoryCode = menuCategoryCode || categoryCode
-    }
+    const searchCode = menuCategoryCode || categoryCode
+    // Note: Filtering by menuCategoryCode in structured format requires special handling
+    // We'll filter after fetching and converting to structured format
     if (isActive !== null) {
       where.isActive = isActive === 'true' ? 1 : 0
     }
@@ -120,12 +121,86 @@ export async function GET(request: NextRequest) {
       orderBy: { createdOn: 'desc' }
     })
 
-    // Convert menuItemId to string for JSON serialization
-    const itemsWithStringIds = (menuItems as any[]).map((item: any) => ({
-      ...item,
-      menuItemId: (item.menuItemId ?? item.tblMenuItemId)?.toString?.() ?? undefined,
-      skuPlu: item.skuPlu ? item.skuPlu.toString() : null,
-    }))
+    // Fetch all categories for conversion (if needed)
+    const allCategories = await prisma.menuCategory.findMany({
+      where: storeFilter,
+      select: {
+        menuCategoryCode: true,
+        menuMasterCode: true,
+      },
+    })
+
+    // Convert menuItemId to string and normalize menuCategoryCode to structured format
+    let itemsWithStringIds = (menuItems as any[]).map((item: any) => {
+      // Parse menuCategoryCode
+      let menuCategoryCodeParsed: any = null;
+      if (item.menuCategoryCode) {
+        if (typeof item.menuCategoryCode === 'string') {
+          try {
+            menuCategoryCodeParsed = JSON.parse(item.menuCategoryCode);
+          } catch {
+            menuCategoryCodeParsed = item.menuCategoryCode;
+          }
+        } else {
+          menuCategoryCodeParsed = item.menuCategoryCode;
+        }
+      }
+      
+      // If it's old format (simple array), convert to structured format
+      if (menuCategoryCodeParsed && Array.isArray(menuCategoryCodeParsed) && menuCategoryCodeParsed.length > 0) {
+        const firstItem = menuCategoryCodeParsed[0];
+        // Check if it's structured format
+        if (!(firstItem && typeof firstItem === 'object' && 'menuMasterCode' in firstItem && 'menuCategoryCode' in firstItem)) {
+          // Old format - convert to structured format
+          const menuMasterCodeParsed = item.menuMasterCode 
+            ? (Array.isArray(item.menuMasterCode) ? item.menuMasterCode : [item.menuMasterCode])
+            : [];
+          
+          if (menuMasterCodeParsed.length > 0 && allCategories.length > 0) {
+            menuCategoryCodeParsed = normalizeToStructuredFormat(
+              menuCategoryCodeParsed as string[],
+              menuMasterCodeParsed,
+              allCategories
+            );
+          }
+        }
+      }
+      
+      return {
+        ...item,
+        menuItemId: (item.menuItemId ?? item.tblMenuItemId)?.toString?.() ?? undefined,
+        skuPlu: item.skuPlu ? item.skuPlu.toString() : null,
+        menuCategoryCode: menuCategoryCodeParsed, // Return structured format
+        menuMasterCode: item.menuMasterCode ? (() => {
+          if (Array.isArray(item.menuMasterCode)) {
+            return item.menuMasterCode;
+          }
+          if (typeof item.menuMasterCode === 'string') {
+            return [item.menuMasterCode];
+          }
+          return [item.menuMasterCode];
+        })() : null,
+      };
+    })
+
+    // Filter by category code if specified (for structured format)
+    if (searchCode) {
+      itemsWithStringIds = itemsWithStringIds.filter((item: any) => {
+        if (!item.menuCategoryCode) return false;
+        if (Array.isArray(item.menuCategoryCode)) {
+          // Check if it's structured format
+          const firstItem = item.menuCategoryCode[0];
+          if (firstItem && typeof firstItem === 'object' && 'menuCategoryCode' in firstItem) {
+            // Structured format - check menuCategoryCode field
+            return item.menuCategoryCode.some((entry: any) => entry.menuCategoryCode === searchCode);
+          } else {
+            // Old format - check directly
+            return item.menuCategoryCode.includes(searchCode);
+          }
+        }
+        return false;
+      });
+    }
 
     return NextResponse.json(itemsWithStringIds)
   } catch (error) {
@@ -235,14 +310,84 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Handle menuMasterCode - can be string or array (JSON field)
+    let processedMenuMasterCode: string[] | null = null;
+    if (menuMasterCode) {
+      if (Array.isArray(menuMasterCode)) {
+        processedMenuMasterCode = menuMasterCode.length > 0 ? menuMasterCode : null;
+      } else if (typeof menuMasterCode === 'string') {
+        processedMenuMasterCode = [menuMasterCode];
+      }
+    }
+
+    // Handle menuCategoryCode - supports both structured format and old format
+    let processedMenuCategoryCode: MenuCategoryMapping[] | null = null;
+    
+    if (menuCategoryCode) {
+      // Check if it's already in structured format
+      if (isStructuredFormat(menuCategoryCode)) {
+        processedMenuCategoryCode = menuCategoryCode as MenuCategoryMapping[];
+      } else {
+        // Old format: need to convert to structured format
+        // Fetch categories to get their menuMasterCode mapping
+        const allCategories = await prisma.menuCategory.findMany({
+          where: {
+            ...storeFilter,
+            ...(selectedStoreCode ? { storeCode: selectedStoreCode } : {})
+          },
+          select: {
+            menuCategoryCode: true,
+            menuMasterCode: true,
+          },
+        });
+        
+        if (processedMenuMasterCode && allCategories.length > 0) {
+          // Convert old format to structured format
+          let categoryCodes: string[] = [];
+          if (Array.isArray(menuCategoryCode)) {
+            categoryCodes = menuCategoryCode;
+          } else if (typeof menuCategoryCode === 'string' && menuCategoryCode.length > 0) {
+            try {
+              const parsed = JSON.parse(menuCategoryCode);
+              categoryCodes = Array.isArray(parsed) ? parsed : [menuCategoryCode];
+            } catch {
+              categoryCodes = [menuCategoryCode];
+            }
+          }
+          
+          processedMenuCategoryCode = normalizeToStructuredFormat(
+            categoryCodes,
+            processedMenuMasterCode,
+            allCategories
+          );
+        }
+      }
+    }
+
+    // Validate: if menuMasterCode is array, menuCategoryCode must have at least one entry per master
+    if (processedMenuMasterCode && processedMenuCategoryCode) {
+      const masterCodesSet = new Set(processedMenuMasterCode);
+      const categoryMasterCodes = new Set(processedMenuCategoryCode.map(item => item.menuMasterCode));
+      
+      // Check that each master has at least one category
+      for (const masterCode of masterCodesSet) {
+        if (!categoryMasterCodes.has(masterCode)) {
+          return NextResponse.json(
+            { error: 'At least one category required for each menu master' },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     const menuItem = await withRetry(async () => {
       return await (prisma as any).menuItem.create({
         data: {
           menuItemCode,
-          menuMasterCode: menuMasterCode || null,
-          menuCategoryCode: Array.isArray(menuCategoryCode) && menuCategoryCode.length > 0 
-            ? menuCategoryCode 
-            : menuCategoryCode || null,
+          menuMasterCode: processedMenuMasterCode && processedMenuMasterCode.length > 0
+            ? processedMenuMasterCode
+            : null,
+          menuCategoryCode: processedMenuCategoryCode || null, // Store as structured format
           name: name || null,
           kitchenName: kitchenName || null,
           labelName: labelName || null,

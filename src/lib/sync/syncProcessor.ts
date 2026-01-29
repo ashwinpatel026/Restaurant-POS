@@ -18,6 +18,42 @@ import {
 import { syncValidator } from './syncValidator';
 import { normalizeDeptCode } from '@/lib/deptCodeHelper';
 
+/**
+ * Normalize JSON values for database storage
+ * Handles arrays, objects, strings, and ensures valid JSON format
+ */
+function normalizeJsonValue(value: any): any {
+  // If null or undefined, return null
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  // If already an array or object, return as is
+  if (Array.isArray(value) || (typeof value === 'object' && value !== null)) {
+    return value;
+  }
+
+  // If it's a string, try to parse it as JSON first
+  if (typeof value === 'string') {
+    // Empty string
+    if (value.trim() === '') {
+      return null;
+    }
+
+    // Try to parse as JSON
+    try {
+      const parsed = JSON.parse(value);
+      return parsed;
+    } catch (e) {
+      // If parsing fails, treat as a JSON string value (not wrapped in array)
+      return value;
+    }
+  }
+
+  // For any other type, return as is (will be stringified later)
+  return value;
+}
+
 export class SyncProcessor {
   // Tables that are global (not store-specific) - don't use store_code
   // These tables are synced once per location database, not per store_code
@@ -83,6 +119,8 @@ export class SyncProcessor {
   private readonly JSON_COLUMNS: Record<string, Set<string>> = {
     'tbl_time_events': new Set(['dept_code']),  // Location table name
     'tbl_master_time_events': new Set(['dept_code']),  // Master table name (for reference)
+    'tbl_master_menu_item': new Set(['menu_master_code', 'menu_category_code', 'prep_zone_code']),  // Master table name
+    'tbl_menu_item': new Set(['menu_master_code', 'menu_category_code', 'prep_zone_code']),  // Location table name
   };
 
   /**
@@ -1203,20 +1241,128 @@ export class SyncProcessor {
           }
           // Transform menu_category_code (in any table, including foreign keys) - check for arrays FIRST
           else if (key === 'menu_category_code') {
-            // Handle JSON arrays
-            if (Array.isArray(value)) {
-              mappedData[mappedKey] = value.map((v: any) => {
-                const menuCategoryCodeValue = String(v || '');
-                const menuCategoryMatch = menuCategoryCodeValue.match(/^(MC\d+)$/);
-                return menuCategoryMatch ? `WM${locationCode}${menuCategoryMatch[1]}` : v;
-              });
+            // Handle structured format and old format
+            if (Array.isArray(value) && value.length > 0) {
+              const firstItem = value[0];
+              // Check if it's structured format
+              if (firstItem && typeof firstItem === 'object' && 'menuMasterCode' in firstItem && 'menuCategoryCode' in firstItem) {
+                // Structured format - transform both menuMasterCode and menuCategoryCode
+                mappedData[mappedKey] = value.map((v: any) => {
+                  const menuMasterCodeValue = String(v.menuMasterCode || '');
+                  const menuCategoryCodeValue = String(v.menuCategoryCode || '');
+                  
+                  // Transform menuMasterCode
+                  const menuMasterMatch = menuMasterCodeValue.match(/^(MM\d+)$/);
+                  const transformedMasterCode = menuMasterMatch ? `WM${locationCode}${menuMasterMatch[1]}` : menuMasterCodeValue;
+                  
+                  // Transform menuCategoryCode
+                  const menuCategoryMatch = menuCategoryCodeValue.match(/^(MC\d+)$/);
+                  const transformedCategoryCode = menuCategoryMatch ? `WM${locationCode}${menuCategoryMatch[1]}` : menuCategoryCodeValue;
+                  
+                  return {
+                    menuMasterCode: transformedMasterCode,
+                    menuCategoryCode: transformedCategoryCode,
+                  };
+                });
+                continue;
+              } else {
+                // Old format - simple array of category codes
+                mappedData[mappedKey] = value.map((v: any) => {
+                  const menuCategoryCodeValue = String(v || '');
+                  const menuCategoryMatch = menuCategoryCodeValue.match(/^(MC\d+)$/);
+                  return menuCategoryMatch ? `WM${locationCode}${menuCategoryMatch[1]}` : v;
+                });
+                continue;
+              }
             } else {
-              const codeValue = String(value || '');
+              // Try to parse as JSON string if it's a string
+              let parsedValue = value;
+              if (typeof value === 'string') {
+                try {
+                  parsedValue = JSON.parse(value);
+                  // If parsing succeeded and it's an array, handle it
+                  if (Array.isArray(parsedValue) && parsedValue.length > 0) {
+                    const firstItem = parsedValue[0];
+                    // Check if structured format
+                    if (firstItem && typeof firstItem === 'object' && 'menuMasterCode' in firstItem && 'menuCategoryCode' in firstItem) {
+                      // Structured format
+                      mappedData[mappedKey] = parsedValue.map((v: any) => {
+                        const menuMasterCodeValue = String(v.menuMasterCode || '');
+                        const menuCategoryCodeValue = String(v.menuCategoryCode || '');
+                        
+                        const menuMasterMatch = menuMasterCodeValue.match(/^(MM\d+)$/);
+                        const transformedMasterCode = menuMasterMatch ? `WM${locationCode}${menuMasterMatch[1]}` : menuMasterCodeValue;
+                        
+                        const menuCategoryMatch = menuCategoryCodeValue.match(/^(MC\d+)$/);
+                        const transformedCategoryCode = menuCategoryMatch ? `WM${locationCode}${menuCategoryMatch[1]}` : menuCategoryCodeValue;
+                        
+                        return {
+                          menuMasterCode: transformedMasterCode,
+                          menuCategoryCode: transformedCategoryCode,
+                        };
+                      });
+                      continue;
+                    } else {
+                      // Old format
+                      mappedData[mappedKey] = parsedValue.map((v: any) => {
+                        const menuCategoryCodeValue = String(v || '');
+                        const menuCategoryMatch = menuCategoryCodeValue.match(/^(MC\d+)$/);
+                        return menuCategoryMatch ? `WM${locationCode}${menuCategoryMatch[1]}` : v;
+                      });
+                      continue;
+                    }
+                  }
+                } catch (e) {
+                  // Not valid JSON, treat as regular string
+                  parsedValue = value;
+                }
+              }
+              // Handle single value
+              const codeValue = String(parsedValue || '');
               const menuCategoryMatch = codeValue.match(/^(MC\d+)$/);
               if (menuCategoryMatch) {
                 mappedData[mappedKey] = `WM${locationCode}${menuCategoryMatch[1]}`;
               } else {
-                mappedData[mappedKey] = value;
+                mappedData[mappedKey] = parsedValue;
+              }
+            }
+          }
+          // Transform menu_master_code (in any table, including foreign keys) - check for arrays FIRST
+          else if (key === 'menu_master_code') {
+            // Handle JSON arrays (e.g., in tbl_master_menu_item)
+            if (Array.isArray(value)) {
+              mappedData[mappedKey] = value.map((v: any) => {
+                const menuMasterCodeValue = String(v || '');
+                const menuMasterMatch = menuMasterCodeValue.match(/^(MM\d+)$/);
+                return menuMasterMatch ? `WM${locationCode}${menuMasterMatch[1]}` : v;
+              });
+            } else {
+              // Try to parse as JSON string if it's a string
+              let parsedValue = value;
+              if (typeof value === 'string') {
+                try {
+                  parsedValue = JSON.parse(value);
+                  // If parsing succeeded and it's an array, handle it
+                  if (Array.isArray(parsedValue)) {
+                    mappedData[mappedKey] = parsedValue.map((v: any) => {
+                      const menuMasterCodeValue = String(v || '');
+                      const menuMasterMatch = menuMasterCodeValue.match(/^(MM\d+)$/);
+                      return menuMasterMatch ? `WM${locationCode}${menuMasterMatch[1]}` : v;
+                    });
+                    continue; // Skip the rest of the else block
+                  }
+                } catch (e) {
+                  // Not valid JSON, treat as regular string
+                  parsedValue = value;
+                }
+              }
+              // Handle single value
+              const codeValue = String(parsedValue || '');
+              const menuMasterMatch = codeValue.match(/^(MM\d+)$/);
+              if (menuMasterMatch) {
+                mappedData[mappedKey] = `WM${locationCode}${menuMasterMatch[1]}`;
+              } else {
+                mappedData[mappedKey] = parsedValue;
               }
             }
           }
@@ -1247,15 +1393,6 @@ export class SyncProcessor {
               const eventMatch = codeValue.match(/^(TE\d+)$/);
               if (eventMatch) {
                 mappedData[mappedKey] = `WM${locationCode}${eventMatch[1]}`;
-              } else {
-                mappedData[mappedKey] = value;
-              }
-            }
-            // Transform menu_master_code (in any table, including foreign keys)
-            else if (key === 'menu_master_code') {
-              const menuMasterMatch = codeValue.match(/^(MM\d+)$/);
-              if (menuMasterMatch) {
-                mappedData[mappedKey] = `WM${locationCode}${menuMasterMatch[1]}`;
               } else {
                 mappedData[mappedKey] = value;
               }
@@ -1444,10 +1581,36 @@ export class SyncProcessor {
         continue;
       }
 
-      // Check if parent record exists in location database
-      const valuesToCheck = Array.isArray(foreignKeyValue)
-        ? foreignKeyValue
-        : [foreignKeyValue];
+      // Parse JSON strings if needed (for JSON fields like menu_master_code and menu_category_code)
+      let parsedValue = foreignKeyValue;
+      if (typeof foreignKeyValue === 'string' && (foreignKeyField === 'menu_master_code' || foreignKeyField === 'menu_category_code')) {
+        try {
+          // Try to parse as JSON (could be a JSON array string like '["MM1", "MM2"]' or structured format)
+          parsedValue = JSON.parse(foreignKeyValue);
+        } catch (e) {
+          // Not valid JSON, treat as regular string
+          parsedValue = foreignKeyValue;
+        }
+      }
+
+      // Handle structured format for menu_category_code
+      let valuesToCheck: string[] = [];
+      if (foreignKeyField === 'menu_category_code' && Array.isArray(parsedValue) && parsedValue.length > 0) {
+        const firstItem = parsedValue[0];
+        // Check if it's structured format
+        if (firstItem && typeof firstItem === 'object' && 'menuCategoryCode' in firstItem) {
+          // Extract menuCategoryCode from structured format
+          valuesToCheck = parsedValue.map((item: any) => String(item.menuCategoryCode || '')).filter(Boolean);
+        } else {
+          // Old format - simple array
+          valuesToCheck = parsedValue.map((v: any) => String(v || '')).filter(Boolean);
+        }
+      } else {
+        // For other fields or non-array values
+        valuesToCheck = Array.isArray(parsedValue)
+          ? parsedValue.map((v: any) => String(v || '')).filter(Boolean)
+          : [String(parsedValue || '')].filter(Boolean);
+      }
 
       for (const value of valuesToCheck) {
         if (!value) continue;
@@ -1533,11 +1696,36 @@ export class SyncProcessor {
         continue;
       }
 
-      // Check if parent record exists in location database
-      // Handle both single values and arrays (for JSON fields)
-      const valuesToCheck = Array.isArray(foreignKeyValue)
-        ? foreignKeyValue
-        : [foreignKeyValue];
+      // Parse JSON strings if needed (for JSON fields like menu_master_code and menu_category_code)
+      let parsedValue = foreignKeyValue;
+      if (typeof foreignKeyValue === 'string' && (foreignKeyField === 'menu_master_code' || foreignKeyField === 'menu_category_code')) {
+        try {
+          // Try to parse as JSON (could be a JSON array string like '["MM1", "MM2"]' or structured format)
+          parsedValue = JSON.parse(foreignKeyValue);
+        } catch (e) {
+          // Not valid JSON, treat as regular string
+          parsedValue = foreignKeyValue;
+        }
+      }
+
+      // Handle structured format for menu_category_code
+      let valuesToCheck: string[] = [];
+      if (foreignKeyField === 'menu_category_code' && Array.isArray(parsedValue) && parsedValue.length > 0) {
+        const firstItem = parsedValue[0];
+        // Check if it's structured format
+        if (firstItem && typeof firstItem === 'object' && 'menuCategoryCode' in firstItem) {
+          // Extract menuCategoryCode from structured format
+          valuesToCheck = parsedValue.map((item: any) => String(item.menuCategoryCode || '')).filter(Boolean);
+        } else {
+          // Old format - simple array
+          valuesToCheck = parsedValue.map((v: any) => String(v || '')).filter(Boolean);
+        }
+      } else {
+        // For other fields or non-array values
+        valuesToCheck = Array.isArray(parsedValue)
+          ? parsedValue.map((v: any) => String(v || '')).filter(Boolean)
+          : [String(parsedValue || '')].filter(Boolean);
+      }
 
       for (const value of valuesToCheck) {
         if (!value) continue; // Skip null/undefined values
@@ -1713,10 +1901,17 @@ export class SyncProcessor {
       const isIntegerColumn = isTableInteger || this.INTEGER_COLUMNS.has(key);
       const isJsonColumn = this.JSON_COLUMNS[tableName]?.has(key);
 
-      // Normalize JSON columns (e.g., dept_code) - convert string to JSON array
+      // Normalize JSON columns
       let normalizedVal = val;
       if (isJsonColumn && val !== null && val !== undefined) {
-        normalizedVal = normalizeDeptCode(val);
+        // Use normalizeDeptCode for dept_code (needs array format)
+        if (key === 'dept_code') {
+          normalizedVal = normalizeDeptCode(val);
+        } else {
+          // For other JSON columns (menu_master_code, menu_category_code, prep_zone_code)
+          // use general JSON normalization that preserves structure
+          normalizedVal = normalizeJsonValue(val);
+        }
       }
 
       if (normalizedVal === null) {
@@ -1727,9 +1922,12 @@ export class SyncProcessor {
           values.push(`'${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`);
         } else if (typeof normalizedVal === 'object' && normalizedVal !== null) {
           values.push(`'${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`);
+        } else if (typeof normalizedVal === 'string') {
+          // For string values, stringify as JSON string (not wrapped in array)
+          values.push(`'${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`);
         } else {
-          // Should not happen after normalization, but handle as fallback
-          values.push(`'${JSON.stringify([normalizedVal]).replace(/'/g, "''")}'::jsonb`);
+          // For other primitives (number, boolean), stringify directly
+          values.push(`'${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`);
         }
       } else if (typeof normalizedVal === 'boolean') {
         // Handle boolean values
@@ -2051,10 +2249,17 @@ export class SyncProcessor {
       const isIntegerColumn = isTableInteger || this.INTEGER_COLUMNS.has(key);
       const isJsonColumn = this.JSON_COLUMNS[tableName]?.has(key);
 
-      // Normalize JSON columns (e.g., dept_code) - convert string to JSON array
+      // Normalize JSON columns
       let normalizedVal = val;
       if (isJsonColumn && val !== null && val !== undefined) {
-        normalizedVal = normalizeDeptCode(val);
+        // Use normalizeDeptCode for dept_code (needs array format)
+        if (key === 'dept_code') {
+          normalizedVal = normalizeDeptCode(val);
+        } else {
+          // For other JSON columns (menu_master_code, menu_category_code, prep_zone_code)
+          // use general JSON normalization that preserves structure
+          normalizedVal = normalizeJsonValue(val);
+        }
       }
 
       if (normalizedVal === null) {
@@ -2065,9 +2270,12 @@ export class SyncProcessor {
           setParts.push(`${quotedKey} = '${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`);
         } else if (typeof normalizedVal === 'object' && normalizedVal !== null) {
           setParts.push(`${quotedKey} = '${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`);
+        } else if (typeof normalizedVal === 'string') {
+          // For string values, stringify as JSON string (not wrapped in array)
+          setParts.push(`${quotedKey} = '${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`);
         } else {
-          // Should not happen after normalization, but handle as fallback
-          setParts.push(`${quotedKey} = '${JSON.stringify([normalizedVal]).replace(/'/g, "''")}'::jsonb`);
+          // For other primitives (number, boolean), stringify directly
+          setParts.push(`${quotedKey} = '${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`);
         }
       } else if (typeof normalizedVal === 'boolean') {
         // Handle boolean values
@@ -2338,10 +2546,17 @@ export class SyncProcessor {
       const isIntegerColumn = isTableInteger || this.INTEGER_COLUMNS.has(key);
       const isJsonColumn = this.JSON_COLUMNS[locationTableName]?.has(key);
 
-      // Normalize JSON columns (e.g., dept_code) - convert string to JSON array
+      // Normalize JSON columns
       let normalizedVal = val;
       if (isJsonColumn && val !== null && val !== undefined) {
-        normalizedVal = normalizeDeptCode(val);
+        // Use normalizeDeptCode for dept_code (needs array format)
+        if (key === 'dept_code') {
+          normalizedVal = normalizeDeptCode(val);
+        } else {
+          // For other JSON columns (menu_master_code, menu_category_code, prep_zone_code)
+          // use general JSON normalization that preserves structure
+          normalizedVal = normalizeJsonValue(val);
+        }
       }
 
       let valueStr: string;
@@ -2353,9 +2568,12 @@ export class SyncProcessor {
           valueStr = `'${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`;
         } else if (typeof normalizedVal === 'object' && normalizedVal !== null) {
           valueStr = `'${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`;
+        } else if (typeof normalizedVal === 'string') {
+          // For string values, stringify as JSON string (not wrapped in array)
+          valueStr = `'${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`;
         } else {
-          // Should not happen after normalization, but handle as fallback
-          valueStr = `'${JSON.stringify([normalizedVal]).replace(/'/g, "''")}'::jsonb`;
+          // For other primitives (number, boolean), stringify directly
+          valueStr = `'${JSON.stringify(normalizedVal).replace(/'/g, "''")}'::jsonb`;
         }
       } else if (typeof normalizedVal === 'boolean') {
         if (isBooleanColumn) {

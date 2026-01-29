@@ -253,8 +253,8 @@ export default function EditMenuMasterPage() {
         const masterData = await masterRes.json();
         setMenuMaster(masterData);
 
-        // Fetch all associated events if it's an event menu
-        if (masterData.isEventMenu === 1 && masterData.menuMasterCode) {
+        // Fetch all associated events for this menu master
+        if (masterData.menuMasterCode) {
           const eventAssocRes = await fetch(
             `/api/master/menu-masters/${masterId}/events`,
             {
