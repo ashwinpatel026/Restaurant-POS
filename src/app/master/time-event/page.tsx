@@ -17,6 +17,7 @@ interface TimeEvent {
   id: string;
   eventCode: string;
   eventName: string;
+  deptCode?: any;
   byFixedValue?: boolean;
   globalPriceAmountAdd: number | null;
   globalPriceAmountDisc: number | null;
@@ -50,9 +51,17 @@ interface TimeEvent {
   createdBy: string | null;
 }
 
+interface Department {
+  deptId: string;
+  deptCode: string;
+  deptName: string;
+  isActive: number;
+}
+
 export default function TimeEventsPage() {
   const router = useRouter();
   const [events, setEvents] = useState<TimeEvent[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Filter states
@@ -65,6 +74,7 @@ export default function TimeEventsPage() {
 
   useEffect(() => {
     fetchEvents();
+    fetchDepartments();
   }, []);
 
   // Filter effect
@@ -112,6 +122,25 @@ export default function TimeEventsPage() {
       console.error("Error:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDepartments = async () => {
+    try {
+      const token = localStorage.getItem("master_admin_token");
+      const response = await fetch("/api/master/department", {
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setDepartments(Array.isArray(data) ? data : []);
+      }
+    } catch (error) {
+      console.error("Error fetching departments:", error);
     }
   };
 
@@ -234,6 +263,40 @@ export default function TimeEventsPage() {
     return `${new Date(event.eventStartDate).toLocaleDateString()} - ${new Date(
       event.eventEndDate
     ).toLocaleDateString()}`;
+  };
+
+  const getDepartmentDisplay = (event: TimeEvent) => {
+    if (!event.deptCode) {
+      return null;
+    }
+
+    // Parse deptCode - could be JSON array or string
+    let deptCodes: string[] = [];
+    
+    if (Array.isArray(event.deptCode)) {
+      deptCodes = event.deptCode;
+    } else if (typeof event.deptCode === 'string') {
+      try {
+        const parsed = JSON.parse(event.deptCode);
+        deptCodes = Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        deptCodes = [event.deptCode];
+      }
+    }
+
+    if (deptCodes.length === 0) {
+      return null;
+    }
+
+    // Get department names
+    const deptNames = deptCodes
+      .map((code) => {
+        const dept = departments.find((d) => d.deptCode === code);
+        return dept?.deptName || code;
+      })
+      .filter(Boolean);
+
+    return deptNames.length > 0 ? deptNames.join(", ") : null;
   };
 
   if (loading) {
@@ -397,7 +460,7 @@ export default function TimeEventsPage() {
                     </div>
 
                     {/* Event Duration */}
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                    <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                       <p>
                         <strong className="text-gray-900 dark:text-white">
                           Duration:
@@ -405,6 +468,18 @@ export default function TimeEventsPage() {
                         {getEventDateDisplay(event)}
                       </p>
                     </div>
+
+                    {/* Department Display */}
+                    {getDepartmentDisplay(event) && (
+                      <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                        <p>
+                          <strong className="text-gray-900 dark:text-white">
+                            Department:
+                          </strong>{" "}
+                          {getDepartmentDisplay(event)}
+                        </p>
+                      </div>
+                    )}
 
                     <div className="flex justify-end space-x-2 pt-4 border-t border-gray-200 dark:border-gray-600">
                       <button

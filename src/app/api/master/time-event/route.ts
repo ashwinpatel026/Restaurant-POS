@@ -86,25 +86,59 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const deptCode = searchParams.get('deptCode')
+    const menuMasterCode = searchParams.get('menuMasterCode')
+
+    // Parse menuMasterCode into array format (can be comma-separated string or null)
+    const menuMasterCodeArray = menuMasterCode
+      ? menuMasterCode.split(',').map(code => code.trim()).filter(Boolean)
+      : null
 
     let events
-    if (deptCode) {
-      // Filter by department code - use raw SQL to check if deptCode exists in JSON array
-      // PostgreSQL JSONB @> operator checks if left JSONB contains right JSONB
+    if (deptCode || menuMasterCodeArray) {
+      // Filter by department code and/or menu master code
+      const params: any[] = []
+      let paramIndex = 1
+      const conditions: string[] = []
+
+      // Department-based filtering
+      if (deptCode) {
+        conditions.push(
+          `(te.dept_code @> to_jsonb($${paramIndex}::text) OR te.override_all_events = true)`
+        )
+        params.push(deptCode)
+        paramIndex++
+      }
+
+      // Menu master-based filtering
+      if (menuMasterCodeArray && menuMasterCodeArray.length > 0) {
+        conditions.push(`mme.menu_master_code = ANY($${paramIndex}::text[])`)
+        params.push(menuMasterCodeArray)
+        paramIndex++
+      }
+
+      // Build the query with proper JOIN
+      const joinClause = menuMasterCodeArray && menuMasterCodeArray.length > 0
+        ? 'LEFT JOIN tbl_master_menu_master_event mme ON te."Event_code" = mme.event_code'
+        : ''
+
+      const whereClause = conditions.length > 0
+        ? `AND (${conditions.join(' OR ')})`
+        : ''
+
       events = await masterPrisma.$queryRawUnsafe<Array<{
         eventCode: string
         eventName: string
         byFixedValue: boolean
+        created_date?: Date
       }>>(
-        `SELECT "Event_code" as "eventCode", "EventName" as "eventName", "by_fixed_value" as "byFixedValue"
-         FROM tbl_master_time_events
-         WHERE is_active = 1
-           AND (
-             dept_code @> to_jsonb($1::text)
-             OR override_all_events = true
-           )
-         ORDER BY created_date DESC`,
-        deptCode
+        `SELECT DISTINCT te."Event_code" as "eventCode", te."EventName" as "eventName", te."by_fixed_value" as "byFixedValue", te.created_date
+         FROM tbl_master_time_events te
+         ${joinClause}
+         WHERE te.is_active = 1
+           AND te.is_delete = FALSE
+           ${whereClause}
+         ORDER BY te.created_date DESC`,
+        ...params
       )
     } else {
       events = await masterPrisma.masterTimeEvent.findMany({
@@ -112,8 +146,8 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // If filtering by department, return simplified format
-    if (deptCode) {
+    // If filtering by department or menu master, return simplified format
+    if (deptCode || menuMasterCodeArray) {
       return NextResponse.json(events)
     }
 

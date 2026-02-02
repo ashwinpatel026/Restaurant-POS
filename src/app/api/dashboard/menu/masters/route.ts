@@ -85,10 +85,52 @@ export async function GET(request: NextRequest) {
         orderBy: { createdOn: 'desc' }
       })
 
-      // For authenticated requests, return simple structure
+      // Fetch all menu master events
+      const menuMasterCodes = menuMasters.map((m: any) => m.menuMasterCode).filter(Boolean)
+      const allMenuMasterEvents = menuMasterCodes.length > 0
+        ? await prisma.menuMasterEvent.findMany({
+            where: {
+              menuMasterCode: { in: menuMasterCodes }
+            },
+            select: {
+              menuMasterCode: true,
+              eventCode: true,
+            }
+          })
+        : []
+
+      // Fetch all time events to get event names
+      const allTimeEvents = await prisma.timeEvent.findMany({
+        select: {
+          eventCode: true,
+          eventName: true,
+        }
+      })
+
+      // Create a map of eventCode -> eventName
+      const eventNameMap = new Map<string, string>()
+      allTimeEvents.forEach((event: any) => {
+        eventNameMap.set(event.eventCode, event.eventName)
+      })
+
+      // Group events by menuMasterCode
+      const eventsByMaster = new Map<string, Array<{ eventCode: string; eventName: string }>>()
+      allMenuMasterEvents.forEach((mme: any) => {
+        if (!eventsByMaster.has(mme.menuMasterCode)) {
+          eventsByMaster.set(mme.menuMasterCode, [])
+        }
+        const eventName = eventNameMap.get(mme.eventCode) || mme.eventCode
+        eventsByMaster.get(mme.menuMasterCode)!.push({
+          eventCode: mme.eventCode,
+          eventName: eventName,
+        })
+      })
+
+      // For authenticated requests, return simple structure with events
       const menusWithStringId = menuMasters.map((menu: any) => ({
         ...menu,
-        menuMasterId: menu.menuMasterId.toString()
+        menuMasterId: menu.menuMasterId.toString(),
+        events: eventsByMaster.get(menu.menuMasterCode) || []
       }))
 
       // Cache response for 60 seconds

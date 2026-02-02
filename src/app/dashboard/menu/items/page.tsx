@@ -53,7 +53,11 @@ interface MenuCategory {
   tblMenuCategoryId?: number;
   menuCategoryCode?: string;
   name: string;
-  menuMaster?: { name: string };
+  menuMasterCode?: string;
+  menuMaster?: { 
+    name: string;
+    menuMasterCode?: string;
+  };
 }
 
 export default function MenuItemsPage() {
@@ -192,6 +196,116 @@ export default function MenuItemsPage() {
       currency: "USD",
       minimumFractionDigits: 2,
     }).format(price);
+  };
+
+  // Helper function to get category and menu master info for an item
+  const getItemCategoryInfo = (item: MenuItem) => {
+    // Create a map for quick category lookup
+    const categoryMap = new Map<string, MenuCategory>();
+    categories.forEach((cat) => {
+      if (cat.menuCategoryCode) {
+        categoryMap.set(cat.menuCategoryCode, cat);
+      }
+    });
+
+    type MasterCategoryPair = {
+      menuMasterCode: string;
+      menuMasterName: string;
+      categoryCode: string;
+      categoryName: string;
+    };
+
+    const pairs: MasterCategoryPair[] = [];
+
+    // Handle structured format: [{menuMasterCode: "MM1", menuCategoryCode: "MC1"}, ...]
+    if (item.menuCategoryCode) {
+      if (Array.isArray(item.menuCategoryCode)) {
+        // Check if it's structured format
+        const firstItem = item.menuCategoryCode[0];
+        if (firstItem && typeof firstItem === 'object' && 'menuMasterCode' in firstItem && 'menuCategoryCode' in firstItem) {
+          // Structured format
+          const mappings = item.menuCategoryCode as Array<{ menuMasterCode: string; menuCategoryCode: string }>;
+          mappings.forEach((mapping) => {
+            const category = categoryMap.get(mapping.menuCategoryCode);
+            if (category) {
+              pairs.push({
+                menuMasterCode: mapping.menuMasterCode,
+                menuMasterName: category.menuMaster?.name || 'Unknown',
+                categoryCode: mapping.menuCategoryCode,
+                categoryName: category.name || 'Unknown',
+              });
+            }
+          });
+        } else {
+          // Old format: simple array of category codes
+          const categoryCodes = item.menuCategoryCode as string[];
+          
+          categoryCodes.forEach((catCode) => {
+            const category = categoryMap.get(catCode);
+            if (category && category.menuMasterCode) {
+              pairs.push({
+                menuMasterCode: category.menuMasterCode,
+                menuMasterName: category.menuMaster?.name || 'Unknown',
+                categoryCode: catCode,
+                categoryName: category.name || 'Unknown',
+              });
+            }
+          });
+        }
+      } else if (typeof item.menuCategoryCode === 'string') {
+        // Single category code (old format)
+        const category = categoryMap.get(item.menuCategoryCode);
+        if (category && category.menuMasterCode) {
+          pairs.push({
+            menuMasterCode: category.menuMasterCode,
+            menuMasterName: category.menuMaster?.name || 'Unknown',
+            categoryCode: item.menuCategoryCode,
+            categoryName: category.name || 'Unknown',
+          });
+        }
+      }
+    }
+
+    // Fallback to legacy approach
+    if (pairs.length === 0 && item.tblMenuCategoryId) {
+      const category = categories.find(
+        (c) => c.tblMenuCategoryId === item.tblMenuCategoryId
+      );
+      if (category && category.menuCategoryCode && category.menuMasterCode) {
+        pairs.push({
+          menuMasterCode: category.menuMasterCode,
+          menuMasterName: category.menuMaster?.name || 'Unknown',
+          categoryCode: category.menuCategoryCode,
+          categoryName: category.name || 'Unknown',
+        });
+      }
+    }
+
+    // Group by menu master
+    const groupedByMaster = new Map<string, { menuMasterCode: string; menuMasterName: string; categories: Array<{ code: string; name: string }> }>();
+    
+    pairs.forEach((pair) => {
+      if (!groupedByMaster.has(pair.menuMasterCode)) {
+        groupedByMaster.set(pair.menuMasterCode, {
+          menuMasterCode: pair.menuMasterCode,
+          menuMasterName: pair.menuMasterName,
+          categories: [],
+        });
+      }
+      const masterGroup = groupedByMaster.get(pair.menuMasterCode)!;
+      if (!masterGroup.categories.find(c => c.code === pair.categoryCode)) {
+        masterGroup.categories.push({
+          code: pair.categoryCode,
+          name: pair.categoryName,
+        });
+      }
+    });
+
+    return {
+      menuMasterNames: Array.from(groupedByMaster.values()).map(m => m.menuMasterName),
+      categoryNames: pairs.map(p => p.categoryName),
+      groupedByMaster: Array.from(groupedByMaster.values()),
+    };
   };
 
   // Navigation handlers
@@ -468,7 +582,7 @@ export default function MenuItemsPage() {
                       Label
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Category
+                      Menu Master & Categories
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Price Strategy
@@ -535,41 +649,18 @@ export default function MenuItemsPage() {
                           {item.labelName}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
-                          {(() => {
-                            // Handle both string and array (JSON) formats
-                            const categoryCodes = Array.isArray(
-                              item.menuCategoryCode
-                            )
-                              ? item.menuCategoryCode
-                              : item.menuCategoryCode
-                              ? [item.menuCategoryCode]
-                              : [];
-
-                            if (categoryCodes.length === 0) {
-                              // Fallback to legacy ID
-                              const category = categories.find(
-                                (c) =>
-                                  c.tblMenuCategoryId === item.tblMenuCategoryId
-                              );
-                              return category?.name || "N/A";
-                            }
-
-                            // Find category names for all codes
-                            const categoryNames = categoryCodes
-                              .map(
-                                (code) =>
-                                  categories.find(
-                                    (c) => c.menuCategoryCode === code
-                                  )?.name
-                              )
-                              .filter(Boolean);
-
-                            return categoryNames.length > 0
-                              ? categoryNames.join(", ")
-                              : "N/A";
-                          })()}
+                      <td className="px-6 py-4">
+                        <div className="flex flex-wrap gap-1.5">
+                          {getItemCategoryInfo(item).groupedByMaster.map((masterGroup) =>
+                            masterGroup.categories.map((category) => (
+                              <span
+                                key={`${masterGroup.menuMasterCode}-${category.code}`}
+                                className="inline-flex items-center px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 text-xs font-medium"
+                              >
+                                [{masterGroup.menuMasterName}: {category.name}]
+                              </span>
+                            ))
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -746,45 +837,24 @@ export default function MenuItemsPage() {
                       </span>
                     </div>
 
-                    <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    <div className="space-y-1.5 text-sm text-gray-600 dark:text-gray-400 mb-3">
                       <p>
-                        <strong>Label:</strong> {item.labelName}
+                        <strong>Menu Master & Category:</strong>{" "}
+                        <span className="text-gray-900 dark:text-white">
+                          {getItemCategoryInfo(item).groupedByMaster.map((masterGroup) =>
+                            masterGroup.categories.map((category) => (
+                              <span
+                                key={`${masterGroup.menuMasterCode}-${category.code}`}
+                                className="inline-flex items-center px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 text-xs font-medium mr-1.5"
+                              >
+                                [{masterGroup.menuMasterName}: {category.name}]
+                              </span>
+                            ))
+                          )}
+                        </span>
                       </p>
                       <p>
-                        <strong>Category:</strong>{" "}
-                        {(() => {
-                          // Handle both string and array (JSON) formats
-                          const categoryCodes = Array.isArray(
-                            item.menuCategoryCode
-                          )
-                            ? item.menuCategoryCode
-                            : item.menuCategoryCode
-                            ? [item.menuCategoryCode]
-                            : [];
-
-                          if (categoryCodes.length === 0) {
-                            // Fallback to legacy ID
-                            const category = categories.find(
-                              (c) =>
-                                c.tblMenuCategoryId === item.tblMenuCategoryId
-                            );
-                            return category?.name || "N/A";
-                          }
-
-                          // Find category names for all codes
-                          const categoryNames = categoryCodes
-                            .map(
-                              (code) =>
-                                categories.find(
-                                  (c) => c.menuCategoryCode === code
-                                )?.name
-                            )
-                            .filter(Boolean);
-
-                          return categoryNames.length > 0
-                            ? categoryNames.join(", ")
-                            : "N/A";
-                        })()}
+                        <strong>Label:</strong> {item.labelName}
                       </p>
                       {item.isPrice === 0 ? (
                         <div className="flex items-center space-x-2">

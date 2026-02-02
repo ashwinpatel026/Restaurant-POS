@@ -13,11 +13,21 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url)
         const deptCode = searchParams.get('deptCode')
         const basePrice = searchParams.get('basePrice')
+        const menuMasterCode = searchParams.get('menuMasterCode')
 
         // Validate required parameters
-        if (!deptCode || !basePrice) {
+        // Either department code OR menu master code must be provided
+        if (!basePrice) {
             return NextResponse.json(
-                { error: 'Department code and base price are required' },
+                { error: 'Base price is required' },
+                { status: 400 }
+            )
+        }
+
+        // At least one of deptCode or menuMasterCode must be provided
+        if (!deptCode && !menuMasterCode) {
+            return NextResponse.json(
+                { error: 'Either department code or menu master code is required' },
                 { status: 400 }
             )
         }
@@ -31,14 +41,22 @@ export async function GET(request: NextRequest) {
             )
         }
 
-        // Call PostgreSQL function fn_get_event_price
+        // Parse menuMasterCode into array format (can be comma-separated string or null)
+        const menuMasterCodeArray = menuMasterCode
+            ? menuMasterCode.split(',').map(code => code.trim()).filter(Boolean)
+            : null
+
+        // Call PostgreSQL function fn_get_event_price with menu_master_code parameter
+        // Pass NULL for deptCode if not provided
+        // Parameter order: p_base_price, p_dept_code, p_menu_master_code
         const results = await masterPrisma.$queryRawUnsafe<Array<{
             event_name: string
             final_price: number | string
         }>>(
-            `SELECT * FROM fn_get_event_price($1, $2)`,
-            deptCode,
-            basePriceNum
+            `SELECT * FROM fn_get_event_price($1, $2, $3)`,
+            basePriceNum,
+            deptCode || null,
+            menuMasterCodeArray
         )
 
         // Convert final_price to number if it's a string (PostgreSQL Decimal type)

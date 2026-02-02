@@ -51,7 +51,49 @@ export async function GET(request: NextRequest) {
       orderBy: { createdOn: 'desc' }
     })
 
-    const mappedMasters = menuMasters.map(mapMenuMasterResponse)
+    // Fetch all menu master events
+    const allMenuMasterEvents = await masterPrisma.masterMenuMasterEvent.findMany({
+      select: {
+        menuMasterCode: true,
+        eventCode: true,
+      }
+    })
+
+    // Fetch all time events to get event names
+    const allTimeEvents = await masterPrisma.masterTimeEvent.findMany({
+      select: {
+        eventCode: true,
+        eventName: true,
+      }
+    })
+
+    // Create a map of eventCode -> eventName
+    const eventNameMap = new Map<string, string>()
+    allTimeEvents.forEach(event => {
+      eventNameMap.set(event.eventCode, event.eventName)
+    })
+
+    // Group events by menuMasterCode
+    const eventsByMaster = new Map<string, Array<{ eventCode: string; eventName: string }>>()
+    allMenuMasterEvents.forEach(mme => {
+      if (!eventsByMaster.has(mme.menuMasterCode)) {
+        eventsByMaster.set(mme.menuMasterCode, [])
+      }
+      const eventName = eventNameMap.get(mme.eventCode) || mme.eventCode
+      eventsByMaster.get(mme.menuMasterCode)!.push({
+        eventCode: mme.eventCode,
+        eventName: eventName,
+      })
+    })
+
+    const mappedMasters = menuMasters.map(master => {
+      const mapped = mapMenuMasterResponse(master)
+      const events = eventsByMaster.get(master.menuMasterCode) || []
+      return {
+        ...mapped,
+        events: events,
+      }
+    })
 
     return NextResponse.json(mappedMasters)
   } catch (error) {

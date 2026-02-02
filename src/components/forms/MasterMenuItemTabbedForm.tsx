@@ -513,24 +513,36 @@ export default function MasterMenuItemTabbedForm({
     load();
   }, [inheritModifiers, selectedCategoriesKey]);
 
-  // Fetch time events when department is selected, price is enabled, and retail price is set
+  // Fetch time events when menu master is selected, price is enabled, and retail price is set
+  // Department is optional - can fetch events based on menu master alone
   useEffect(() => {
     const fetchTimeEvents = async () => {
       // Check if all conditions are met
+      // menuMasterCode must be an array with at least one item
+      const hasMenuMaster = Array.isArray(formData.menuMasterCode) && formData.menuMasterCode.length > 0;
+      
+      // Fetch events if menu master is selected, pricing is enabled, and base price is set
+      // Department is optional - can fetch menu master events without department
       if (
-        formData.deptCode &&
         formData.isPrice === 1 &&
-        formData.retailPrice > 0
+        formData.retailPrice > 0 &&
+        hasMenuMaster
       ) {
         setLoadingTimeEvents(true);
         try {
           const token = localStorage.getItem("master_admin_token");
 
+          // Build query parameters
+          const menuMasterCodeParam = Array.isArray(formData.menuMasterCode)
+            ? formData.menuMasterCode.join(',')
+            : '';
+          
+          // Build URL with optional department code
+          const deptCodeParam = formData.deptCode ? `&deptCode=${encodeURIComponent(formData.deptCode)}` : '';
+          
           // Call PostgreSQL function to get calculated prices
           const functionResponse = await fetch(
-            `/api/master/menu-items/time-events?deptCode=${encodeURIComponent(
-              formData.deptCode
-            )}&basePrice=${formData.retailPrice}`,
+            `/api/master/menu-items/time-events?basePrice=${formData.retailPrice}&menuMasterCode=${encodeURIComponent(menuMasterCodeParam)}${deptCodeParam}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -545,10 +557,17 @@ export default function MasterMenuItemTabbedForm({
           const functionResults = await functionResponse.json();
 
           // Fetch time event details to get eventCode and byFixedValue
+          // Build URL with optional department code and menu master code
+          const queryParams = new URLSearchParams();
+          if (formData.deptCode) {
+            queryParams.append('deptCode', formData.deptCode);
+          }
+          if (menuMasterCodeParam) {
+            queryParams.append('menuMasterCode', menuMasterCodeParam);
+          }
+          
           const detailsResponse = await fetch(
-            `/api/master/time-event?deptCode=${encodeURIComponent(
-              formData.deptCode
-            )}`,
+            `/api/master/time-event?${queryParams.toString()}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -654,7 +673,7 @@ export default function MasterMenuItemTabbedForm({
     };
 
     fetchTimeEvents();
-  }, [formData.deptCode, formData.isPrice, formData.retailPrice, menuItem?.menuItemId, menuItem?.tblMenuItemId]);
+  }, [formData.deptCode, formData.isPrice, formData.retailPrice, formData.menuMasterCode, menuItem?.menuItemId, menuItem?.tblMenuItemId]);
 
   const fetchModifiers = async () => {
     try {
@@ -1940,13 +1959,13 @@ export default function MasterMenuItemTabbedForm({
                 </p>
               </div>
 
-              {!formData.deptCode || formData.isPrice !== 1 || formData.retailPrice <= 0 ? (
+              {formData.isPrice !== 1 || formData.retailPrice <= 0 || !Array.isArray(formData.menuMasterCode) || formData.menuMasterCode.length === 0 ? (
                 <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {!formData.deptCode && formData.isPrice !== 1 && formData.retailPrice <= 0
-                      ? "Please select Department and enable Pricing with base price to view time events"
-                      : !formData.deptCode
-                        ? "Please select Department to view time events"
+                    {formData.isPrice !== 1 && formData.retailPrice <= 0 && (!Array.isArray(formData.menuMasterCode) || formData.menuMasterCode.length === 0)
+                      ? "Please select Menu Master and enable Pricing with base price to view time events"
+                      : !Array.isArray(formData.menuMasterCode) || formData.menuMasterCode.length === 0
+                        ? "Please select Menu Master to view time events"
                         : formData.isPrice !== 1
                           ? "Please enable Pricing to view time events"
                           : "Please enter base price to view time events"}

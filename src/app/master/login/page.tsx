@@ -188,9 +188,25 @@ export default function MasterLoginPage() {
 
         {/* Right Side - Branded Area */}
         <div className="lg:w-1/2 w-full h-full bg-primary-900 dark:bg-white/5 lg:grid items-center hidden relative overflow-hidden">
-          <div className="relative items-center justify-center flex z-1 w-full h-full">
+          <div className="relative items-center justify-center flex z-1">
             {/* Grid Pattern Background */}
-            <div
+            <div className="absolute right-0 top-0 -z-1 w-full max-w-[250px] xl:max-w-[450px]">
+              <Image
+                width={540}
+                height={254}
+                src="/assets/image/shape/grid-01.svg"
+                alt="grid"
+              />
+            </div>
+            <div className="absolute bottom-0 left-0 -z-1 w-full max-w-[250px] rotate-180 xl:max-w-[450px]">
+              <Image
+                width={540}
+                height={254}
+                src="/assets/image/shape/grid-01.svg"
+                alt="grid"
+              />
+            </div>
+            {/* <div
               className="absolute inset-0"
               style={{
                 backgroundImage: `
@@ -219,7 +235,7 @@ export default function MasterLoginPage() {
                 `,
                 backgroundSize: "90px 42px",
               }}
-            />
+            /> */}
             <div className="flex flex-col items-center max-w-xs z-10">
               <div className="mb-6 flex items-center justify-center">
                 {/* <Image
@@ -233,8 +249,8 @@ export default function MasterLoginPage() {
                 <img
                   src={
                     theme === "dark"
-                      ? "/assets/image/logo-light.png"
-                      : "/assets/image/logo.png"
+                      ? "/assets/image/white_admin_logo.png"
+                      : "/assets/image/white_admin_logo.png"
                   }
                   alt="Acute-RPOS Logo"
                   width={280}
@@ -242,12 +258,12 @@ export default function MasterLoginPage() {
                   className="object-contain"
                 />
               </div>
-              <h2 className="text-2xl text-white dark:text-white/90 mb-6 text-center">
+              {/* <h2 className="text-2xl text-white dark:text-white/90 mb-6 text-center">
                 Acute Master Dashboard
               </h2>
               <p className="text-center text-gray-300 dark:text-white/60 text-sm">
                 Sign in to manage your multi-tenant system
-              </p>
+              </p> */}
             </div>
           </div>
         </div>

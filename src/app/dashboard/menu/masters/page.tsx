@@ -27,6 +27,15 @@ interface MenuMaster {
   prepZoneCode?: string | string[] | null;
   stationCode?: string | string[] | null;
   isEventMenu?: number;
+  deptCode?: string | null;
+  events?: Array<{ eventCode: string; eventName: string }>;
+}
+
+interface Department {
+  deptId: string;
+  deptCode: string;
+  deptName: string | null;
+  isActive: number;
 }
 
 interface PrepZone {
@@ -55,6 +64,7 @@ export default function MenuMastersPage() {
   const [menuMasters, setMenuMasters] = useState<MenuMaster[]>([]);
   const [prepZones, setPrepZones] = useState<PrepZone[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const fetchingRef = useRef(false);
 
@@ -199,6 +209,13 @@ export default function MenuMastersPage() {
     return "None";
   };
 
+  // Helper function to get department name by code
+  const getDepartmentName = (deptCode?: string | null) => {
+    if (!deptCode) return null;
+    const department = departments.find((d) => d.deptCode === deptCode);
+    return department?.deptName || null;
+  };
+
   const fetchData = async () => {
     // Prevent duplicate calls
     if (fetchingRef.current) {
@@ -208,10 +225,11 @@ export default function MenuMastersPage() {
 
     try {
       setLoading(true);
-      const [mastersRes, prepZonesRes, stationsRes] = await Promise.all([
+      const [mastersRes, prepZonesRes, stationsRes, departmentsRes] = await Promise.all([
         fetch(buildApiUrl("/api/dashboard/menu/masters"), { cache: "no-store" }),
         fetch(buildApiUrl("/api/dashboard/menu/prep-zone"), { cache: "no-store" }),
         fetch(buildApiUrl("/api/dashboard/station"), { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/department"), { cache: "no-store" }),
       ]);
 
       if (mastersRes.ok) {
@@ -227,6 +245,11 @@ export default function MenuMastersPage() {
       if (stationsRes.ok) {
         const stationsData = await stationsRes.json();
         setStations(stationsData);
+      }
+
+      if (departmentsRes.ok) {
+        const departmentsData = await departmentsRes.json();
+        setDepartments(departmentsData);
       }
     } catch (error) {
       toast.error("Error loading data");
@@ -475,7 +498,13 @@ export default function MenuMastersPage() {
                       Stations
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Department
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Menu Type
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Events
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Status
@@ -527,13 +556,36 @@ export default function MenuMastersPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          {getDepartmentName(master.deptCode) || "N/A"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         {master.isEventMenu === 1 ? (
-                          <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-400">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-400">
                             Event Menu
                           </span>
                         ) : (
                           <span className="text-sm text-gray-400 dark:text-gray-500">
                             Regular
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        {master.isEventMenu === 1 && master.events && master.events.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {master.events.map((event) => (
+                              <span
+                                key={event.eventCode}
+                                className="inline-flex items-center px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-900/10 text-purple-700 dark:text-purple-300 text-xs font-medium"
+                              >
+                                {event.eventName}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400 dark:text-gray-500">
+                            N/A
                           </span>
                         )}
                       </td>
@@ -594,15 +646,22 @@ export default function MenuMastersPage() {
                           {master.name}
                         </h3>
                       </div>
-                      <span
-                        className={`px-2 py-1 text-xs font-medium rounded-full ${
-                          master.isActive === 1
-                            ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400"
-                            : "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400"
-                        }`}
-                      >
-                        {master.isActive === 1 ? "Active" : "Inactive"}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {master.isEventMenu === 1 && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-400">
+                            Event Menu
+                          </span>
+                        )}
+                        <span
+                          className={`px-2 py-1 text-xs font-medium rounded-full ${
+                            master.isActive === 1
+                              ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400"
+                              : "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400"
+                          }`}
+                        >
+                          {master.isActive === 1 ? "Active" : "Inactive"}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
@@ -617,10 +676,24 @@ export default function MenuMastersPage() {
                         <strong>Stations:</strong>{" "}
                         {getStationNames(master.stationCode)}
                       </p>
-                      {master.isEventMenu === 1 && (
+                      {getDepartmentName(master.deptCode) && (
                         <p>
-                          <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-400">
-                            Event Menu
+                          <strong>Department:</strong>{" "}
+                          {getDepartmentName(master.deptCode)}
+                        </p>
+                      )}
+                      {master.isEventMenu === 1 && master.events && master.events.length > 0 && (
+                        <p>
+                          <strong>Events:</strong>{" "}
+                          <span className="text-gray-900 dark:text-white">
+                            {master.events.map((event, index) => (
+                              <span key={event.eventCode}>
+                                <span className="inline-flex items-center px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-900/10 text-purple-700 dark:text-purple-300 text-xs font-medium">
+                                  {event.eventName}
+                                </span>
+                                {index < master.events!.length - 1 && " "}
+                              </span>
+                            ))}
                           </span>
                         </p>
                       )}

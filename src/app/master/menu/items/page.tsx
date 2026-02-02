@@ -197,6 +197,116 @@ export default function MasterMenuItemsPage() {
     }).format(price);
   };
 
+  // Helper function to get category and menu master info for an item
+  const getItemCategoryInfo = (item: MenuItem) => {
+    // Create a map for quick category lookup
+    const categoryMap = new Map<string, MenuCategory>();
+    categories.forEach((cat) => {
+      if (cat.menuCategoryCode) {
+        categoryMap.set(cat.menuCategoryCode, cat);
+      }
+    });
+
+    type MasterCategoryPair = {
+      menuMasterCode: string;
+      menuMasterName: string;
+      categoryCode: string;
+      categoryName: string;
+    };
+
+    const pairs: MasterCategoryPair[] = [];
+
+    // Handle structured format: [{menuMasterCode: "MM1", menuCategoryCode: "MC1"}, ...]
+    if (item.menuCategoryCode) {
+      if (Array.isArray(item.menuCategoryCode)) {
+        // Check if it's structured format
+        const firstItem = item.menuCategoryCode[0];
+        if (firstItem && typeof firstItem === 'object' && 'menuMasterCode' in firstItem && 'menuCategoryCode' in firstItem) {
+          // Structured format
+          const mappings = item.menuCategoryCode as Array<{ menuMasterCode: string; menuCategoryCode: string }>;
+          mappings.forEach((mapping) => {
+            const category = categoryMap.get(mapping.menuCategoryCode);
+            if (category) {
+              pairs.push({
+                menuMasterCode: mapping.menuMasterCode,
+                menuMasterName: category.menuMaster?.name || 'Unknown',
+                categoryCode: mapping.menuCategoryCode,
+                categoryName: category.name || 'Unknown',
+              });
+            }
+          });
+        } else {
+          // Old format: simple array of category codes
+          const categoryCodes = item.menuCategoryCode as string[];
+          
+          categoryCodes.forEach((catCode) => {
+            const category = categoryMap.get(catCode);
+            if (category && category.menuMasterCode) {
+              pairs.push({
+                menuMasterCode: category.menuMasterCode,
+                menuMasterName: category.menuMaster?.name || 'Unknown',
+                categoryCode: catCode,
+                categoryName: category.name || 'Unknown',
+              });
+            }
+          });
+        }
+      } else if (typeof item.menuCategoryCode === 'string') {
+        // Single category code (old format)
+        const category = categoryMap.get(item.menuCategoryCode);
+        if (category && category.menuMasterCode) {
+          pairs.push({
+            menuMasterCode: category.menuMasterCode,
+            menuMasterName: category.menuMaster?.name || 'Unknown',
+            categoryCode: item.menuCategoryCode,
+            categoryName: category.name || 'Unknown',
+          });
+        }
+      }
+    }
+
+    // Fallback to legacy approach
+    if (pairs.length === 0 && item.tblMenuCategoryId) {
+      const category = categories.find(
+        (c) => c.menuCategoryId === item.tblMenuCategoryId?.toString()
+      );
+      if (category && category.menuMasterCode) {
+        pairs.push({
+          menuMasterCode: category.menuMasterCode,
+          menuMasterName: category.menuMaster?.name || 'Unknown',
+          categoryCode: category.menuCategoryCode || '',
+          categoryName: category.name || 'Unknown',
+        });
+      }
+    }
+
+    // Group by menu master
+    const groupedByMaster = new Map<string, { menuMasterCode: string; menuMasterName: string; categories: Array<{ code: string; name: string }> }>();
+    
+    pairs.forEach((pair) => {
+      if (!groupedByMaster.has(pair.menuMasterCode)) {
+        groupedByMaster.set(pair.menuMasterCode, {
+          menuMasterCode: pair.menuMasterCode,
+          menuMasterName: pair.menuMasterName,
+          categories: [],
+        });
+      }
+      const masterGroup = groupedByMaster.get(pair.menuMasterCode)!;
+      if (!masterGroup.categories.find(c => c.code === pair.categoryCode)) {
+        masterGroup.categories.push({
+          code: pair.categoryCode,
+          name: pair.categoryName,
+        });
+      }
+    });
+
+    return {
+      menuMasterNames: Array.from(groupedByMaster.values()).map(m => m.menuMasterName),
+      categoryNames: pairs.map(p => p.categoryName),
+      groupedByMaster: Array.from(groupedByMaster.values()),
+    };
+  };
+
   // Navigation handlers
   const handleAdd = () => {
     router.push("/master/menu/items/add");
@@ -472,7 +582,7 @@ export default function MasterMenuItemsPage() {
                       Label
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Category
+                      Menu Master & Categories
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Price Strategy
@@ -539,33 +649,18 @@ export default function MasterMenuItemsPage() {
                           {item.labelName}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
-                          {(() => {
-                            // Handle both string and array (JSON) formats
-                            const categoryCodes = Array.isArray(item.menuCategoryCode)
-                              ? item.menuCategoryCode
-                              : item.menuCategoryCode
-                              ? [item.menuCategoryCode]
-                              : [];
-                            
-                            if (categoryCodes.length === 0) {
-                              // Fallback to legacy ID
-                              const category = categories.find(
-                                (c) => c.menuCategoryId === item.tblMenuCategoryId?.toString()
-                              );
-                              return category?.name || "N/A";
-                            }
-                            
-                            // Find category names for all codes
-                            const categoryNames = categoryCodes
-                              .map((code) => categories.find((c) => c.menuCategoryCode === code)?.name)
-                              .filter(Boolean);
-                            
-                            return categoryNames.length > 0
-                              ? categoryNames.join(", ")
-                              : "N/A";
-                          })()}
+                      <td className="px-6 py-4">
+                        <div className="flex flex-wrap gap-1.5">
+                          {getItemCategoryInfo(item).groupedByMaster.map((masterGroup) =>
+                            masterGroup.categories.map((category) => (
+                              <span
+                                key={`${masterGroup.menuMasterCode}-${category.code}`}
+                                className="inline-flex items-center px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 text-xs font-medium"
+                              >
+                                [{masterGroup.menuMasterName}: {category.name}]
+                              </span>
+                            ))
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -693,24 +788,24 @@ export default function MasterMenuItemsPage() {
                 {filteredItems.map((item) => (
                   <div
                     key={item.menuItemId || item.tblMenuItemId}
-                    className="border-2 rounded-lg p-6 hover:shadow-md transition-shadow bg-white dark:bg-gray-700"
+                    className="border-2 rounded-lg p-4 hover:shadow-md transition-shadow bg-white dark:bg-gray-700"
                     style={{
                       borderColor: item.colorCode || "#E5E7EB",
                     }}
                   >
                     {/* Image Display */}
-                    <div className="mb-4">
+                    <div className="mb-3">
                       {item.menuImg ? (
                         <img
                           src={item.menuImg}
                           alt={item.name}
-                          className="w-full h-32 object-cover rounded-lg"
+                          className="w-full h-24 object-cover rounded-lg"
                         />
                       ) : (
-                        <div className="w-full h-32 bg-gray-100 dark:bg-gray-600 rounded-lg flex items-center justify-center">
+                        <div className="w-full h-24 bg-gray-100 dark:bg-gray-600 rounded-lg flex items-center justify-center">
                           <div className="text-center text-gray-400 dark:text-gray-500">
                             <svg
-                              className="w-12 h-12 mx-auto mb-2"
+                              className="w-8 h-8 mx-auto mb-1"
                               fill="none"
                               stroke="currentColor"
                               viewBox="0 0 24 24"
@@ -722,18 +817,18 @@ export default function MasterMenuItemsPage() {
                                 d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
                               />
                             </svg>
-                            <p className="text-sm">No Image</p>
+                            <p className="text-xs">No Image</p>
                           </div>
                         </div>
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                         {item.name}
                       </h3>
                       <span
-                        className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        className={`px-2 py-0.5 text-xs font-medium rounded-full ${
                           item.isActive === 1
                             ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400"
                             : "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400"
@@ -743,37 +838,25 @@ export default function MasterMenuItemsPage() {
                       </span>
                     </div>
 
-                    <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    {/* Menu Master and Categories - Simple Format */}
+                    <div className="space-y-1.5 text-sm text-gray-600 dark:text-gray-400 mb-3">
                       <p>
-                        <strong>Label:</strong> {item.labelName}
+                        <strong>Menu Master & Category:</strong>{" "}
+                        <span className="text-gray-900 dark:text-white">
+                          {getItemCategoryInfo(item).groupedByMaster.map((masterGroup) =>
+                            masterGroup.categories.map((category) => (
+                              <span
+                                key={`${masterGroup.menuMasterCode}-${category.code}`}
+                                className="inline-flex items-center px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 text-xs font-medium mr-1.5"
+                              >
+                                [{masterGroup.menuMasterName}: {category.name}]
+                              </span>
+                            ))
+                          )}
+                        </span>
                       </p>
                       <p>
-                        <strong>Category:</strong>{" "}
-                        {(() => {
-                          // Handle both string and array (JSON) formats
-                          const categoryCodes = Array.isArray(item.menuCategoryCode)
-                            ? item.menuCategoryCode
-                            : item.menuCategoryCode
-                            ? [item.menuCategoryCode]
-                            : [];
-                          
-                          if (categoryCodes.length === 0) {
-                            // Fallback to legacy ID
-                            const category = categories.find(
-                              (c) => c.menuCategoryId === item.tblMenuCategoryId?.toString()
-                            );
-                            return category?.name || "N/A";
-                          }
-                          
-                          // Find category names for all codes
-                          const categoryNames = categoryCodes
-                            .map((code) => categories.find((c) => c.menuCategoryCode === code)?.name)
-                            .filter(Boolean);
-                          
-                          return categoryNames.length > 0
-                            ? categoryNames.join(", ")
-                            : "N/A";
-                        })()}
+                        <strong>Label:</strong> {item.labelName}
                       </p>
                       {item.isPrice === 0 ? (
                         <div className="flex items-center space-x-2">
@@ -868,35 +951,35 @@ export default function MasterMenuItemsPage() {
                       )}
                     </div>
 
-                    <div className="flex justify-end space-x-2">
-                      <button
-                        onClick={() => handleEdit(item)}
-                        className="p-1 text-blue-500 hover:text-blue-700 transition-colors duration-200"
-                        title="Edit menu item"
-                      >
-                        <PencilIcon className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleClone(item)}
-                        className="p-1 text-purple-500 hover:text-purple-700 transition-colors duration-200"
-                        title="Clone menu item"
-                      >
-                        <DocumentDuplicateIcon className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() =>
-                          handleDelete(
-                            item.menuItemId ||
-                              item.tblMenuItemId?.toString() ||
-                              ""
-                          )
-                        }
-                        className="p-1 text-red-500 hover:text-red-700 transition-colors duration-200"
-                        title="Delete menu item"
-                      >
-                        <TrashIcon className="w-4 h-4" />
-                      </button>
-                    </div>
+                                  <div className="flex justify-end space-x-1.5 mt-3">
+                                    <button
+                                      onClick={() => handleEdit(item)}
+                                      className="p-1 text-blue-500 hover:text-blue-700 transition-colors duration-200"
+                                      title="Edit menu item"
+                                    >
+                                      <PencilIcon className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleClone(item)}
+                                      className="p-1 text-purple-500 hover:text-purple-700 transition-colors duration-200"
+                                      title="Clone menu item"
+                                    >
+                                      <DocumentDuplicateIcon className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleDelete(
+                                          item.menuItemId ||
+                                            item.tblMenuItemId?.toString() ||
+                                            ""
+                                        )
+                                      }
+                                      className="p-1 text-red-500 hover:text-red-700 transition-colors duration-200"
+                                      title="Delete menu item"
+                                    >
+                                      <TrashIcon className="w-4 h-4" />
+                                    </button>
+                                  </div>
                   </div>
                 ))}
               </div>
