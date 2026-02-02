@@ -42,6 +42,8 @@ export default function MenuItemTabbedForm({
   const menuMasterRef = useRef<HTMLElement>(null);
   const categoryRef = useRef<HTMLElement>(null);
   const retailPriceRef = useRef<HTMLInputElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -461,22 +463,67 @@ export default function MenuItemTabbedForm({
 
   // Fetch time events when department is selected, price is enabled, and retail price is set
   useEffect(() => {
-    const fetchTimeEvents = async () => {
+    // Clear any existing debounce timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+      debounceTimeoutRef.current = null;
+    }
+
+    // Abort any pending request when dependencies change
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create a new AbortController for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    // Store current values to use in the debounced function
+    const currentRetailPrice = formData.retailPrice;
+    const currentDeptCode = formData.deptCode;
+    const currentIsPrice = formData.isPrice;
+    const currentMenuMasterCode = formData.menuMasterCode;
+    const currentStoreCode = selectedStoreCode;
+
+    // Debounced fetch function
+    debounceTimeoutRef.current = setTimeout(async () => {
+      // Check if request was aborted during debounce period
+      if (abortController.signal.aborted) {
+        return;
+      }
+
       // Check if all conditions are met
+      // menuMasterCode must be an array with at least one item
+      const hasMenuMaster = Array.isArray(currentMenuMasterCode) && currentMenuMasterCode.length > 0;
+      
+      // Fetch events if menu master is selected, pricing is enabled, base price is set, and store is selected
+      // Department is optional - can fetch menu master events without department
       if (
-        formData.deptCode &&
-        formData.isPrice === 1 &&
-        formData.retailPrice > 0 &&
-        selectedStoreCode
+        currentIsPrice === 1 &&
+        currentRetailPrice > 0 &&
+        currentStoreCode &&
+        hasMenuMaster
       ) {
         setLoadingTimeEvents(true);
         try {
+          // Build query parameters
+          const menuMasterCodeParam = Array.isArray(currentMenuMasterCode)
+            ? currentMenuMasterCode.join(',')
+            : '';
+          
+          // Build URL with optional department code
+          const deptCodeParam = currentDeptCode ? `&deptCode=${encodeURIComponent(currentDeptCode)}` : '';
+          
           // Call PostgreSQL function to get calculated prices (location dashboard endpoint)
           const functionResponse = await fetch(
-            buildApiUrl(`/api/dashboard/menu-items/time-events?deptCode=${encodeURIComponent(
-              formData.deptCode
-            )}&basePrice=${formData.retailPrice}`)
+            buildApiUrl(`/api/dashboard/menu-items/time-events?basePrice=${currentRetailPrice}&menuMasterCode=${encodeURIComponent(menuMasterCodeParam)}${deptCodeParam}`),
+            { signal: abortController.signal }
           );
+
+          // Check if request was aborted
+          if (abortController.signal.aborted) {
+            return;
+          }
 
           if (!functionResponse.ok) {
             throw new Error("Failed to fetch time events");
@@ -485,9 +532,25 @@ export default function MenuItemTabbedForm({
           const functionResults = await functionResponse.json();
 
           // Fetch time event details to get eventCode and byFixedValue (filtered by storeCode)
+          // Build URL with optional department code and menu master code
+          const queryParams = new URLSearchParams();
+          queryParams.append('storeCode', currentStoreCode);
+          if (currentDeptCode) {
+            queryParams.append('deptCode', currentDeptCode);
+          }
+          if (menuMasterCodeParam) {
+            queryParams.append('menuMasterCode', menuMasterCodeParam);
+          }
+          
           const detailsResponse = await fetch(
-            buildApiUrl(`/api/dashboard/events?storeCode=${encodeURIComponent(selectedStoreCode)}`)
+            buildApiUrl(`/api/dashboard/events?${queryParams.toString()}`),
+            { signal: abortController.signal }
           );
+
+          // Check if request was aborted
+          if (abortController.signal.aborted) {
+            return;
+          }
 
           let eventDetailsMap: Record<string, {
             eventCode: string;
@@ -499,23 +562,8 @@ export default function MenuItemTabbedForm({
 
           if (detailsResponse.ok) {
             const eventDetails = await detailsResponse.json();
-            // Filter events by department code (deptCode is JSON array)
-            const deptEvents = eventDetails.filter((event: any) => {
-              if (!event.deptCode) return false;
-              try {
-                const deptCodes = typeof event.deptCode === 'string' 
-                  ? JSON.parse(event.deptCode) 
-                  : event.deptCode;
-                if (Array.isArray(deptCodes)) {
-                  return deptCodes.includes(formData.deptCode) || event.overrideAllEvents;
-                }
-                return deptCodes === formData.deptCode || event.overrideAllEvents;
-              } catch {
-                return event.deptCode === formData.deptCode || event.overrideAllEvents;
-              }
-            });
-            
-            deptEvents.forEach((event: any) => {
+            // Events are already filtered by the API, so use them directly
+            eventDetails.forEach((event: any) => {
               eventDetailsMap[event.eventName] = {
                 eventCode: event.eventCode,
                 eventName: event.eventName,
@@ -555,8 +603,14 @@ export default function MenuItemTabbedForm({
             try {
               const itemId = menuItem.menuItemId || menuItem.tblMenuItemId;
               const existingFormulasResponse = await fetch(
-                buildApiUrl(`/api/dashboard/menu-items/${itemId}/time-events?storeCode=${encodeURIComponent(selectedStoreCode)}`)
+                buildApiUrl(`/api/dashboard/menu-items/${itemId}/time-events?storeCode=${encodeURIComponent(currentStoreCode)}`),
+                { signal: abortController.signal }
               );
+
+              // Check if request was aborted
+              if (abortController.signal.aborted) {
+                return;
+              }
 
               if (existingFormulasResponse.ok) {
                 const existingFormulas = await existingFormulasResponse.json();
@@ -579,18 +633,29 @@ export default function MenuItemTabbedForm({
                 setTimeEventDetails(eventDetailsMap);
               }
             } catch (e) {
+              // Don't show error for aborted requests
+              if (e instanceof Error && e.name === 'AbortError') {
+                return;
+              }
               console.error("Error fetching existing formula values:", e);
               // Continue with calculated values
             }
           }
-        } catch (error) {
+        } catch (error: any) {
+          // Don't show error toast for aborted requests
+          if (error?.name === 'AbortError' || abortController.signal.aborted) {
+            return;
+          }
           console.error("Error fetching time events:", error);
           toast.error("Failed to load time events");
           setTimeEvents([]);
           setTimeEventFormulas({});
           setTimeEventDetails({});
         } finally {
-          setLoadingTimeEvents(false);
+          // Only update loading state if request wasn't aborted
+          if (!abortController.signal.aborted) {
+            setLoadingTimeEvents(false);
+          }
         }
       } else {
         // Only clear state if it's not already empty to prevent unnecessary re-renders
@@ -598,9 +663,22 @@ export default function MenuItemTabbedForm({
         setTimeEventFormulas((prev) => Object.keys(prev).length > 0 ? {} : prev);
         setTimeEventDetails((prev) => Object.keys(prev).length > 0 ? {} : prev);
       }
+    }, 500); // 500ms debounce delay
+
+    // Cleanup function
+    return () => {
+      // Clear debounce timeout
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+        debounceTimeoutRef.current = null;
+      }
+      // Abort any pending request on unmount or dependency change
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
     };
-    fetchTimeEvents();
-  }, [formData.deptCode, formData.isPrice, formData.retailPrice, menuItem?.menuItemId, menuItem?.tblMenuItemId, selectedStoreCode, buildApiUrl]);
+  }, [formData.deptCode, formData.isPrice, formData.retailPrice, formData.menuMasterCode, menuItem?.menuItemId, menuItem?.tblMenuItemId, selectedStoreCode, buildApiUrl]);
 
   // Create a stable dependency for selected categories
   const selectedCategoriesKey = useMemo(() => {
@@ -1869,13 +1947,13 @@ export default function MenuItemTabbedForm({
                 </p>
               </div>
 
-              {!formData.deptCode || formData.isPrice !== 1 || formData.retailPrice <= 0 ? (
+              {formData.isPrice !== 1 || formData.retailPrice <= 0 || !Array.isArray(formData.menuMasterCode) || formData.menuMasterCode.length === 0 || !selectedStoreCode ? (
                 <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     {!formData.deptCode && formData.isPrice !== 1 && formData.retailPrice <= 0
-                      ? "Please select Department and enable Pricing with base price to view time events"
-                      : !formData.deptCode
-                        ? "Please select Department to view time events"
+                      ? "Please select Menu Master and enable Pricing with base price to view time events"
+                      : !Array.isArray(formData.menuMasterCode) || formData.menuMasterCode.length === 0
+                        ? "Please select Menu Master to view time events"
                         : formData.isPrice !== 1
                           ? "Please enable Pricing to view time events"
                           : "Please enter base price to view time events"}

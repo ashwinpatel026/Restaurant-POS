@@ -40,6 +40,8 @@ export async function GET(request: NextRequest) {
     // Get selected store from query
     const searchParams = request.nextUrl.searchParams
     const queryStoreCode = searchParams.get('storeCode')
+    const deptCode = searchParams.get('deptCode')
+    const menuMasterCode = searchParams.get('menuMasterCode')
     const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode)
 
     if (!selectedStoreCode) {
@@ -52,17 +54,106 @@ export async function GET(request: NextRequest) {
     // Filter by ONE store only
     const storeFilter = buildStoreFilter(accessInfo, selectedStoreCode)
 
-    const events = await prisma.timeEvent.findMany({
-      where: {
-        ...storeFilter
-      },
-      orderBy: {
-        createdDate: 'desc'
+    // Parse menuMasterCode into array format (can be comma-separated string or null)
+    const menuMasterCodeArray = menuMasterCode
+      ? menuMasterCode.split(',').map(code => code.trim()).filter(Boolean)
+      : null
+
+    // Build where clause with optional department and menu master filtering
+    let events
+
+    // If filtering by department or menu master, use raw SQL for complex filtering
+    if (deptCode || menuMasterCodeArray) {
+      const params: any[] = []
+      let paramIndex = 1
+      const conditions: string[] = []
+
+      // Department-based filtering
+      if (deptCode) {
+        conditions.push(
+          `(te.override_all_events = true OR te.dept_code @> to_jsonb($${paramIndex}::text))`
+        )
+        params.push(deptCode)
+        paramIndex++
       }
-    })
+
+      // Menu master-based filtering
+      if (menuMasterCodeArray && menuMasterCodeArray.length > 0) {
+        conditions.push(
+          `EXISTS (
+            SELECT 1 FROM tbl_menu_master_event mme
+            WHERE mme.event_code = te."Event_code"
+            AND mme.menu_master_code = ANY($${paramIndex}::text[])
+          )`
+        )
+        params.push(menuMasterCodeArray)
+        paramIndex++
+      }
+
+      // Build store filter condition
+      const storeCondition = storeFilter.storeCode 
+        ? `AND te.store_code = $${paramIndex}::text`
+        : ''
+      if (storeFilter.storeCode) {
+        params.push(storeFilter.storeCode)
+        paramIndex++
+      }
+
+      const whereClause = conditions.length > 0
+        ? `AND (${conditions.join(' OR ')})`
+        : ''
+
+      events = await prisma.$queryRawUnsafe<Array<any>>(
+        `SELECT DISTINCT te.*
+         FROM tbl_time_events te
+         WHERE te.is_active = 1
+           AND te.is_delete = FALSE
+           ${storeCondition}
+           ${whereClause}
+         ORDER BY te.created_date DESC`,
+        ...params
+      )
+    } else {
+      // No filtering, use Prisma query
+      events = await prisma.timeEvent.findMany({
+        where: {
+          ...storeFilter
+        },
+        orderBy: {
+          createdDate: 'desc'
+        }
+      })
+    }
 
     // Convert BigInt and Decimal to string/number for JSON serialization
-    const eventsWithStringId = events.map((event: any) => convertEventForJson(event))
+    // If events came from raw query, they need special handling
+    const eventsWithStringId = events.map((event: any) => {
+      // If event came from raw query, it might have different structure
+      if (event.Event_code) {
+        // Convert raw query result to expected format
+        return convertEventForJson({
+          ...event,
+          eventCode: event.Event_code,
+          eventName: event.EventName,
+          byFixedValue: event.by_fixed_value,
+          overrideAllEvents: event.override_all_events,
+          deptCode: event.dept_code,
+          globalPriceAmountAdd: event.GlobalPrice_Amount_Add,
+          globalPriceAmountDisc: event.GlobalPrice_Amount_Disc,
+          globalPricePerAdd: event.GlobalPrice_Per_Add,
+          globalPricePerDisc: event.GlobalPrice_Per_Disc,
+          createdDate: event.created_date,
+          updatedOn: event.updated_on,
+          createdBy: event.created_by,
+          updatedBy: event.updated_by,
+          id: event.id,
+          storeCode: event.store_code,
+          isActive: event.is_active,
+          isDelete: event.is_delete
+        })
+      }
+      return convertEventForJson(event)
+    })
 
     return NextResponse.json(eventsWithStringId, { status: 200 })
   } catch (error) {

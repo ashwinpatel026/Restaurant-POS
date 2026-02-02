@@ -1,12 +1,17 @@
--- FUNCTION: public.fn_get_event_price(text, numeric, text)
--- Location Database Function with storeCode support
+-- FUNCTION: public.fn_get_event_price(numeric, text, text, text[])
+-- Location Database Function with storeCode and menu_master_code support
 
--- DROP FUNCTION IF EXISTS public.fn_get_event_price(text, numeric, text);
+-- DROP FUNCTION IF EXISTS public.fn_get_event_price(numeric, text, text, text[]);
+
+-- FUNCTION: public.fn_get_event_price(numeric, text, text, text[])
+
+-- DROP FUNCTION IF EXISTS public.fn_get_event_price(numeric, text, text, text[]);
 
 CREATE OR REPLACE FUNCTION public.fn_get_event_price(
-	p_dept_code text,
 	p_base_price numeric,
-	p_store_code text DEFAULT NULL)
+	p_dept_code text DEFAULT NULL::text,
+	p_store_code text DEFAULT NULL::text,
+	p_menu_master_code text[] DEFAULT NULL::text[])
     RETURNS TABLE(event_name text, final_price numeric) 
     LANGUAGE 'plpgsql'
     COST 100
@@ -16,7 +21,7 @@ CREATE OR REPLACE FUNCTION public.fn_get_event_price(
 AS $BODY$
 BEGIN
     RETURN QUERY
-    SELECT
+    SELECT DISTINCT
         te."EventName"::TEXT AS event_name,
 
         ROUND(
@@ -48,15 +53,30 @@ BEGIN
 			, 2) AS final_price
 
     FROM public."tbl_time_events" te
+    LEFT JOIN public."tbl_menu_master_event" mme 
+        ON te."Event_code" = mme.event_code
     WHERE te.is_active = 1
       AND te.is_delete = FALSE
       AND (p_store_code IS NULL OR te.store_code = p_store_code)
       AND (
-           te.override_all_events = TRUE
-           OR te.dept_code @> to_jsonb(p_dept_code::text)  -- for jsonb array
+           -- Department-based filtering (existing logic)
+           (
+               (p_dept_code IS NOT NULL AND p_dept_code != '')
+               AND (
+                   te.override_all_events = TRUE
+                   OR (te.dept_code IS NOT NULL AND te.dept_code @> to_jsonb(p_dept_code::text))
+               )
+           )
+           -- Menu master-based filtering (new logic)
+           OR (
+               p_menu_master_code IS NOT NULL 
+               AND array_length(p_menu_master_code, 1) > 0
+               AND mme.menu_master_code = ANY(p_menu_master_code)
+           )
           );
 END;
 $BODY$;
 
-ALTER FUNCTION public.fn_get_event_price(text, numeric, text)
+ALTER FUNCTION public.fn_get_event_price(numeric, text, text, text[])
     OWNER TO postgres;
+

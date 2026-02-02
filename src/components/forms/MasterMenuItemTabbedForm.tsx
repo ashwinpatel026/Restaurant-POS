@@ -38,6 +38,8 @@ export default function MasterMenuItemTabbedForm({
   const forColorCodeRef = useRef<HTMLElement>(null);
   const menuMasterRef = useRef<HTMLElement>(null);
   const categoryRef = useRef<HTMLElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -516,16 +518,43 @@ export default function MasterMenuItemTabbedForm({
   // Fetch time events when menu master is selected, price is enabled, and retail price is set
   // Department is optional - can fetch events based on menu master alone
   useEffect(() => {
-    const fetchTimeEvents = async () => {
+    // Clear any existing debounce timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+      debounceTimeoutRef.current = null;
+    }
+
+    // Abort any pending request when dependencies change
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create a new AbortController for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    // Store current values to use in the debounced function
+    const currentRetailPrice = formData.retailPrice;
+    const currentDeptCode = formData.deptCode;
+    const currentIsPrice = formData.isPrice;
+    const currentMenuMasterCode = formData.menuMasterCode;
+
+    // Debounced fetch function
+    debounceTimeoutRef.current = setTimeout(async () => {
+      // Check if request was aborted during debounce period
+      if (abortController.signal.aborted) {
+        return;
+      }
+
       // Check if all conditions are met
       // menuMasterCode must be an array with at least one item
-      const hasMenuMaster = Array.isArray(formData.menuMasterCode) && formData.menuMasterCode.length > 0;
+      const hasMenuMaster = Array.isArray(currentMenuMasterCode) && currentMenuMasterCode.length > 0;
       
       // Fetch events if menu master is selected, pricing is enabled, and base price is set
       // Department is optional - can fetch menu master events without department
       if (
-        formData.isPrice === 1 &&
-        formData.retailPrice > 0 &&
+        currentIsPrice === 1 &&
+        currentRetailPrice > 0 &&
         hasMenuMaster
       ) {
         setLoadingTimeEvents(true);
@@ -533,22 +562,28 @@ export default function MasterMenuItemTabbedForm({
           const token = localStorage.getItem("master_admin_token");
 
           // Build query parameters
-          const menuMasterCodeParam = Array.isArray(formData.menuMasterCode)
-            ? formData.menuMasterCode.join(',')
+          const menuMasterCodeParam = Array.isArray(currentMenuMasterCode)
+            ? currentMenuMasterCode.join(',')
             : '';
           
           // Build URL with optional department code
-          const deptCodeParam = formData.deptCode ? `&deptCode=${encodeURIComponent(formData.deptCode)}` : '';
+          const deptCodeParam = currentDeptCode ? `&deptCode=${encodeURIComponent(currentDeptCode)}` : '';
           
           // Call PostgreSQL function to get calculated prices
           const functionResponse = await fetch(
-            `/api/master/menu-items/time-events?basePrice=${formData.retailPrice}&menuMasterCode=${encodeURIComponent(menuMasterCodeParam)}${deptCodeParam}`,
+            `/api/master/menu-items/time-events?basePrice=${currentRetailPrice}&menuMasterCode=${encodeURIComponent(menuMasterCodeParam)}${deptCodeParam}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
               },
+              signal: abortController.signal,
             }
           );
+
+          // Check if request was aborted
+          if (abortController.signal.aborted) {
+            return;
+          }
 
           if (!functionResponse.ok) {
             throw new Error("Failed to fetch time events");
@@ -559,8 +594,8 @@ export default function MasterMenuItemTabbedForm({
           // Fetch time event details to get eventCode and byFixedValue
           // Build URL with optional department code and menu master code
           const queryParams = new URLSearchParams();
-          if (formData.deptCode) {
-            queryParams.append('deptCode', formData.deptCode);
+          if (currentDeptCode) {
+            queryParams.append('deptCode', currentDeptCode);
           }
           if (menuMasterCodeParam) {
             queryParams.append('menuMasterCode', menuMasterCodeParam);
@@ -572,8 +607,14 @@ export default function MasterMenuItemTabbedForm({
               headers: {
                 Authorization: `Bearer ${token}`,
               },
+              signal: abortController.signal,
             }
           );
+
+          // Check if request was aborted
+          if (abortController.signal.aborted) {
+            return;
+          }
 
           let eventDetailsMap: Record<string, {
             eventCode: string;
@@ -628,8 +669,14 @@ export default function MasterMenuItemTabbedForm({
                   headers: {
                     Authorization: `Bearer ${token}`,
                   },
+                  signal: abortController.signal,
                 }
               );
+
+              // Check if request was aborted
+              if (abortController.signal.aborted) {
+                return;
+              }
 
               if (existingFormulasResponse.ok) {
                 const existingFormulas = await existingFormulasResponse.json();
@@ -652,17 +699,28 @@ export default function MasterMenuItemTabbedForm({
                 setTimeEventDetails(eventDetailsMap);
               }
             } catch (e) {
+              // Don't show error for aborted requests
+              if (e instanceof Error && e.name === 'AbortError') {
+                return;
+              }
               console.error("Error fetching existing formula values:", e);
               // Continue with calculated values
             }
           }
-        } catch (error) {
+        } catch (error: any) {
+          // Don't show error toast for aborted requests
+          if (error?.name === 'AbortError' || abortController.signal.aborted) {
+            return;
+          }
           console.error("Error fetching time events:", error);
           toast.error("Failed to load time events");
           setTimeEvents([]);
           setTimeEventFormulas({});
         } finally {
-          setLoadingTimeEvents(false);
+          // Only update loading state if request wasn't aborted
+          if (!abortController.signal.aborted) {
+            setLoadingTimeEvents(false);
+          }
         }
       } else {
         // Clear time events when conditions are not met
@@ -670,9 +728,21 @@ export default function MasterMenuItemTabbedForm({
         setTimeEventFormulas({});
         setTimeEventDetails({});
       }
-    };
+    }, 500); // 500ms debounce delay
 
-    fetchTimeEvents();
+    // Cleanup function
+    return () => {
+      // Clear debounce timeout
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+        debounceTimeoutRef.current = null;
+      }
+      // Abort any pending request on unmount or dependency change
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
   }, [formData.deptCode, formData.isPrice, formData.retailPrice, formData.menuMasterCode, menuItem?.menuItemId, menuItem?.tblMenuItemId]);
 
   const fetchModifiers = async () => {
