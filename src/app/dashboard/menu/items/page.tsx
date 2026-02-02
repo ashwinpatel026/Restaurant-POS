@@ -224,7 +224,7 @@ export default function MenuItemsPage() {
         const firstItem = item.menuCategoryCode[0];
         if (firstItem && typeof firstItem === 'object' && 'menuMasterCode' in firstItem && 'menuCategoryCode' in firstItem) {
           // Structured format
-          const mappings = item.menuCategoryCode as Array<{ menuMasterCode: string; menuCategoryCode: string }>;
+          const mappings = item.menuCategoryCode as unknown as Array<{ menuMasterCode: string; menuCategoryCode: string }>;
           mappings.forEach((mapping) => {
             const category = categoryMap.get(mapping.menuCategoryCode);
             if (category) {
