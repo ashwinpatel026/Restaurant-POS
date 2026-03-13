@@ -243,7 +243,7 @@ export default function DataTable<T>({
                       {column.cell
                         ? column.cell(
                             row,
-                            (currentPage - 1) * itemsPerPage + rowIndex
+                            (currentPage - 1) * itemsPerPage + rowIndex,
                           )
                         : String(row[column.accessor as keyof T] ?? "")}
                     </td>
@@ -295,7 +295,7 @@ export default function DataTable<T>({
                   >
                     {page}
                   </button>
-                )
+                ),
               )}
 
               <button

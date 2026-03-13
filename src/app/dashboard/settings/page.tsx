@@ -64,11 +64,11 @@ export default function SettingsPage() {
         // Cache locally for quick access elsewhere if needed
         localStorage.setItem(
           "allowedColors",
-          JSON.stringify(data.allowedColors ?? DEFAULT_PALETTE)
+          JSON.stringify(data.allowedColors ?? DEFAULT_PALETTE),
         );
         localStorage.setItem(
           "primaryColor",
-          data.primaryColor ?? DEFAULT_PALETTE[0]
+          data.primaryColor ?? DEFAULT_PALETTE[0],
         );
         if (data.theme) {
           localStorage.setItem("theme", data.theme);
@@ -78,7 +78,7 @@ export default function SettingsPage() {
         toast.error(
           error instanceof Error
             ? error.message
-            : "Unable to load system settings"
+            : "Unable to load system settings",
         );
       } finally {
         if (isMounted) {
@@ -135,7 +135,7 @@ export default function SettingsPage() {
         setAllowedColors(payload.allowedColors);
         localStorage.setItem(
           "allowedColors",
-          JSON.stringify(payload.allowedColors)
+          JSON.stringify(payload.allowedColors),
         );
       }
 
@@ -152,7 +152,7 @@ export default function SettingsPage() {
     } catch (error) {
       console.error(error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to save settings"
+        error instanceof Error ? error.message : "Failed to save settings",
       );
     } finally {
       setSaving(false);
@@ -195,10 +195,10 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* System Settings */}
+        {/* Theme Colors Settings */}
         <div className="card">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-            System Settings
+            Theme Colors Settings
           </h2>
           <div className="space-y-6">
             {/* Allowed Color Palette (9 colors) */}
@@ -272,11 +272,18 @@ export default function SettingsPage() {
                 {saving
                   ? "Saving..."
                   : loading
-                  ? "Loading settings..."
-                  : "Save System Settings"}
+                    ? "Loading settings..."
+                    : "Save System Settings"}
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Store Settings */}
+        <div className="card">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+            Store Settings
+          </h2>
         </div>
       </div>
     </DashboardLayout>
