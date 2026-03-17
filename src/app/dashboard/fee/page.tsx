@@ -31,7 +31,9 @@ interface Fee {
 }
 
 const FEE_TYPES = ["Fee", "Gratuity", "Surcharge", "Card Fee"] as const;
+type FeeType = (typeof FEE_TYPES)[number];
 const DOLLAR_PER_OPTIONS = ["Percent", "Dollar"] as const;
+type DollarPerType = (typeof DOLLAR_PER_OPTIONS)[number];
 
 export default function FeeManagementPage() {
   const { selectedStoreCode, buildApiUrl } = useApiWithStore();
@@ -427,7 +429,13 @@ function FeeForm({
   onSave: (data: any) => void;
   onCancel: () => void;
 }) {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    feeName: string;
+    feeType: FeeType;
+    dollarPer: DollarPerType;
+    feeValue: string;
+    isActive: boolean;
+  }>({
     feeName: "",
     feeType: FEE_TYPES[0],
     dollarPer: DOLLAR_PER_OPTIONS[0],
@@ -441,10 +449,15 @@ function FeeForm({
     if (fee) {
       setFormData({
         feeName: fee.feeName || "",
-        feeType: (fee.feeType as (typeof FEE_TYPES)[number]) || FEE_TYPES[0],
+        feeType: (FEE_TYPES.includes(fee.feeType as FeeType)
+          ? (fee.feeType as FeeType)
+          : FEE_TYPES[0]),
         dollarPer:
-          (fee.dollarPer as (typeof DOLLAR_PER_OPTIONS)[number]) ||
-          DOLLAR_PER_OPTIONS[0],
+          DOLLAR_PER_OPTIONS.includes(
+            (fee.dollarPer || "") as DollarPerType,
+          )
+            ? ((fee.dollarPer as DollarPerType) || DOLLAR_PER_OPTIONS[0])
+            : DOLLAR_PER_OPTIONS[0],
         feeValue:
           fee.feeValue !== null && fee.feeValue !== undefined
             ? formatDecimal(fee.feeValue)
