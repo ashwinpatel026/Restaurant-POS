@@ -5,6 +5,8 @@ import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import { useTheme, Theme } from "@/contexts/ThemeContext";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
+import { formatDecimal } from "@/utils/formatDecimal";
 
 const DEFAULT_PALETTE = [
   "#3B82F6",
@@ -21,8 +23,31 @@ const DEFAULT_PALETTE = [
 export default function SettingsPage() {
   const { data: session } = useSession();
   const { theme, setTheme } = useTheme();
+  const { selectedStoreCode, fetchWithStore } = useApiWithStore();
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [storeSaving, setStoreSaving] = useState(false);
+
+  // Store settings
+  const [currency, setCurrency] = useState<string>("USD");
+  const [defaultPriceSource, setDefaultPriceSource] = useState<"card" | "cash">(
+    "card",
+  );
+  const [allowMultipleDiscount, setAllowMultipleDiscount] =
+    useState<boolean>(false);
+  const [enableAlternateId, setEnableAlternateId] = useState<boolean>(false);
+  const [cashRoundingAdjustmentNearest, setCashRoundingAdjustmentNearest] =
+    useState<string>("0.05");
+
+  // Receipt settings
+  const [tipPer1, setTipPer1] = useState<string>("25.00");
+  const [tipPer2, setTipPer2] = useState<string>("20.00");
+  const [tipPer3, setTipPer3] = useState<string>("18.00");
+  const [gratuityTipPer1, setGratuityTipPer1] = useState<string>("0.00");
+  const [gratuityTipPer2, setGratuityTipPer2] = useState<string>("0.00");
+  const [gratuityTipPer3, setGratuityTipPer3] = useState<string>("0.00");
+  const [showDualPriceOnReceipt, setShowDualPriceOnReceipt] =
+    useState<boolean>(false);
 
   // System palette of exactly six colors used across app
   const [allowedColors, setAllowedColors] = useState<string[]>(DEFAULT_PALETTE);
@@ -34,9 +59,13 @@ export default function SettingsPage() {
 
     const loadSettings = async () => {
       try {
-        const response = await fetch("/api/dashboard/settings/system", {
-          cache: "no-store",
-        });
+        setLoading(true);
+        const response = await fetchWithStore(
+          "/api/dashboard/settings/system",
+          {
+            cache: "no-store",
+          },
+        );
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => null);
@@ -59,6 +88,20 @@ export default function SettingsPage() {
 
         if (data.theme && ["light", "dark"].includes(data.theme)) {
           setUiTheme(data.theme as Theme);
+        }
+
+        // Receipt settings
+        if (data.tipPer1 != null) setTipPer1(String(data.tipPer1));
+        if (data.tipPer2 != null) setTipPer2(String(data.tipPer2));
+        if (data.tipPer3 != null) setTipPer3(String(data.tipPer3));
+        if (data.gratuityTipPer1 != null)
+          setGratuityTipPer1(String(data.gratuityTipPer1));
+        if (data.gratuityTipPer2 != null)
+          setGratuityTipPer2(String(data.gratuityTipPer2));
+        if (data.gratuityTipPer3 != null)
+          setGratuityTipPer3(String(data.gratuityTipPer3));
+        if (typeof data.showDualPriceOnReceipt === "boolean") {
+          setShowDualPriceOnReceipt(data.showDualPriceOnReceipt);
         }
 
         // Cache locally for quick access elsewhere if needed
@@ -92,7 +135,7 @@ export default function SettingsPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [selectedStoreCode]);
 
   useEffect(() => {
     setUiTheme(theme);
@@ -110,10 +153,56 @@ export default function SettingsPage() {
     if (!next.includes(primaryColor)) setPrimaryColor(next[0]);
   };
 
+  const handleSaveStoreSettings = async () => {
+    setStoreSaving(true);
+    try {
+      const response = await fetchWithStore("/api/dashboard/settings/system", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          allowedColors,
+          primaryColor,
+          theme: uiTheme,
+          storeCurrency: currency,
+          operationDefaultPrice: defaultPriceSource,
+          allowMultipleDiscount,
+          isAlternate: enableAlternateId,
+          roundingOffCashAmtNearest: cashRoundingAdjustmentNearest,
+          tipPer1,
+          tipPer2,
+          tipPer3,
+          gratuityTipPer1,
+          gratuityTipPer2,
+          gratuityTipPer3,
+          showDualPriceOnReceipt,
+        }),
+      });
+
+      const payload = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(payload?.error || "Failed to save store settings");
+      }
+
+      toast.success("Store settings saved");
+    } catch (error) {
+      console.error(error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to save store settings",
+      );
+    } finally {
+      setStoreSaving(false);
+    }
+  };
+
   const handleSaveSystemSettings = async () => {
     setSaving(true);
     try {
-      const response = await fetch("/api/dashboard/settings/system", {
+      const response = await fetchWithStore("/api/dashboard/settings/system", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -161,7 +250,7 @@ export default function SettingsPage() {
 
   return (
     <DashboardLayout>
-      <div className="max-w-full space-y-6">
+      <div className="max-w-7xl space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             Settings
@@ -284,6 +373,221 @@ export default function SettingsPage() {
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
             Store Settings
           </h2>
+
+          <div className="space-y-6">
+            {/* Currency */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Currency
+              </label>
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="mt-1 block w-1/4 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              >
+                <option value="USD">$ (USD)</option>
+                <option value="EUR">€ (EUR)</option>
+                <option value="GBP">£ (GBP)</option>
+                <option value="JPY">¥ (JPY)</option>
+                <option value="CNY">¥ (CNY)</option>
+                <option value="INR">₹ (INR)</option>
+                <option value="CAD">$ (CAD)</option>
+                <option value="AUD">$ (AUD)</option>
+                <option value="HKD">$ (HKD)</option>
+                <option value="TWD">$ (TWD)</option>
+              </select>
+            </div>
+
+            {/* Default Price Source */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Default Price Source
+              </label>
+              <select
+                value={defaultPriceSource}
+                onChange={(e) =>
+                  setDefaultPriceSource(e.target.value as "card" | "cash")
+                }
+                className="mt-1 block w-1/4 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              >
+                <option value="card">card</option>
+                <option value="cash">cash</option>
+              </select>
+            </div>
+
+            {/* Checkboxes row */}
+            <div className="flex flex-wrap gap-6">
+              <label className="inline-flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={allowMultipleDiscount}
+                  onChange={(e) => setAllowMultipleDiscount(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600"
+                />
+                <span>Allow Multiple Discount</span>
+              </label>
+              <label className="inline-flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={enableAlternateId}
+                  onChange={(e) => setEnableAlternateId(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600"
+                />
+                <span>Enable Alternate-ID for User</span>
+              </label>
+            </div>
+
+            {/* Cash Rounding Adjustment Nearest */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Cash Rounding Adjustment Nearest
+              </label>
+              <input
+                type="text"
+                value={cashRoundingAdjustmentNearest}
+                onChange={(e) =>
+                  setCashRoundingAdjustmentNearest(e.target.value)
+                }
+                className="mt-1 block w-1/4 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                placeholder="0.05"
+              />
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={handleSaveStoreSettings}
+                disabled={storeSaving}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              >
+                {storeSaving ? "Saving..." : "Save Store Settings"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Receipt Settings */}
+        <div className="card">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+            Receipt Settings
+          </h2>
+          <div className="space-y-4">
+            <p className="font-medium text-gray-900 dark:text-white">
+              Suggested Tip
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Tip1 */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Tip1 (%)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={tipPer1}
+                  onChange={(e) => setTipPer1(e.target.value)}
+                  onBlur={(e) => setTipPer1(formatDecimal(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  With Gratuity Tip1 (%)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={gratuityTipPer1}
+                  onChange={(e) => setGratuityTipPer1(e.target.value)}
+                  onBlur={(e) =>
+                    setGratuityTipPer1(formatDecimal(e.target.value))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Tip2 */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Tip2 (%)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={tipPer2}
+                  onChange={(e) => setTipPer2(e.target.value)}
+                  onBlur={(e) => setTipPer2(formatDecimal(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  With Gratuity Tip2 (%)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={gratuityTipPer2}
+                  onChange={(e) => setGratuityTipPer2(e.target.value)}
+                  onBlur={(e) =>
+                    setGratuityTipPer2(formatDecimal(e.target.value))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Tip3 */}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Tip3 (%)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={tipPer3}
+                  onChange={(e) => setTipPer3(e.target.value)}
+                  onBlur={(e) => setTipPer3(formatDecimal(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  With Gratuity Tip3 (%)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={gratuityTipPer3}
+                  onChange={(e) => setGratuityTipPer3(e.target.value)}
+                  onBlur={(e) =>
+                    setGratuityTipPer3(formatDecimal(e.target.value))
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            <label className="inline-flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300 pt-2">
+              <input
+                type="checkbox"
+                checked={showDualPriceOnReceipt}
+                onChange={(e) => setShowDualPriceOnReceipt(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 dark:border-gray-600"
+              />
+              <span>Show Dual Price On Receipt</span>
+            </label>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={handleSaveStoreSettings}
+                disabled={storeSaving}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+              >
+                {storeSaving ? "Saving..." : "Save Receipt Settings"}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </DashboardLayout>

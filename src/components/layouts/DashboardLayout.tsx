@@ -129,13 +129,29 @@ const navigation: MenuItem[] = [
     name: "Discount",
     href: "/dashboard/discount",
     icon: TagIcon,
-    permissions: ["discount.view", "discount.create", "discount.update", "discount.delete"],
+    permissions: [
+      "discount.view",
+      "discount.create",
+      "discount.update",
+      "discount.delete",
+    ],
+  },
+  {
+    name: "Fee Management",
+    href: "/dashboard/fee",
+    icon: CalculatorIcon,
+    permissions: ["fee.view", "fee.create", "fee.update", "fee.delete"],
   },
   {
     name: "Reason/Request Master",
     href: "/dashboard/suggestion",
     icon: DocumentTextIcon,
-    permissions: ["suggestion.view", "suggestion.create", "suggestion.update", "suggestion.delete"],
+    permissions: [
+      "suggestion.view",
+      "suggestion.create",
+      "suggestion.update",
+      "suggestion.delete",
+    ],
   },
   {
     name: "Department",
@@ -364,13 +380,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     setExpandedMenus((prev) =>
       prev.includes(menuName)
         ? prev.filter((name) => name !== menuName)
-        : [...prev, menuName]
+        : [...prev, menuName],
     );
   };
 
   const isChildItemActive = (
     child: MenuItem,
-    siblings?: MenuItem[]
+    siblings?: MenuItem[],
   ): boolean => {
     if (!child.href) return false;
 
@@ -385,7 +401,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           (sibling) =>
             sibling.href &&
             sibling.href.length > childHref.length &&
-            pathname === sibling.href
+            pathname === sibling.href,
         );
         // If a longer sibling matches exactly, this child should not be active
         if (longerMatchingSibling) return false;
@@ -403,7 +419,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             sibling.href &&
             sibling.href.length > childHref.length &&
             (pathname === sibling.href ||
-              pathname.startsWith(sibling.href + "/"))
+              pathname.startsWith(sibling.href + "/")),
         );
         // If a longer sibling matches, this child should not be active
         if (longerMatchingSibling) return false;
@@ -437,7 +453,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     navigation.forEach((item) => {
       if (item.children) {
         const hasActiveChild = item.children.some((child) =>
-          isChildItemActive(child, item.children)
+          isChildItemActive(child, item.children),
         );
         if (hasActiveChild && !expandedMenus.includes(item.name)) {
           setExpandedMenus((prev) => [...prev, item.name]);
@@ -545,7 +561,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                         {item.children?.map((child) => {
                           const isChildActiveState = isChildItemActive(
                             child,
-                            item.children
+                            item.children,
                           );
                           return (
                             <Link

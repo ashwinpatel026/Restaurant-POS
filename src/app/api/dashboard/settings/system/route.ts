@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 
 import { authOptions } from "@/lib/auth";
+import {
+  getUserAccessInfo,
+  getSelectedStoreCode,
+} from "@/lib/auth/accessControl";
 import { prisma } from "@/lib/database";
 
 const DEFAULT_ALLOWED_COLORS = [
@@ -18,8 +22,6 @@ const DEFAULT_ALLOWED_COLORS = [
 
 const DEFAULT_PRIMARY_COLOR = DEFAULT_ALLOWED_COLORS[0];
 
-const STORE_CODE = process.env.STORE_CODE || null;
-
 function normaliseColor(value: string) {
   if (!value) return value;
   return value.trim().startsWith("#")
@@ -27,16 +29,29 @@ function normaliseColor(value: string) {
     : `#${value.trim().toUpperCase()}`;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id, 10));
+
+    const searchParams = request.nextUrl.searchParams;
+    const queryStoreCode = searchParams.get("storeCode");
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode);
+
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: "No accessible store selected" },
+        { status: 403 },
+      );
     }
 
     const setting = await prisma.systemSetting.findFirst({
       where: {
-        storeCode: STORE_CODE,
+        storeCode: selectedStoreCode,
       },
       orderBy: {
         updatedOn: "desc",
@@ -48,7 +63,7 @@ export async function GET() {
         theme: "light",
         allowedColors: DEFAULT_ALLOWED_COLORS,
         primaryColor: DEFAULT_PRIMARY_COLOR,
-        storeCode: STORE_CODE,
+        storeCode: selectedStoreCode,
       });
     }
 
@@ -60,7 +75,10 @@ export async function GET() {
           allowedColors = parsed;
         }
       } catch (error) {
-        console.warn("Failed to parse allowedColors from system setting", error);
+        console.warn(
+          "Failed to parse allowedColors from system setting",
+          error,
+        );
       }
     }
 
@@ -73,14 +91,26 @@ export async function GET() {
       theme: setting.theme ?? "light",
       allowedColors,
       primaryColor,
-      storeCode: setting.storeCode ?? STORE_CODE,
+      storeCode: setting.storeCode ?? selectedStoreCode,
       updatedOn: setting.updatedOn ?? setting.createdOn,
+      storeCurrency: setting.storeCurrency,
+      operationDefaultPrice: setting.operationDefaultPrice,
+      allowMultipleDiscount: setting.allowMultipleDiscount,
+      isAlternate: setting.isAlternate,
+      roundingOffCashAmtNearest: setting.roundingOffCashAmtNearest,
+      tipPer1: setting.tipPer1,
+      tipPer2: setting.tipPer2,
+      tipPer3: setting.tipPer3,
+      gratuityTipPer1: setting.gratuityTipPer1,
+      gratuityTipPer2: setting.gratuityTipPer2,
+      gratuityTipPer3: setting.gratuityTipPer3,
+      showDualPriceOnReceipt: setting.showDualPriceOnReceipt,
     });
   } catch (error) {
     console.error("Error fetching system settings:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -88,21 +118,62 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const accessInfo = await getUserAccessInfo(parseInt(session.user.id, 10));
+
+    const searchParams = request.nextUrl.searchParams;
+    const queryStoreCode = searchParams.get("storeCode");
+    const selectedStoreCode = getSelectedStoreCode(accessInfo, queryStoreCode);
+
+    if (!selectedStoreCode) {
+      return NextResponse.json(
+        { error: "No accessible store selected" },
+        { status: 403 },
+      );
+    }
+
     const body = await request.json();
-    let { allowedColors, primaryColor, theme } = body as {
+    let {
+      allowedColors,
+      primaryColor,
+      theme,
+      storeCurrency,
+      operationDefaultPrice,
+      allowMultipleDiscount,
+      isAlternate,
+      roundingOffCashAmtNearest,
+      tipPer1,
+      tipPer2,
+      tipPer3,
+      gratuityTipPer1,
+      gratuityTipPer2,
+      gratuityTipPer3,
+      showDualPriceOnReceipt,
+    } = body as {
       allowedColors?: string[];
       primaryColor?: string;
       theme?: string;
+      storeCurrency?: string;
+      operationDefaultPrice?: string;
+      allowMultipleDiscount?: boolean;
+      isAlternate?: boolean;
+      roundingOffCashAmtNearest?: string | number;
+      tipPer1?: string | number;
+      tipPer2?: string | number;
+      tipPer3?: string | number;
+      gratuityTipPer1?: string | number;
+      gratuityTipPer2?: string | number;
+      gratuityTipPer3?: string | number;
+      showDualPriceOnReceipt?: boolean;
     };
 
     if (!Array.isArray(allowedColors) || allowedColors.length !== 9) {
       return NextResponse.json(
         { error: "allowedColors must be an array of 9 values" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -117,19 +188,42 @@ export async function PUT(request: NextRequest) {
 
     const existing = await prisma.systemSetting.findFirst({
       where: {
-        storeCode: STORE_CODE,
+        storeCode: selectedStoreCode,
       },
     });
 
     const data = {
-      storeCode: STORE_CODE,
+      storeCode: selectedStoreCode,
       theme: theme ?? "light",
       allowedColors: JSON.stringify(allowedColors),
       primaryColor,
+      storeCurrency: storeCurrency ?? existing?.storeCurrency ?? undefined,
+      operationDefaultPrice:
+        operationDefaultPrice ?? existing?.operationDefaultPrice ?? undefined,
+      allowMultipleDiscount:
+        allowMultipleDiscount ?? existing?.allowMultipleDiscount ?? undefined,
+      isAlternate: isAlternate ?? existing?.isAlternate ?? undefined,
+      roundingOffCashAmtNearest:
+        roundingOffCashAmtNearest ??
+        existing?.roundingOffCashAmtNearest ??
+        undefined,
+      tipPer1: tipPer1 ?? existing?.tipPer1 ?? undefined,
+      tipPer2: tipPer2 ?? existing?.tipPer2 ?? undefined,
+      tipPer3: tipPer3 ?? existing?.tipPer3 ?? undefined,
+      gratuityTipPer1:
+        gratuityTipPer1 ?? existing?.gratuityTipPer1 ?? undefined,
+      gratuityTipPer2:
+        gratuityTipPer2 ?? existing?.gratuityTipPer2 ?? undefined,
+      gratuityTipPer3:
+        gratuityTipPer3 ?? existing?.gratuityTipPer3 ?? undefined,
+      showDualPriceOnReceipt:
+        showDualPriceOnReceipt ??
+        existing?.showDualPriceOnReceipt ??
+        undefined,
       updatedBy: userId,
       updatedOn: new Date(),
     } as const;
-
+    console.log("data", data);
     const record = existing
       ? await prisma.systemSetting.update({
           where: { id: existing.id },
@@ -146,14 +240,13 @@ export async function PUT(request: NextRequest) {
       theme: record.theme ?? "light",
       allowedColors,
       primaryColor,
-      storeCode: record.storeCode ?? STORE_CODE,
+      storeCode: record.storeCode,
     });
   } catch (error) {
     console.error("Error updating system settings:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-

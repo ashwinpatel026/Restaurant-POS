@@ -884,3 +884,23 @@ model MasterTableCounter {
   @@index([tableName])
   @@map("tbl_table_counter")
 }
+
+model FeeMaster {
+  feeId      BigInt   @id @default(autoincrement()) @map("fee_id")
+  feeCode    String   @unique @map("fee_code") @db.VarChar(50)
+  feeName    String?  @map("fee_name") @db.VarChar(50)
+  feeType    String   @map("fee_type") @db.VarChar(50)
+  dollarPer  String?  @default("Percent") @map("dollar_per") @db.VarChar(20)
+  feeValue   Decimal? @default(0.00) @map("fee_value") @db.Decimal(18, 2)
+  isActive   Boolean  @default(true) @map("is_active")
+  isDelete   Boolean  @default(false) @map("is_delete")
+  createdBy             BigInt?  @map("createdby")
+  createdOn             DateTime @default(now()) @map("createdon")
+  updatedBy             BigInt?  @map("updatedby")
+  updatedOn             DateTime? @map("updatedon")
+  storeCode             String?   @map("store_code") @db.VarChar(100)
+  syncId                String   @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource            String?  @default("server") @map("sync_source") @db.VarChar(20)
+
+  @@map("tbl_fee_master")
+}
