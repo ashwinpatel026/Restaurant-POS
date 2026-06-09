@@ -904,3 +904,34 @@ model FeeMaster {
 
   @@map("tbl_fee_master")
 }
+
+model GiftCard {
+  giftCardId    Int       @id @default(autoincrement()) @map("gift_card_id")
+  giftCardCode  String?   @map("gift_card_code") @db.VarChar(50)
+  giftCardNo    String?   @map("gift_card_no") @db.VarChar(50)
+  cardAmount    Decimal?  @map("card_amount") @db.Decimal(12, 2)
+  cardExpDate   DateTime? @map("card_exp_date") @db.Timestamptz(6)
+  receivedAmount Decimal? @map("received_amount") @db.Decimal(12, 2)
+  isClosed      Int?      @map("is_closed")
+  shiftCode     String?   @map("shift_code") @db.VarChar(20)
+  menuItemCode  String?   @map("menu_item_code") @db.VarChar(50)
+  isActive      Boolean   @default(true) @map("is_active")
+  stationCode   String?   @map("station_code") @db.VarChar(20)
+  isDelete      Boolean   @default(false) @map("is_delete")
+  topupAmount   Decimal   @default(0.00) @map("topup_amount") @db.Decimal(18, 2)
+  usedAmount    Decimal   @default(0.00) @map("used_amount") @db.Decimal(18, 2)
+
+  createdBy     BigInt?   @map("createdby")
+  createdOn     DateTime  @default(now()) @map("createdon")
+  updatedBy     BigInt?   @map("updatedby")
+  updatedOn     DateTime? @map("updatedon")
+  storeCode     String?   @map("store_code") @db.VarChar(100)
+  syncId        String    @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource    String?   @default("server") @map("sync_source") @db.VarChar(20)
+
+  @@index([storeCode])
+  @@index([giftCardNo])
+  @@index([syncId])
+  @@unique([syncId, storeCode])
+  @@map("tbl_gift_card")
+}

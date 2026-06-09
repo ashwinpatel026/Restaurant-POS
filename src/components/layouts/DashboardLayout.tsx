@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useState, useEffect } from "react";
+import { ReactNode, useState, useEffect, useRef } from "react";
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
@@ -34,6 +34,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { useTheme } from "@/contexts/ThemeContext";
 import StoreSelector from "@/components/store/StoreSelector";
+import { REPORTS } from "@/lib/reports/config";
 
 interface MenuItem {
   name: string;
@@ -143,6 +144,17 @@ const navigation: MenuItem[] = [
     permissions: ["fee.view", "fee.create", "fee.update", "fee.delete"],
   },
   {
+    name: "Gift Card Management",
+    href: "/dashboard/gift-cards",
+    icon: CalculatorIcon,
+    permissions: [
+      "giftcards.view",
+      "giftcards.create",
+      "giftcards.update",
+      "giftcards.delete",
+    ],
+  },
+  {
     name: "Reason/Request Master",
     href: "/dashboard/suggestion",
     icon: DocumentTextIcon,
@@ -231,9 +243,14 @@ const navigation: MenuItem[] = [
   },
   {
     name: "Reports",
-    href: "/dashboard/reports",
     icon: ChartBarIcon,
     permissions: ["reports.view"],
+    children: REPORTS.map((report) => ({
+      name: report.name,
+      href: report.available ? report.href : undefined,
+      icon: DocumentTextIcon,
+      permissions: ["reports.view"],
+    })),
   },
   {
     name: "Users",
@@ -257,6 +274,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
   const [userPermissions, setUserPermissions] = useState<string[] | null>(null);
   const [loadingPermissions, setLoadingPermissions] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [avatarImageFailed, setAvatarImageFailed] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const { theme, toggleTheme } = useTheme();
 
   // Load permissions for the current user from location database (via API)
@@ -462,6 +482,43 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     });
   }, [pathname, expandedMenus]);
 
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    const handlePointerDown = (event: Event) => {
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(event.target as Node)
+      ) {
+        setProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+    };
+  }, [profileMenuOpen]);
+
+  const userImage = (session?.user as { image?: string | null })?.image;
+
+  useEffect(() => {
+    setAvatarImageFailed(false);
+  }, [userImage]);
+
+  const displayName = session?.user?.name || "User";
+  const roleLabel = (session?.user?.role || "")
+    .replace(/_/g, " ")
+    .toUpperCase();
+  const userInitials = (() => {
+    const parts = displayName.trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) {
+      return `${parts[0][0] ?? ""}${parts[parts.length - 1][0] ?? ""}`.toUpperCase();
+    }
+    const single = parts[0] || "?";
+    return single.slice(0, 2).toUpperCase();
+  })();
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Mobile sidebar backdrop */}
@@ -563,19 +620,18 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                             child,
                             item.children,
                           );
-                          return (
-                            <Link
-                              key={child.name}
-                              href={child.href || "#"}
-                              className={`
+                          const childClassName = `
                                 flex items-center space-x-3 px-3 py-2 rounded-lg transition-all duration-200 text-sm
                                 ${
                                   isChildActiveState
                                     ? "bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-400 font-medium"
-                                    : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                    : child.href
+                                      ? "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                      : "text-gray-400 dark:text-gray-500 cursor-not-allowed"
                                 }
-                              `}
-                            >
+                              `;
+                          const childContent = (
+                            <>
                               {child.iconImage ? (
                                 <Image
                                   src={child.iconImage}
@@ -588,6 +644,28 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                                 <child.icon className="w-4 h-4 flex-shrink-0" />
                               )}
                               <span className="truncate">{child.name}</span>
+                            </>
+                          );
+
+                          if (!child.href) {
+                            return (
+                              <span
+                                key={child.name}
+                                title="Coming soon"
+                                className={childClassName}
+                              >
+                                {childContent}
+                              </span>
+                            );
+                          }
+
+                          return (
+                            <Link
+                              key={child.name}
+                              href={child.href}
+                              className={childClassName}
+                            >
+                              {childContent}
                             </Link>
                           );
                         })}
@@ -617,32 +695,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               );
             })}
           </nav>
-
-          {/* User info */}
-          <div className="p-3 border-t border-gray-200 dark:border-gray-700">
-            <div className="flex items-center space-x-3 mb-3">
-              <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/20 rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-primary-700 dark:text-primary-400 font-medium">
-                  {session?.user?.name?.charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                  {session?.user?.name}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  {session?.user?.role?.replace("_", " ")}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="flex items-center space-x-2 w-full px-3 py-2 text-sm text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-            >
-              <ArrowRightOnRectangleIcon className="w-5 h-5" />
-              <span>Logout</span>
-            </button>
-          </div>
         </div>
       </aside>
 
@@ -683,6 +735,69 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <BellIcon className="w-6 h-6" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
             </button>
+
+            {/* User profile menu */}
+            <div className="relative flex-shrink-0" ref={profileMenuRef}>
+              <button
+                type="button"
+                onClick={() => setProfileMenuOpen((open) => !open)}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-gray-100 text-xs font-semibold text-primary-700 ring-offset-2 transition hover:ring-2 hover:ring-primary-500/30 dark:border-gray-600 dark:bg-gray-700 dark:text-primary-300 dark:ring-offset-gray-800 overflow-hidden"
+                aria-expanded={profileMenuOpen}
+                aria-haspopup="true"
+                aria-label="User menu"
+              >
+                {userImage && !avatarImageFailed ? (
+                  <Image
+                    src={userImage}
+                    alt=""
+                    width={36}
+                    height={36}
+                    className="h-full w-full object-cover"
+                    unoptimized
+                    onError={() => setAvatarImageFailed(true)}
+                  />
+                ) : (
+                  <span className="leading-none">{userInitials}</span>
+                )}
+              </button>
+
+              <div
+                className={`absolute right-0 z-50 mt-2 w-[min(100vw-2rem,16rem)] origin-top-right rounded-[12px] border border-gray-200 bg-white shadow-lg transition-[opacity,transform,visibility] duration-200 ease-out dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/40 sm:w-56 ${
+                  profileMenuOpen
+                    ? "visible translate-y-0 scale-100 opacity-100"
+                    : "invisible pointer-events-none -translate-y-1 scale-95 opacity-0"
+                }`}
+                role="menu"
+                aria-hidden={!profileMenuOpen}
+              >
+                <div className="px-4 py-3">
+                  <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                    {displayName}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    {roleLabel}
+                  </p>
+                </div>
+                <div className="mx-4 border-t border-gray-200 dark:border-gray-700" />
+                <div className="p-2">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      void handleLogout();
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-700/80"
+                  >
+                    <ArrowRightOnRectangleIcon
+                      className="h-5 w-5 shrink-0 text-gray-500 dark:text-gray-400"
+                      aria-hidden
+                    />
+                    <span>Logout</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </header>
 

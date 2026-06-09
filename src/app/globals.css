@@ -207,3 +207,82 @@
   border-bottom-color: rgb(75 85 99);
 }
 
+/* Report theme datepicker (amber accent) */
+.report-theme .react-datepicker {
+  background-color: rgb(255 255 255);
+  border-color: rgb(229 231 235);
+  color: rgb(17 24 39);
+}
+
+.report-theme .react-datepicker__header {
+  background-color: rgb(249 250 251);
+  border-bottom-color: rgb(229 231 235);
+}
+
+.report-theme .react-datepicker__current-month,
+.report-theme .react-datepicker__day-name {
+  color: rgb(55 65 81);
+}
+
+.report-theme .react-datepicker__day {
+  color: rgb(55 65 81);
+}
+
+.report-theme .react-datepicker__day:hover {
+  background-color: rgb(243 244 246);
+}
+
+.dark .report-theme .react-datepicker {
+  background-color: rgb(24 24 27);
+  border-color: rgb(63 63 70);
+  color: rgb(250 250 250);
+}
+
+.dark .report-theme .react-datepicker__header {
+  background-color: rgb(9 9 11);
+  border-bottom-color: rgb(63 63 70);
+}
+
+.dark .report-theme .react-datepicker__current-month,
+.dark .report-theme .react-datepicker__day-name {
+  color: rgb(250 250 250);
+}
+
+.dark .report-theme .react-datepicker__day {
+  color: rgb(212 212 216);
+}
+
+.dark .report-theme .react-datepicker__day:hover {
+  background-color: rgb(39 39 42);
+}
+
+.report-theme .react-datepicker__day--selected,
+.report-theme .react-datepicker__day--keyboard-selected {
+  background-color: rgb(251 191 36);
+  color: rgb(9 9 11);
+}
+
+.report-theme .react-datepicker__day--today {
+  font-weight: bold;
+  color: rgb(251 191 36);
+}
+
+/* Day End Report — print-friendly accounting layout */
+@media print {
+  .day-end-report {
+    background: white !important;
+    color: black !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .day-end-report table {
+    font-size: 9pt;
+  }
+
+  .day-end-report section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+

@@ -5,6 +5,7 @@ const config: Config = {
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/lib/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   darkMode: 'class',
   theme: {
@@ -39,6 +40,8 @@ const config: Config = {
         'fade-in': 'fadeIn 0.3s ease-in-out',
         'slide-in': 'slideIn 0.3s ease-in-out',
         'shake': 'shake 0.3s ease-in-out',
+        'dashboard-fade-in': 'dashboardFadeIn 0.6s ease-out',
+        'dashboard-glow': 'dashboardGlow 4s ease-in-out infinite',
       },
       keyframes: {
         fadeIn: {
@@ -53,6 +56,14 @@ const config: Config = {
           '0%, 100%': { transform: 'translateX(0)' },
           '25%': { transform: 'translateX(-4px)' },
           '75%': { transform: 'translateX(4px)' },
+        },
+        dashboardFadeIn: {
+          '0%': { opacity: '0', transform: 'translateY(16px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        dashboardGlow: {
+          '0%, 100%': { opacity: '0.4' },
+          '50%': { opacity: '0.7' },
         },
       },
     },
