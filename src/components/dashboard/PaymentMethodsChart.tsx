@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Chart as ChartJS,
   ArcElement,
+  DoughnutController,
   Tooltip,
   Legend,
   type ChartData,
@@ -12,7 +13,7 @@ import {
 import { Doughnut } from "react-chartjs-2";
 import clsx from "clsx";
 
-ChartJS.register(ArcElement, Tooltip, Legend);
+ChartJS.register(ArcElement, DoughnutController, Tooltip, Legend);
 
 export interface PaymentMethod {
   name: string;

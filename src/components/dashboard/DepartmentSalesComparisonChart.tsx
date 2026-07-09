@@ -6,13 +6,21 @@ import {
   CategoryScale,
   LinearScale,
   BarElement,
+  BarController,
   Tooltip,
   Legend,
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
 import type { ComparisonPeriod } from "@/components/dashboard/PeriodComparisonChart";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  BarController,
+  Tooltip,
+  Legend,
+);
 
 export interface DepartmentSalesPoint {
   department: string;
