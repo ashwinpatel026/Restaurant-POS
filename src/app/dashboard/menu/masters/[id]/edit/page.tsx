@@ -194,6 +194,10 @@ export default function EditMenuMasterPage() {
           isEventMenu: masterData.isEventMenu ? 1 : 0,
           isActive:
             typeof masterData.isActive === "number" ? masterData.isActive : 1,
+          disableInPOS:
+            typeof masterData.disableInPOS === "number"
+              ? masterData.disableInPOS
+              : 0,
         };
         formik.setValues(initialData);
       }
@@ -287,6 +291,7 @@ export default function EditMenuMasterPage() {
             eventCodes: eventCodes.length > 0 ? eventCodes : null,
             isEventMenu: eventCodes.length > 0 ? 1 : 0,
             isActive: values.isActive,
+            disableInPOS: values.disableInPOS,
           }),
         }
       );
@@ -324,6 +329,7 @@ export default function EditMenuMasterPage() {
       deptCode: "",
       isEventMenu: 0,
       isActive: 1,
+      disableInPOS: 0,
     },
     validationSchema: menuMasterSchema,
     enableReinitialize: true,
@@ -736,6 +742,18 @@ export default function EditMenuMasterPage() {
                 onChange={(val) =>
                   formik.setFieldValue("isActive", val ? 1 : 0)
                 }
+                disabled={submitting}
+              />
+
+              <StatusToggle
+                label="Disable In POS"
+                description="Toggle to disable this menu master from appearing in the POS."
+                value={formik.values.disableInPOS === 1}
+                onChange={(val) =>
+                  formik.setFieldValue("disableInPOS", val ? 1 : 0)
+                }
+                trueLabel="Disabled"
+                falseLabel="Enabled"
                 disabled={submitting}
               />
             </div>

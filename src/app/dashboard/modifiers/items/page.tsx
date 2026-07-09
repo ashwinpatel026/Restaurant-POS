@@ -38,7 +38,7 @@ interface ModifierGroup {
 export default function ModifierItemsPage() {
   const router = useRouter();
   const { selectedStoreCode, buildApiUrl } = useApiWithStore();
-  
+
   const [modifierItems, setModifierItems] = useState<ModifierItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<ModifierItem[]>([]);
   const [modifiers, setModifiers] = useState<ModifierGroup[]>([]);
@@ -51,12 +51,11 @@ export default function ModifierItemsPage() {
 
   // Modal states
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
   }, [selectedStoreCode]);
-
 
   // Apply filters effect
   useEffect(() => {
@@ -71,32 +70,34 @@ export default function ModifierItemsPage() {
       filtered = filtered.filter(
         (item) =>
           item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.labelName.toLowerCase().includes(searchTerm.toLowerCase())
+          item.labelName.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
 
     // Filter by modifier group
     if (selectedModifier) {
       filtered = filtered.filter(
-        (item) => item.modifierGroupCode === selectedModifier
+        (item) => item.modifierGroupCode === selectedModifier,
       );
     }
 
     setFilteredItems(filtered);
   };
 
-  const fetchData = async () => {
-    // Prevent duplicate calls
-    if (fetchingRef.current) {
+  const fetchData = async (options?: { force?: boolean; silent?: boolean }) => {
+    // Prevent duplicate calls unless forced (e.g. after delete)
+    if (fetchingRef.current && !options?.force) {
       return;
     }
     fetchingRef.current = true;
 
     try {
-      setLoading(true);
+      if (!options?.silent) {
+        setLoading(true);
+      }
       const [itemsRes, modifiersRes] = await Promise.all([
-        fetch(buildApiUrl("/api/dashboard/modifier-items")),
-        fetch(buildApiUrl("/api/dashboard/modifier-groups")),
+        fetch(buildApiUrl("/api/dashboard/modifier-items"), { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/modifier-groups"), { cache: "no-store" }),
       ]);
 
       if (itemsRes.ok) {
@@ -106,7 +107,7 @@ export default function ModifierItemsPage() {
         console.error(
           "Failed to fetch modifier items:",
           itemsRes.status,
-          itemsRes.statusText
+          itemsRes.statusText,
         );
       }
 
@@ -124,9 +125,9 @@ export default function ModifierItemsPage() {
   };
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("en-IN", {
+    return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: "INR",
+      currency: "USD",
       minimumFractionDigits: 0,
     }).format(price);
   };
@@ -138,15 +139,13 @@ export default function ModifierItemsPage() {
 
   const handleEdit = (item: ModifierItem) => {
     router.push(
-      `/dashboard/modifiers/items/${item.id || item.tblModifierItemId}/edit`
+      `/dashboard/modifiers/items/${item.id || item.tblModifierItemId}/edit`,
     );
   };
 
   const handleDelete = (itemId: number | string | undefined) => {
     if (itemId) {
-      setDeletingId(
-        typeof itemId === "number" ? itemId : parseInt(String(itemId))
-      );
+      setDeletingId(String(itemId));
       setShowConfirmModal(true);
     }
   };
@@ -158,17 +157,23 @@ export default function ModifierItemsPage() {
       const url = buildApiUrl(`/api/dashboard/modifier-items/${deletingId}`);
       const response = await fetch(url, {
         method: "DELETE",
+        cache: "no-store",
       });
 
       if (response.ok) {
-        setModifierItems(
-          modifierItems.filter((item) => item.tblModifierItemId !== deletingId)
+        setModifierItems((prev) =>
+          prev.filter(
+            (item) =>
+              String(item.id || item.tblModifierItemId) !== deletingId,
+          ),
         );
         toast.success("Modifier item deleted successfully");
+        await fetchData({ force: true, silent: true });
       } else {
         try {
           const errorData = await response.json();
-          const errorMessage = errorData.error || "Failed to delete modifier item";
+          const errorMessage =
+            errorData.error || "Failed to delete modifier item";
           toast.error(errorMessage);
         } catch (jsonError) {
           toast.error("Failed to delete modifier item");
@@ -176,10 +181,13 @@ export default function ModifierItemsPage() {
       }
     } catch (error: any) {
       // Only log unexpected errors (network errors, etc.)
-      if (error instanceof TypeError && error.message.includes('fetch')) {
+      if (error instanceof TypeError && error.message.includes("fetch")) {
         toast.error("Network error. Please check your connection.");
       } else {
-        const errorMessage = error instanceof Error ? error.message : "Error deleting modifier item";
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Error deleting modifier item";
         toast.error(errorMessage);
       }
     } finally {
@@ -305,74 +313,128 @@ export default function ModifierItemsPage() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredItems.map((item) => (
-                  <div
-                    key={item.id || item.tblModifierItemId}
-                    className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-shadow bg-white dark:bg-gray-700"
-                    style={
-                      item.colorCode
-                        ? { borderColor: item.colorCode }
-                        : undefined
-                    }
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center">
-                        <div
-                          className="w-4 h-4 rounded-full mr-3"
-                          style={{
-                            backgroundColor: item.colorCode || "#3B82F6",
-                          }}
-                        ></div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                          {item.name}
-                        </h3>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {filteredItems.map((item) => {
+                  const groupName =
+                    modifiers.find(
+                      (g) => g.modifierGroupCode === item.modifierGroupCode,
+                    )?.groupName ||
+                    item.modifierGroupCode ||
+                    "N/A";
+
+                  const itemColor = item.colorCode || "#3B82F6";
+
+                  return (
+                    <div
+                      key={item.id || item.tblModifierItemId}
+                      className="group overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800"
+                      style={
+                        item.colorCode
+                          ? {
+                              borderColor: item.colorCode,
+                            }
+                          : undefined
+                      }
+                    >
+                      {/* Top Accent */}
+                      <div
+                        className="h-1 w-full"
+                        style={{ backgroundColor: itemColor }}
+                      />
+
+                      {/* Header */}
+                      <div className="border-b border-gray-100 px-4 py-3 dark:border-gray-700">
+                        <div className="flex min-w-0 items-start gap-3">
+                          <div
+                            className="mt-1.5 h-3.5 w-3.5 shrink-0 rounded-full ring-4 ring-gray-100 dark:ring-gray-700"
+                            style={{ backgroundColor: itemColor }}
+                          />
+
+                          <div className="min-w-0">
+                            <h3 className="truncate text-base font-bold leading-5 text-gray-950 dark:text-white">
+                              {item.name || "Unnamed Item"}
+                            </h3>
+
+                            <p className="mt-1 truncate text-sm font-medium text-gray-500 dark:text-gray-400">
+                              {item.labelName || "No label assigned"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Body */}
+                      <div className="px-4 py-3">
+                        <div className="rounded-lg bg-gray-50 px-3.5 py-3 dark:bg-gray-700/60">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="min-w-0 truncate text-sm text-gray-600 dark:text-gray-300">
+                              <span className="font-bold text-gray-900 dark:text-white">
+                                Label :
+                              </span>{" "}
+                              <span className="font-semibold">
+                                {item.labelName || "N/A"}
+                              </span>
+                            </p>
+
+                            <div className="h-4 w-px shrink-0 bg-gray-300 dark:bg-gray-600" />
+
+                            <p className="shrink-0 text-sm text-gray-600 dark:text-gray-300">
+                              <span className="font-bold text-gray-900 dark:text-white">
+                                Price :
+                              </span>{" "}
+                              <span className="font-extrabold text-gray-950 dark:text-white">
+                                {formatPrice(item.price || 0)}
+                              </span>
+                            </p>
+                          </div>
+
+                          <div className="my-2.5 border-t border-gray-200 dark:border-gray-600" />
+
+                          <p className="truncate text-sm text-gray-600 dark:text-gray-300">
+                            <span className="font-bold text-gray-900 dark:text-white">
+                              Group :
+                            </span>{" "}
+                            <span className="font-semibold text-gray-950 dark:text-white">
+                              {groupName}
+                            </span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Footer Actions */}
+                      <div className="border-t border-gray-100 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/35">
+                        <div className="grid grid-cols-3 gap-2">
+                          <button
+                            className="inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs font-bold text-gray-700 transition-all hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                            title="View modifier item details"
+                          >
+                            <EyeIcon className="mr-1.5 h-3.5 w-3.5" />
+                            View
+                          </button>
+
+                          <button
+                            onClick={() => handleEdit(item)}
+                            className="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-xs font-bold text-blue-700 transition-all hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300 dark:hover:bg-blue-900/40"
+                            title="Edit modifier item"
+                          >
+                            <PencilIcon className="mr-1.5 h-3.5 w-3.5" />
+                            Edit
+                          </button>
+
+                          <button
+                            onClick={() =>
+                              handleDelete(item.id || item.tblModifierItemId)
+                            }
+                            className="inline-flex items-center justify-center rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-xs font-bold text-red-700 transition-all hover:bg-red-100 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/40"
+                            title="Delete modifier item"
+                          >
+                            <TrashIcon className="mr-1.5 h-3.5 w-3.5" />
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     </div>
-
-                    <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
-                      <p>
-                        <strong>Label:</strong> {item.labelName}
-                      </p>
-                      <p>
-                        <strong>Group:</strong>{" "}
-                        {modifiers.find(
-                          (g) => g.modifierGroupCode === item.modifierGroupCode
-                        )?.groupName ||
-                          item.modifierGroupCode ||
-                          "N/A"}
-                      </p>
-                      <p>
-                        <strong>Price:</strong> {formatPrice(item.price || 0)}
-                      </p>
-                    </div>
-
-                    <div className="flex justify-end space-x-2">
-                      <button
-                        className="p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors duration-200"
-                        title="View modifier item details"
-                      >
-                        <EyeIcon className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleEdit(item)}
-                        className="p-1 text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200"
-                        title="Edit modifier item"
-                      >
-                        <PencilIcon className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() =>
-                          handleDelete(item.id || item.tblModifierItemId)
-                        }
-                        className="p-1 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-200"
-                        title="Delete modifier item"
-                      >
-                        <TrashIcon className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

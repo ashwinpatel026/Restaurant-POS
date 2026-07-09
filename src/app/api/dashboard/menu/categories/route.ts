@@ -74,7 +74,8 @@ export async function GET(request: NextRequest) {
     const menuMasterCode = searchParams.get('menuMasterCode')
 
     const where: any = {
-      ...storeFilter
+      ...storeFilter,
+      isDelete: false,
     }
     if (menuMasterCode) {
       where.menuMasterCode = menuMasterCode
@@ -196,15 +197,15 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, colorCode, forColorCode, menuMasterId, modifierGroupCodes = [], deptCode } = body
+    const { name, colorCode, forColorCode, menuMasterId, modifierGroupCodes = [], deptCode, isActive, disableInPOS } = body
 
     // Get the menu master to get its code and deptCode
     const menuMaster = await prisma.menuMaster.findUnique({
       where: { menuMasterId: BigInt(menuMasterId) },
-      select: { menuMasterCode: true, storeCode: true, deptCode: true }
+      select: { menuMasterCode: true, storeCode: true, deptCode: true, isDelete: true }
     })
 
-    if (!menuMaster) {
+    if (!menuMaster || menuMaster.isDelete) {
       return NextResponse.json({ error: 'Menu master not found' }, { status: 404 })
     }
 
@@ -246,6 +247,9 @@ export async function POST(request: NextRequest) {
         deptCode: finalDeptCode,
         menuMasterCode: menuMaster.menuMasterCode,
         menuCategoryCode,
+        isActive: isActive ?? 1,
+        disableInPOS: disableInPOS ?? 0,
+        isDelete: false,
         createdBy: parseInt(session.user.id),
         storeCode: selectedStoreCode,
         syncSource: 'location' // Set sync_source to 'location' when created from dashboard

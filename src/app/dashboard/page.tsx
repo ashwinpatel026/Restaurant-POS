@@ -344,7 +344,8 @@ export default function DashboardPage() {
     }
   }, [selectedDate]);
 
-  const userName = session?.user?.name || "Admin";
+  console.log(session);
+  const userName = session?.user?.name || "John Doe";
 
   return (
     <DashboardLayout>
@@ -524,7 +525,11 @@ export default function DashboardPage() {
 
               {/* Section 3: Payment Methods & Department Sales */}
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-                <ChartCard title="Payment Methods" delay={600} className="min-h-[340px]">
+                <ChartCard
+                  title="Payment Methods"
+                  delay={600}
+                  className="min-h-[340px]"
+                >
                   <div className="h-72 w-full">
                     <PaymentMethodsChart
                       data={PAYMENT_METHODS}

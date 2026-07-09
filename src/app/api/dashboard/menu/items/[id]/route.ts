@@ -64,7 +64,7 @@ export async function GET(
       where: { menuItemId: itemId } as any
     })
 
-    if (!menuItem) {
+    if (!menuItem || (menuItem as any).isDelete) {
       return NextResponse.json({ error: 'Menu item not found' }, { status: 404 })
     }
 
@@ -259,10 +259,10 @@ export async function PUT(
     // Get existing menu item to validate access
     const existingItem = await (prisma as any).menuItem.findUnique({
       where: { menuItemId: itemId } as any,
-      select: { storeCode: true }
+      select: { storeCode: true, isDelete: true }
     })
 
-    if (!existingItem) {
+    if (!existingItem || existingItem.isDelete) {
       return NextResponse.json({ error: 'Menu item not found' }, { status: 404 })
     }
 
@@ -296,6 +296,7 @@ export async function PUT(
       isPrice,
       isOutStock,
       isPosVisible,
+      disableInPOS,
       isKioskOrderPay,
       isOnlineOrderByApp,
       isOnlineOrdering,
@@ -429,6 +430,7 @@ export async function PUT(
           cashPrice: cashPrice !== undefined && cashPrice !== null ? parseFloat(cashPrice.toString()) : null,
           isPrice: isPrice !== undefined ? (isPrice ? 1 : 0) : undefined,
           isActive: isActive !== undefined ? (isActive ? 1 : 0) : undefined,
+          disableInPOS: disableInPOS !== undefined ? (disableInPOS ? 1 : 0) : undefined,
           stockinhand: stockinhand ? parseFloat(stockinhand) : null,
           isOutStock: isOutStock !== undefined ? (isOutStock ? 1 : 0) : null,
           isPosVisible: isPosVisible !== undefined ? (isPosVisible ? 1 : 0) : null,
@@ -632,7 +634,7 @@ export async function DELETE(
       where: { menuItemId: itemId } as any
     })
 
-    if (!menuItem) {
+    if (!menuItem || (menuItem as any).isDelete) {
       return NextResponse.json({ error: 'Menu item not found' }, { status: 404 })
     }
 
@@ -646,24 +648,24 @@ export async function DELETE(
       }
     }
 
-    // Now safe to delete the menu item
+    // Now soft-delete the menu item
     await withRetry(async () => {
-      await (prisma as any).menuItem.delete({
-        where: { menuItemId: itemId } as any
+      await (prisma as any).menuItem.update({
+        where: { menuItemId: itemId } as any,
+        data: {
+          isActive: 0,
+          isDelete: true,
+          updatedBy: parseInt(session.user.id),
+          updatedOn: new Date(),
+          syncSource: 'location',
+        } as any,
       })
     })
 
     return NextResponse.json({ message: 'Menu item deleted successfully' })
   } catch (error) {
     console.error('Error deleting menu item:', error)
-    
-    // Handle foreign key constraint error specifically
-    if (error instanceof Error && error.message.includes('Foreign key constraint')) {
-      return NextResponse.json({ 
-        error: 'Cannot delete this menu item because it has related orders. Please remove all related data first.' 
-      }, { status: 400 })
-    }
-    
+
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

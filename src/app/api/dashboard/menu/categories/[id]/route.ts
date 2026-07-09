@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getUserAccessInfo, getSelectedStoreCode, canAccessStore, checkLocationPermission } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
+import { softDeleteCategoryAndItems } from '@/lib/menuSoftDelete'
 
 export async function GET(
   request: NextRequest,
@@ -43,7 +44,7 @@ export async function GET(
       }
     })
 
-    if (!category) {
+    if (!category || category.isDelete) {
       return NextResponse.json({ error: 'Category not found' }, { status: 404 })
     }
 
@@ -119,15 +120,15 @@ export async function PUT(
     const categoryId = BigInt(resolvedParams.id)
     const body = await request.json()
 
-    const { name, colorCode, forColorCode, isActive, menuMasterId, modifierGroupCodes = [], deptCode } = body
+    const { name, colorCode, forColorCode, isActive, disableInPOS, menuMasterId, modifierGroupCodes = [], deptCode } = body
 
     // Get the category first to get its code
     const existingCategory = await prisma.menuCategory.findUnique({
       where: { menuCategoryId: categoryId },
-      select: { menuCategoryCode: true, storeCode: true }
+      select: { menuCategoryCode: true, storeCode: true, isDelete: true }
     })
 
-    if (!existingCategory) {
+    if (!existingCategory || existingCategory.isDelete) {
       return NextResponse.json({ error: 'Category not found' }, { status: 404 })
     }
 
@@ -172,7 +173,10 @@ export async function PUT(
         forColorCode: forColorCode || null,
         deptCode: finalDeptCode,
         isActive,
+        disableInPOS: disableInPOS ?? 0,
         menuMasterCode: menuMaster.menuMasterCode,
+        updatedBy: parseInt(session.user.id),
+        updatedOn: new Date(),
         syncSource: 'location' // Set sync_source to 'location' when updated from dashboard
       }
     })
@@ -247,7 +251,7 @@ export async function DELETE(
       where: { menuCategoryId: categoryId }
     })
 
-    if (!category) {
+    if (!category || category.isDelete) {
       return NextResponse.json({ error: 'Category not found' }, { status: 404 })
     }
 
@@ -261,54 +265,16 @@ export async function DELETE(
       }
     }
 
-    // Check if category has any menu items
-    // Use menuCategoryCode (string) instead of ID since MenuItem references by code
-    // menuCategoryCode is stored as JSON (string or array), so we need to use raw SQL
-    const categoryCodeStr = category.menuCategoryCode
-    const itemsCountResult = await prisma.$queryRaw<Array<{ count: bigint }>>`
-      SELECT COUNT(*) as count
-      FROM tbl_menu_item
-      WHERE menu_category_code IS NOT NULL
-        AND (
-          menu_category_code::text = ${JSON.stringify(categoryCodeStr)}
-          OR (jsonb_typeof(menu_category_code::jsonb) = 'array' 
-              AND EXISTS (
-                SELECT 1 FROM jsonb_array_elements_text(menu_category_code::jsonb) AS elem
-                WHERE elem = ${categoryCodeStr}
-              ))
-        )
-    `
-    const itemsCount = Number(itemsCountResult[0]?.count || 0)
-
-    // If category has menu items, prevent deletion
-    if (itemsCount > 0) {
-      return NextResponse.json({ 
-        error: `Cannot delete category "${category.name}" because it contains ${itemsCount} menu item(s). Please delete all menu items first or move them to another category.` 
-      }, { status: 400 })
-    }
-
-    // Delete menu category modifier relationships first (foreign key constraint)
-    await prisma.$executeRaw`
-      DELETE FROM tbl_menu_category_modifier 
-      WHERE menu_category_code = ${category.menuCategoryCode}
-    `
-
-    // Now safe to delete the category
-    await prisma.menuCategory.delete({
-      where: { menuCategoryId: categoryId }
+    // Soft delete category and cascade to assigned menu items
+    await softDeleteCategoryAndItems(category.menuCategoryCode, {
+      updatedBy: parseInt(session.user.id),
+      syncSource: 'location',
     })
 
     return NextResponse.json({ message: 'Category deleted successfully' })
   } catch (error) {
     console.error('Error deleting category:', error)
-    
-    // Handle foreign key constraint error specifically
-    if (error instanceof Error && error.message.includes('Foreign key constraint')) {
-      return NextResponse.json({ 
-        error: 'Cannot delete this category because it has related menu items. Please delete all menu items first or move them to another category.' 
-      }, { status: 400 })
-    }
-    
+
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

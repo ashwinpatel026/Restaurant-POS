@@ -109,6 +109,10 @@ export default function EditCategoryPage() {
             typeof categoryData.isActive === "number"
               ? categoryData.isActive
               : 1,
+          disableInPOS:
+            typeof categoryData.disableInPOS === "number"
+              ? categoryData.disableInPOS
+              : 0,
         };
         formik.setValues(initialData);
 
@@ -206,6 +210,7 @@ export default function EditCategoryPage() {
             menuMasterId: values.menuMasterId,
             deptCode: values.deptCode || null,
             isActive: values.isActive,
+            disableInPOS: values.disableInPOS,
             modifierGroupCodes: Array.from(selectedModifierGroups),
           }),
         }
@@ -243,6 +248,7 @@ export default function EditCategoryPage() {
       menuMasterId: "",
       deptCode: "",
       isActive: 1,
+      disableInPOS: 0,
     },
     validationSchema: menuCategorySchema,
     enableReinitialize: true,
@@ -585,6 +591,17 @@ export default function EditCategoryPage() {
                 onChange={(val) =>
                   formik.setFieldValue("isActive", val ? 1 : 0)
                 }
+              />
+
+              <StatusToggle
+                label="Disable In POS"
+                description="Toggle to disable this category from appearing in the POS."
+                value={formik.values.disableInPOS === 1}
+                onChange={(val) =>
+                  formik.setFieldValue("disableInPOS", val ? 1 : 0)
+                }
+                trueLabel="Disabled"
+                falseLabel="Enabled"
               />
             </div>
 

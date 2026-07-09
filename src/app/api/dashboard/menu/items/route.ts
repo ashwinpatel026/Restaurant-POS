@@ -107,7 +107,8 @@ export async function GET(request: NextRequest) {
     const isActive = searchParams.get('isActive')
 
     const where: any = {
-      ...storeFilter
+      ...storeFilter,
+      isDelete: false,
     }
     const searchCode = menuCategoryCode || categoryCode
     // Note: Filtering by menuCategoryCode in structured format requires special handling
@@ -123,7 +124,10 @@ export async function GET(request: NextRequest) {
 
     // Fetch all categories for conversion (if needed)
     const allCategories = await prisma.menuCategory.findMany({
-      where: storeFilter,
+      where: {
+        ...storeFilter,
+        isDelete: false,
+      },
       select: {
         menuCategoryCode: true,
         menuMasterCode: true,
@@ -263,6 +267,7 @@ export async function POST(request: NextRequest) {
       isPrice,
       isOutStock,
       isPosVisible,
+      disableInPOS,
       isKioskOrderPay,
       isOnlineOrderByApp,
       isOnlineOrdering,
@@ -410,6 +415,8 @@ export async function POST(request: NextRequest) {
           cashPrice: cashPrice !== undefined && cashPrice !== null ? parseFloat(cashPrice.toString()) : null,
           isPrice: isPrice !== undefined ? (isPrice ? 1 : 0) : 1,
           isActive: isActive !== undefined ? (isActive ? 1 : 0) : 1,
+          disableInPOS: disableInPOS !== undefined ? (disableInPOS ? 1 : 0) : 0,
+          isDelete: false,
           stockinhand: stockinhand ? parseFloat(stockinhand) : null,
           isOutStock: isOutStock !== undefined ? (isOutStock ? 1 : 0) : null,
           isPosVisible: isPosVisible !== undefined ? (isPosVisible ? 1 : 0) : null,

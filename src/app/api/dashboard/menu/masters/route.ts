@@ -77,10 +77,11 @@ export async function GET(request: NextRequest) {
       // Filter by ONE store only for authenticated requests
       const storeFilter = buildStoreFilter(accessInfo, selectedStoreCode)
 
-      // Fetch menu masters filtered by store
+      // Fetch menu masters filtered by store (exclude soft-deleted)
       const menuMasters = await prisma.menuMaster.findMany({
         where: {
-          ...storeFilter
+          ...storeFilter,
+          isDelete: false,
         },
         orderBy: { createdOn: 'desc' }
       })
@@ -146,11 +147,13 @@ export async function GET(request: NextRequest) {
     const menuMasters = await prisma.menuMaster.findMany({
       where: {
         isActive: 1, // Only active menus for QR orders
+        isDelete: false,
       },
       include: {
         menuCategories: {
           where: {
             isActive: 1,
+            isDelete: false,
           },
           include: {
             // Note: We need to manually fetch menu items as there's no direct relation in Prisma
@@ -170,6 +173,7 @@ export async function GET(request: NextRequest) {
       const allMenuItems = await prisma.menuItem.findMany({
         where: {
           isActive: 1,
+          isDelete: false,
         },
       })
 
@@ -256,6 +260,7 @@ export async function POST(request: NextRequest) {
       eventCodes,
       isEventMenu,
       isActive,
+      disableInPOS,
       deptCode
     } = body
 
@@ -287,6 +292,8 @@ export async function POST(request: NextRequest) {
       stationCode: stationCodes && stationCodes.length > 0 ? stationCodes : null,
       isEventMenu: isEventMenu || 0,
       isActive: isActive ?? 1,
+      disableInPOS: disableInPOS ?? 0,
+      isDelete: false,
       createdBy: parseInt(session.user.id),
       storeCode: selectedStoreCode,
       syncSource: 'location' // Set sync_source to 'location' when created from dashboard

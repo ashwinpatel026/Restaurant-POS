@@ -49,7 +49,7 @@ export default function MenuCategoriesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMenuMaster, setSelectedMenuMaster] = useState("");
   const [filteredCategories, setFilteredCategories] = useState<MenuCategory[]>(
-    []
+    [],
   );
 
   // View mode state
@@ -72,14 +72,14 @@ export default function MenuCategoriesPage() {
     // Search by name
     if (searchTerm) {
       filtered = filtered.filter((category) =>
-        category.name.toLowerCase().includes(searchTerm.toLowerCase())
+        category.name.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
 
     // Filter by menu master
     if (selectedMenuMaster) {
       filtered = filtered.filter(
-        (category) => category.tblMenuMasterId === parseInt(selectedMenuMaster)
+        (category) => category.tblMenuMasterId === parseInt(selectedMenuMaster),
       );
     }
 
@@ -89,7 +89,7 @@ export default function MenuCategoriesPage() {
   // Helper function to get menu master name by ID
   const getMenuMasterName = (menuMasterId: number) => {
     const master = menuMasters.find(
-      (m) => m.menuMasterId === menuMasterId.toString()
+      (m) => m.menuMasterId === menuMasterId.toString(),
     );
     return master?.name || "Unknown";
   };
@@ -98,8 +98,12 @@ export default function MenuCategoriesPage() {
     try {
       setLoading(true);
       const [categoriesRes, mastersRes] = await Promise.all([
-        fetch(buildApiUrl("/api/dashboard/menu/categories"), { cache: "no-store" }),
-        fetch(buildApiUrl("/api/dashboard/menu/masters"), { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/menu/categories"), {
+          cache: "no-store",
+        }),
+        fetch(buildApiUrl("/api/dashboard/menu/masters"), {
+          cache: "no-store",
+        }),
       ]);
 
       if (categoriesRes.ok) {
@@ -137,13 +141,16 @@ export default function MenuCategoriesPage() {
     if (!deletingId) return;
 
     try {
-      const response = await fetch(buildApiUrl(`/api/dashboard/menu/categories/${deletingId}`), {
-        method: "DELETE",
-      });
+      const response = await fetch(
+        buildApiUrl(`/api/dashboard/menu/categories/${deletingId}`),
+        {
+          method: "DELETE",
+        },
+      );
 
       if (response.ok) {
         setCategories(
-          categories.filter((cat) => cat.tblMenuCategoryId !== deletingId)
+          categories.filter((cat) => cat.tblMenuCategoryId !== deletingId),
         );
         toast.success("Category deleted successfully");
       } else {
@@ -157,10 +164,11 @@ export default function MenuCategoriesPage() {
       }
     } catch (error) {
       // Only log unexpected errors (network errors, etc.)
-      if (error instanceof TypeError && error.message.includes('fetch')) {
+      if (error instanceof TypeError && error.message.includes("fetch")) {
         toast.error("Network error. Please check your connection.");
       } else {
-        const errorMessage = error instanceof Error ? error.message : "Error deleting category";
+        const errorMessage =
+          error instanceof Error ? error.message : "Error deleting category";
         toast.error(errorMessage);
       }
     } finally {
@@ -435,11 +443,11 @@ export default function MenuCategoriesPage() {
                 </tbody>
               </table>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-2">
                 {filteredCategories.map((category) => (
                   <div
                     key={category.tblMenuCategoryId}
-                    className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-shadow bg-white dark:bg-gray-700"
+                    className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow bg-white dark:bg-gray-700"
                     style={
                       category.colorCode
                         ? { borderColor: category.colorCode }
@@ -547,8 +555,9 @@ export default function MenuCategoriesPage() {
             </h3>
             <div className="mt-2">
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Are you sure you want to delete this category? This action
-                cannot be undone and will affect all related menu items.
+                Are you sure you want to delete this category? It will be marked
+                as deleted and all assigned menu items will also be soft
+                deleted.
               </p>
             </div>
           </div>

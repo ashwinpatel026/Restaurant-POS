@@ -7,6 +7,7 @@ import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import ModifierItemForm from "@/components/forms/ModifierItemForm";
 import { FormSkeleton } from "@/components/ui/SkeletonLoader";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 interface ModifierItem {
   id: string;
@@ -31,22 +32,24 @@ export default function EditModifierItemPage() {
   const router = useRouter();
   const params = useParams();
   const { id } = params;
+  const { buildApiUrl, selectedStoreCode } = useApiWithStore();
   const [modifierItem, setModifierItem] = useState<ModifierItem | null>(null);
   const [modifiers, setModifiers] = useState<ModifierGroup[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, selectedStoreCode]);
 
   const fetchData = async () => {
-    if (!id) return;
+    if (!id || !selectedStoreCode) return;
 
     setLoading(true);
     try {
       const [itemRes, groupsRes] = await Promise.all([
-        fetch(`/api/modifier-items/${id}`),
-        fetch("/api/dashboard/modifier-groups"),
+        fetch(buildApiUrl(`/api/dashboard/modifier-items/${id}`)),
+        fetch(buildApiUrl("/api/dashboard/modifier-groups")),
       ]);
 
       if (itemRes.ok) {
@@ -73,11 +76,14 @@ export default function EditModifierItemPage() {
     if (!id) return;
 
     try {
-      const response = await fetch(`/api/modifier-items/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
+      const response = await fetch(
+        buildApiUrl(`/api/dashboard/modifier-items/${id}`),
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        },
+      );
 
       if (response.ok) {
         toast.success("Modifier item updated successfully!");

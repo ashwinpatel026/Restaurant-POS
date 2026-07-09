@@ -188,12 +188,7 @@ export async function GET(request: NextRequest) {
       assignedCategories: codeToCategories.get(g.modifierGroupCode || '') || []
     }))
 
-    // Cache response for 60 seconds
-    return NextResponse.json(data, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
-      },
-    })
+    return NextResponse.json(data)
   } catch (error) {
     console.error('Error fetching modifier groups:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

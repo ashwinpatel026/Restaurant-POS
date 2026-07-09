@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getUserAccessInfo, getSelectedStoreCode, canAccessStore, checkLocationPermission } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
+import { softDeleteCategoriesAndItemsByMasterCode } from '@/lib/menuSoftDelete'
 
 export async function GET(
   request: NextRequest,
@@ -34,7 +35,7 @@ export async function GET(
       where: { menuMasterId: masterId }
     })
 
-    if (!menuMaster) {
+    if (!menuMaster || menuMaster.isDelete) {
       return NextResponse.json({ error: 'Menu master not found' }, { status: 404 })
     }
 
@@ -101,6 +102,7 @@ export async function PUT(
       eventCodes,
       isEventMenu,
       isActive,
+      disableInPOS,
       deptCode
     } = body
 
@@ -109,7 +111,7 @@ export async function PUT(
       where: { menuMasterId: masterId }
     })
 
-    if (!existingMaster) {
+    if (!existingMaster || existingMaster.isDelete) {
       return NextResponse.json({ error: 'Menu master not found' }, { status: 404 })
     }
 
@@ -134,6 +136,7 @@ export async function PUT(
       stationCode: stationCodes && stationCodes.length > 0 ? stationCodes : null,
       isEventMenu: isEventMenu || 0,
       isActive: isActive ?? 1,
+      disableInPOS: disableInPOS ?? 0,
       updatedBy: parseInt(session.user.id),
       updatedOn: new Date(),
       syncSource: 'location' // Set sync_source to 'location' when updated from dashboard
@@ -214,7 +217,7 @@ export async function DELETE(
       where: { menuMasterId: masterId }
     })
 
-    if (!menuMaster) {
+    if (!menuMaster || menuMaster.isDelete) {
       return NextResponse.json({ error: 'Menu master not found' }, { status: 404 })
     }
 
@@ -228,38 +231,28 @@ export async function DELETE(
       }
     }
 
-    // Check if menu master has any categories
-    const categoriesCount = await prisma.menuCategory.count({
-      where: { menuMasterCode: menuMaster.menuMasterCode }
+    const updatedBy = parseInt(session.user.id)
+
+    // Soft delete master, then cascade to categories and items
+    await prisma.menuMaster.update({
+      where: { menuMasterId: masterId },
+      data: {
+        isActive: 0,
+        isDelete: true,
+        updatedBy,
+        updatedOn: new Date(),
+        syncSource: 'location',
+      }
     })
 
-    // If menu master has categories, prevent deletion
-    if (categoriesCount > 0) {
-      return NextResponse.json({
-        error: `Cannot delete menu master "${menuMaster.name}" because it contains ${categoriesCount} categor(ies). Please delete all categories first.`
-      }, { status: 400 })
-    }
-
-    // Delete associated menu master events first
-    await prisma.menuMasterEvent.deleteMany({
-      where: { menuMasterCode: menuMaster.menuMasterCode }
-    })
-
-    // Safe to delete the menu master
-    await prisma.menuMaster.delete({
-      where: { menuMasterId: masterId }
+    await softDeleteCategoriesAndItemsByMasterCode(menuMaster.menuMasterCode, {
+      updatedBy,
+      syncSource: 'location',
     })
 
     return NextResponse.json({ message: 'Menu master deleted successfully' })
   } catch (error) {
     console.error('Error deleting menu master:', error)
-
-    // Handle foreign key constraint error specifically
-    if (error instanceof Error && error.message.includes('Foreign key constraint')) {
-      return NextResponse.json({
-        error: 'Cannot delete this menu master because it has related categories and menu items. Please delete all categories and items first.'
-      }, { status: 400 })
-    }
 
     return NextResponse.json(
       { error: 'Internal server error' },

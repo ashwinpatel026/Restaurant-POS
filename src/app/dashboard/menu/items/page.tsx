@@ -1013,9 +1013,8 @@ export default function MenuItemsPage() {
             </h3>
             <div className="mt-2">
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Are you sure you want to delete this menu item? This action
-                cannot be undone and will affect any related modifiers or
-                orders.
+                Are you sure you want to delete this menu item? It will be marked
+                as deleted and set to inactive.
               </p>
             </div>
           </div>

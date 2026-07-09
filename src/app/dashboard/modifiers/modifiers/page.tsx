@@ -36,13 +36,13 @@ interface ModifierGroup {
 export default function ModifiersPage() {
   const router = useRouter();
   const { selectedStoreCode, buildApiUrl } = useApiWithStore();
-  
+
   const [modifiers, setModifiers] = useState<ModifierGroup[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Modal states
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // View mode state
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
@@ -51,9 +51,11 @@ export default function ModifiersPage() {
     fetchData();
   }, [selectedStoreCode]);
 
-  const fetchData = async () => {
+  const fetchData = async (options?: { silent?: boolean }) => {
     try {
-      setLoading(true);
+      if (!options?.silent) {
+        setLoading(true);
+      }
       const url = buildApiUrl("/api/dashboard/modifier-groups");
       const modifiersRes = await fetch(url, {
         cache: "no-store",
@@ -73,10 +75,11 @@ export default function ModifiersPage() {
       }
     } catch (error: any) {
       // Only log unexpected errors (network errors, etc.)
-      if (error instanceof TypeError && error.message.includes('fetch')) {
+      if (error instanceof TypeError && error.message.includes("fetch")) {
         toast.error("Network error. Please check your connection.");
       } else {
-        const errorMessage = error instanceof Error ? error.message : "Error loading data";
+        const errorMessage =
+          error instanceof Error ? error.message : "Error loading data";
         toast.error(errorMessage);
       }
     } finally {
@@ -94,14 +97,12 @@ export default function ModifiersPage() {
   };
 
   const handleClone = (modifier: ModifierGroup) => {
-    const url = `/dashboard/modifiers/modifiers/add?cloneId=${modifier.id}${selectedStoreCode ? `&storeCode=${selectedStoreCode}` : ''}`;
+    const url = `/dashboard/modifiers/modifiers/add?cloneId=${modifier.id}${selectedStoreCode ? `&storeCode=${selectedStoreCode}` : ""}`;
     router.push(url);
   };
 
   const handleDelete = (modifierId: string | number) => {
-    setDeletingId(
-      typeof modifierId === "string" ? parseInt(modifierId) : modifierId
-    );
+    setDeletingId(String(modifierId));
     setShowConfirmModal(true);
   };
 
@@ -112,11 +113,15 @@ export default function ModifiersPage() {
       const url = buildApiUrl(`/api/dashboard/modifier-groups/${deletingId}`);
       const response = await fetch(url, {
         method: "DELETE",
+        cache: "no-store",
       });
 
       if (response.ok) {
-        setModifiers(modifiers.filter((mod) => mod.id !== String(deletingId)));
+        setModifiers((prev) =>
+          prev.filter((mod) => String(mod.id) !== deletingId),
+        );
         toast.success("Modifier deleted successfully");
+        await fetchData({ silent: true });
       } else {
         try {
           const errorData = await response.json();
@@ -128,10 +133,11 @@ export default function ModifiersPage() {
       }
     } catch (error: any) {
       // Only log unexpected errors (network errors, etc.)
-      if (error instanceof TypeError && error.message.includes('fetch')) {
+      if (error instanceof TypeError && error.message.includes("fetch")) {
         toast.error("Network error. Please check your connection.");
       } else {
-        const errorMessage = error instanceof Error ? error.message : "Error deleting modifier";
+        const errorMessage =
+          error instanceof Error ? error.message : "Error deleting modifier";
         toast.error(errorMessage);
       }
     } finally {
@@ -365,79 +371,106 @@ export default function ModifiersPage() {
                   {modifiers.map((modifier) => (
                     <div
                       key={modifier.id}
-                      className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-shadow bg-white dark:bg-gray-700"
+                      className="group overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg dark:border-gray-700 dark:bg-gray-800"
                     >
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                          {modifier.groupName || "Unnamed Group"}
-                        </h3>
-                        <div className="flex flex-col space-y-1">
-                          <span
-                            className={`px-2 py-1 text-xs font-medium rounded-full ${
-                              modifier.isRequired === 1
-                                ? "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400"
-                                : "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400"
-                            }`}
-                          >
-                            {modifier.isRequired === 1
-                              ? "Required"
-                              : "Optional"}
-                          </span>
-                          <span
-                            className={`px-2 py-1 text-xs font-medium rounded-full ${
-                              modifier.isMultiselect === 1
-                                ? "bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400"
-                                : "bg-gray-100 dark:bg-gray-900/20 text-gray-800 dark:text-gray-400"
-                            }`}
-                          >
-                            {modifier.isMultiselect === 1 ? "Multi" : "Single"}
-                          </span>
+                      {/* Card Header */}
+                      <div className="border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white px-5 py-4 dark:border-gray-700 dark:from-gray-800 dark:to-gray-800">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                              {modifier.groupName || "Unnamed Group"}
+                            </h3>
+
+                            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                              {modifier.labelName || "No label assigned"}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-col items-end gap-2">
+                            <span
+                              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                                modifier.isRequired === 1
+                                  ? "bg-red-50 text-red-700 ring-1 ring-red-200 dark:bg-red-900/20 dark:text-red-300 dark:ring-red-800"
+                                  : "bg-green-50 text-green-700 ring-1 ring-green-200 dark:bg-green-900/20 dark:text-green-300 dark:ring-green-800"
+                              }`}
+                            >
+                              {modifier.isRequired === 1
+                                ? "Required"
+                                : "Optional"}
+                            </span>
+
+                            <span
+                              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                                modifier.isMultiselect === 1
+                                  ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:ring-blue-800"
+                                  : "bg-gray-100 text-gray-700 ring-1 ring-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:ring-gray-600"
+                              }`}
+                            >
+                              {modifier.isMultiselect === 1
+                                ? "Multi Select"
+                                : "Single Select"}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
-                        <p>
-                          <strong>Label:</strong> {modifier.labelName || "N/A"}
-                        </p>
-                        {typeof modifier.minSelection === "number" && (
-                          <p>
-                            <strong>Min Selection:</strong>{" "}
-                            {modifier.minSelection}
-                          </p>
-                        )}
-                        {typeof modifier.maxSelection === "number" && (
-                          <p>
-                            <strong>Max Selection:</strong>{" "}
-                            {modifier.maxSelection}
-                          </p>
-                        )}
+                      {/* Card Body */}
+                      <div className="px-2 py-2">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          <div className="rounded-xl bg-gray-50 p-4 dark:bg-gray-700/60">
+                            <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                              Min Selection
+                            </p>
+                            <p className="mt-1 text-base font-semibold text-gray-900 dark:text-white">
+                              {typeof modifier.minSelection === "number"
+                                ? modifier.minSelection
+                                : "N/A"}
+                            </p>
+                          </div>
+
+                          <div className="rounded-xl bg-gray-50 p-4 dark:bg-gray-700/60">
+                            <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                              Max Selection
+                            </p>
+                            <p className="mt-1 text-base font-semibold text-gray-900 dark:text-white">
+                              {typeof modifier.maxSelection === "number"
+                                ? modifier.maxSelection
+                                : "N/A"}
+                            </p>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="flex justify-end space-x-2">
-                        <button
-                          onClick={() => handleEdit(modifier)}
-                          className="flex-1 inline-flex justify-center items-center px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
-                          title="Edit modifier"
-                        >
-                          <PencilIcon className="w-4 h-4 mr-1" />
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleClone(modifier)}
-                          className="flex-1 inline-flex justify-center items-center px-3 py-2 text-sm font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
-                          title="Clone modifier"
-                        >
-                          <DocumentDuplicateIcon className="w-4 h-4 mr-1" />
-                          Clone
-                        </button>
-                        <button
-                          onClick={() => handleDelete(modifier.id)}
-                          className="flex-1 inline-flex justify-center items-center px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
-                          title="Delete modifier"
-                        >
-                          <TrashIcon className="w-4 h-4 mr-1" />
-                          Delete
-                        </button>
+                      {/* Card Footer Actions */}
+                      <div className="border-t border-gray-100 bg-gray-50 px-5 py-4 dark:border-gray-700 dark:bg-gray-900/40">
+                        <div className="grid grid-cols-3 gap-2">
+                          <button
+                            onClick={() => handleEdit(modifier)}
+                            className="inline-flex items-center justify-center rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5 text-sm font-semibold text-blue-700 transition-all hover:bg-blue-100 hover:shadow-sm dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300 dark:hover:bg-blue-900/40"
+                            title="Edit modifier"
+                          >
+                            <PencilIcon className="mr-1.5 h-4 w-4" />
+                            Edit
+                          </button>
+
+                          <button
+                            onClick={() => handleClone(modifier)}
+                            className="inline-flex items-center justify-center rounded-xl border border-purple-200 bg-purple-50 px-3 py-2.5 text-sm font-semibold text-purple-700 transition-all hover:bg-purple-100 hover:shadow-sm dark:border-purple-800 dark:bg-purple-900/20 dark:text-purple-300 dark:hover:bg-purple-900/40"
+                            title="Clone modifier"
+                          >
+                            <DocumentDuplicateIcon className="mr-1.5 h-4 w-4" />
+                            Clone
+                          </button>
+
+                          <button
+                            onClick={() => handleDelete(modifier.id)}
+                            className="inline-flex items-center justify-center rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm font-semibold text-red-700 transition-all hover:bg-red-100 hover:shadow-sm dark:border-red-800 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/40"
+                            title="Delete modifier"
+                          >
+                            <TrashIcon className="mr-1.5 h-4 w-4" />
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}

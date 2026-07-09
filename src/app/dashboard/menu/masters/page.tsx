@@ -55,7 +55,7 @@ interface Station {
 export default function MenuMastersPage() {
   const router = useRouter();
   const { selectedStoreCode, buildApiUrl } = useApiWithStore();
-  
+
   // Check permission to view menu masters
   const { hasPermission, loading: permissionLoading } = usePagePermission({
     requiredPermissions: ["menu.view"],
@@ -98,7 +98,7 @@ export default function MenuMastersPage() {
     // Search by name
     if (searchTerm) {
       filtered = filtered.filter((master) =>
-        master.name.toLowerCase().includes(searchTerm.toLowerCase())
+        master.name.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
 
@@ -134,7 +134,7 @@ export default function MenuMastersPage() {
     if (selectedEventMenu) {
       const isEvent = selectedEventMenu === "event";
       filtered = filtered.filter(
-        (master) => master.isEventMenu === (isEvent ? 1 : 0)
+        (master) => master.isEventMenu === (isEvent ? 1 : 0),
       );
     }
 
@@ -225,12 +225,19 @@ export default function MenuMastersPage() {
 
     try {
       setLoading(true);
-      const [mastersRes, prepZonesRes, stationsRes, departmentsRes] = await Promise.all([
-        fetch(buildApiUrl("/api/dashboard/menu/masters"), { cache: "no-store" }),
-        fetch(buildApiUrl("/api/dashboard/menu/prep-zone"), { cache: "no-store" }),
-        fetch(buildApiUrl("/api/dashboard/station"), { cache: "no-store" }),
-        fetch(buildApiUrl("/api/dashboard/department"), { cache: "no-store" }),
-      ]);
+      const [mastersRes, prepZonesRes, stationsRes, departmentsRes] =
+        await Promise.all([
+          fetch(buildApiUrl("/api/dashboard/menu/masters"), {
+            cache: "no-store",
+          }),
+          fetch(buildApiUrl("/api/dashboard/menu/prep-zone"), {
+            cache: "no-store",
+          }),
+          fetch(buildApiUrl("/api/dashboard/station"), { cache: "no-store" }),
+          fetch(buildApiUrl("/api/dashboard/department"), {
+            cache: "no-store",
+          }),
+        ]);
 
       if (mastersRes.ok) {
         const mastersData = await mastersRes.json();
@@ -278,19 +285,23 @@ export default function MenuMastersPage() {
     if (!deletingId) return;
 
     try {
-      const response = await fetch(buildApiUrl(`/api/dashboard/menu/masters/${deletingId}`), {
-        method: "DELETE",
-      });
+      const response = await fetch(
+        buildApiUrl(`/api/dashboard/menu/masters/${deletingId}`),
+        {
+          method: "DELETE",
+        },
+      );
 
       if (response.ok) {
         setMenuMasters(
-          menuMasters.filter((master) => master.menuMasterId !== deletingId)
+          menuMasters.filter((master) => master.menuMasterId !== deletingId),
         );
         toast.success("Menu master deleted successfully");
       } else {
         try {
           const errorData = await response.json();
-          const errorMessage = errorData.error || "Failed to delete menu master";
+          const errorMessage =
+            errorData.error || "Failed to delete menu master";
           toast.error(errorMessage);
         } catch (jsonError) {
           toast.error("Failed to delete menu master");
@@ -298,10 +309,11 @@ export default function MenuMastersPage() {
       }
     } catch (error: any) {
       // Only log unexpected errors (network errors, etc.)
-      if (error instanceof TypeError && error.message.includes('fetch')) {
+      if (error instanceof TypeError && error.message.includes("fetch")) {
         toast.error("Network error. Please check your connection.");
       } else {
-        const errorMessage = error instanceof Error ? error.message : "Error deleting menu master";
+        const errorMessage =
+          error instanceof Error ? error.message : "Error deleting menu master";
         toast.error(errorMessage);
       }
     } finally {
@@ -572,7 +584,9 @@ export default function MenuMastersPage() {
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        {master.isEventMenu === 1 && master.events && master.events.length > 0 ? (
+                        {master.isEventMenu === 1 &&
+                        master.events &&
+                        master.events.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {master.events.map((event) => (
                               <span
@@ -623,37 +637,35 @@ export default function MenuMastersPage() {
                 </tbody>
               </table>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-2">
                 {filteredMasters.map((master) => (
                   <div
                     key={master.menuMasterId}
-                    className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-shadow bg-white dark:bg-gray-700"
+                    className="border border-gray-200 dark:border-gray-700 rounded-lg p-2 hover:shadow-md transition-shadow bg-white dark:bg-gray-700"
                     style={
                       master.colorCode
                         ? { borderColor: master.colorCode }
                         : undefined
                     }
                   >
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center">
+                    <div className="flex flex-wrap items-start justify-between gap-2 mb-4">
+                      <div className="flex items-center min-w-0 flex-1">
                         <div
-                          className="w-4 h-4 rounded-full mr-3"
+                          className="w-4 h-4 rounded-full mr-2 shrink-0"
                           style={{
                             backgroundColor: master.colorCode || "#3B82F6",
                           }}
                         ></div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        <h3
+                          className="text-lg font-semibold text-gray-900 dark:text-white truncate"
+                          title={master.name}
+                        >
                           {master.name}
                         </h3>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {master.isEventMenu === 1 && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-purple-100 dark:bg-purple-900/20 text-purple-800 dark:text-purple-400">
-                            Event Menu
-                          </span>
-                        )}
+                      <div className="flex flex-col items-end gap-1 shrink-0">
                         <span
-                          className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          className={`px-2 py-1 text-xs font-medium rounded-full whitespace-nowrap ${
                             master.isActive === 1
                               ? "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400"
                               : "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400"
@@ -664,7 +676,7 @@ export default function MenuMastersPage() {
                       </div>
                     </div>
 
-                    <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400 mb-1">
                       <p>
                         <strong>Label:</strong> {master.labelName || "N/A"}
                       </p>
@@ -682,21 +694,23 @@ export default function MenuMastersPage() {
                           {getDepartmentName(master.deptCode)}
                         </p>
                       )}
-                      {master.isEventMenu === 1 && master.events && master.events.length > 0 && (
-                        <p>
-                          <strong>Events:</strong>{" "}
-                          <span className="text-gray-900 dark:text-white">
-                            {master.events.map((event, index) => (
-                              <span key={event.eventCode}>
-                                <span className="inline-flex items-center px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-900/10 text-purple-700 dark:text-purple-300 text-xs font-medium">
-                                  {event.eventName}
+                      {master.isEventMenu === 1 &&
+                        master.events &&
+                        master.events.length > 0 && (
+                          <p>
+                            <strong>Events:</strong>{" "}
+                            <span className="text-gray-900 dark:text-white">
+                              {master.events.map((event, index) => (
+                                <span key={event.eventCode}>
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-900/10 text-purple-700 dark:text-purple-300 text-xs font-medium">
+                                    {event.eventName}
+                                  </span>
+                                  {index < master.events!.length - 1 && " "}
                                 </span>
-                                {index < master.events!.length - 1 && " "}
-                              </span>
-                            ))}
-                          </span>
-                        </p>
-                      )}
+                              ))}
+                            </span>
+                          </p>
+                        )}
                     </div>
 
                     <div className="flex justify-end space-x-2">
@@ -745,9 +759,9 @@ export default function MenuMastersPage() {
             </h3>
             <div className="mt-2">
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Are you sure you want to delete this menu master? This action
-                cannot be undone and will affect all related categories and menu
-                items.
+                Are you sure you want to delete this menu master? It will be
+                marked as deleted and all assigned categories and menu items
+                will also be soft deleted.
               </p>
             </div>
           </div>
