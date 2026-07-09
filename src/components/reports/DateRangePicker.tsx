@@ -166,7 +166,7 @@ export default function DateRangePicker({
                 </label>
                 <DatePicker
                   selected={draftStart}
-                  onChange={(date) => setDraftStart(date)}
+                  onChange={(date: Date | null) => setDraftStart(date)}
                   dateFormat="MMM-dd-yyyy"
                   placeholderText="Start date"
                   className={inputClass}
@@ -180,7 +180,7 @@ export default function DateRangePicker({
                 </label>
                 <DatePicker
                   selected={draftEnd}
-                  onChange={(date) => setDraftEnd(date)}
+                  onChange={(date: Date | null) => setDraftEnd(date)}
                   dateFormat="MMM-dd-yyyy"
                   placeholderText="End date"
                   className={inputClass}

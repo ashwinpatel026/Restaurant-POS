@@ -243,8 +243,8 @@ export async function POST(
     }
 
     // Check if order number already exists
-    const existing = await locationPrisma.order.findUnique({
-      where: { orderNumber }
+    const existing = await locationPrisma.order.findFirst({
+      where: { orderNumber, storeCode }
     })
 
     if (existing) {

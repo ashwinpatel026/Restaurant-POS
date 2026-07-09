@@ -121,7 +121,7 @@ export function ReportFilterProvider({ children }: { children: ReactNode }) {
   );
   const [rangeEnd, setRangeEnd] = useState<Date | null>(defaults.rangeEnd);
   const [dateQuickPreset, setDateQuickPreset] =
-    useState<DateQuickPreset>("today");
+    useState<DateQuickPreset | null>("today");
   const [applied, setApplied] = useState<AppliedReportFilters | null>(null);
   const [stations, setStations] = useState<ReportStation[]>([]);
   const [stationsLoading, setStationsLoading] = useState(true);

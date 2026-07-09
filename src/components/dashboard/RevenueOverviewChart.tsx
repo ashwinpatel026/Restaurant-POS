@@ -106,8 +106,7 @@ export default function RevenueOverviewChart({
           position: "top" as const,
           align: "end" as const,
           labels: {
-            color: (context: { text?: string }) =>
-              context.text === "Sales ($)" ? salesColor : tickColor,
+            color: tickColor,
             boxWidth: 12,
             boxHeight: 12,
             font: { size: 12 },

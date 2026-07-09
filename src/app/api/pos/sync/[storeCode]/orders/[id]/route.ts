@@ -63,8 +63,8 @@ export async function GET(
     }
 
     if (!order) {
-      order = await locationPrisma.order.findUnique({
-        where: { orderNumber: id },
+      order = await locationPrisma.order.findFirst({
+        where: { orderNumber: id, storeCode },
         include: {
           orderItems: true,
           table: true
@@ -184,8 +184,8 @@ export async function PUT(
     }
 
     if (!existingOrder) {
-      existingOrder = await locationPrisma.order.findUnique({
-        where: { orderNumber: id }
+      existingOrder = await locationPrisma.order.findFirst({
+        where: { orderNumber: id, storeCode }
       })
     }
 
@@ -307,8 +307,8 @@ export async function DELETE(
     }
 
     if (!existingOrder) {
-      existingOrder = await locationPrisma.order.findUnique({
-        where: { orderNumber: id }
+      existingOrder = await locationPrisma.order.findFirst({
+        where: { orderNumber: id, storeCode }
       })
     }
 
