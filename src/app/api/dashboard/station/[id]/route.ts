@@ -44,9 +44,18 @@ function mapStationResponse(station: any) {
           .filter((item): item is string => item.length > 0)
       : []
 
+  // Convert BigInt fields to strings for JSON serialization
+  const { tblStationId, updatedBy, ...rest } = station
   return {
-    ...station,
-    tblStationId: station.tblStationId.toString(),
+    ...rest,
+    tblStationId:
+      typeof tblStationId === 'bigint'
+        ? tblStationId.toString()
+        : String(tblStationId || ''),
+    updatedBy:
+      updatedBy && typeof updatedBy === 'bigint'
+        ? updatedBy.toString()
+        : updatedBy || null,
     stationGroups: groups,
   }
 }
