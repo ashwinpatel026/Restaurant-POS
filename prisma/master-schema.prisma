@@ -369,6 +369,7 @@ model MasterPrepZone {
   alwaysPrintTicket  Int?      @map("always_print_ticket")
   printerCode        String?   @map("printer_code") @db.VarChar(100)
   backupPrinterCode  String?   @map("backup_printer_code") @db.VarChar(100)
+  profileCode        String?   @map("profile_code") @db.VarChar(50)
   createdBy          BigInt?   @map("createdby")
   createdOn          DateTime  @default(now()) @map("createdon")
   updatedBy          BigInt?   @map("updatedby")
@@ -492,6 +493,11 @@ model MasterMenuItem {
   updatedOn                      DateTime? @map("updatedon")
   syncId                         String    @unique @default(uuid()) @map("sync_id") @db.Uuid
   syncSource                     String?   @default("server") @map("sync_source") @db.VarChar(20)
+  disableInPOS                   Int       @default(0) @map("disable_in_pos")
+  isSetToZeroStock                Boolean   @default(false) @map("is_set_to_zero_stock")
+  isOpenItem                      Boolean   @default(false) @map("open_item")
+  isEditStock                     Boolean   @default(false) @map("is_edit_stock")
+  isAllowMultipleDiscount         Boolean   @default(false) @map("allow_multiple_discount")
 
   @@map("tbl_master_menu_item")
 }
@@ -598,19 +604,29 @@ model MasterStation {
 }
 
 model MasterPrinter {
-  printerId     BigInt    @id @default(autoincrement()) @map("printer_id")
-  printerCode   String    @unique @map("printer_code") @db.VarChar(100)
-  printerName   String?   @map("printer_name") @db.VarChar(200)
-  isActive      Int       @default(1) @map("is_active")
-  isreceipt     Boolean   @default(false) @map("isreceipt")
-  isdocument    Boolean   @default(false) @map("isdocument")
-  isKitchen     Boolean   @default(false) @map("is_kitchen")
-  createdBy     BigInt?   @map("createdby")
-  createdOn     DateTime  @default(now()) @map("createdon")
-  updatedBy     BigInt?   @map("updatedby")
-  updatedOn     DateTime? @map("updatedon")
-  syncId        String    @unique @default(uuid()) @map("sync_id") @db.Uuid
-  syncSource    String?   @default("server") @map("sync_source") @db.VarChar(20)
+  printerId        BigInt    @id @default(autoincrement()) @map("printer_id")
+  printerCode      String    @unique @map("printer_code") @db.VarChar(100)
+  printerName      String?   @map("printer_name") @db.VarChar(200)
+  isActive         Int       @default(1) @map("is_active")
+  isreceipt        Boolean   @default(false) @map("isreceipt")
+  isdocument       Boolean   @default(false) @map("isdocument")
+  isKitchen        Boolean   @default(false) @map("is_kitchen")
+  isDelete         Boolean   @default(false) @map("is_delete")
+  stationCode      String?   @map("station_code") @db.VarChar(100)
+  isSerial         Boolean   @default(false) @map("is_serial")
+  comport          String?   @map("comport") @db.VarChar(10)
+  displayName      String?   @map("display_name") @db.VarChar(200)
+  characterPerLine Int       @default(40) @map("character_per_line")
+  printerBrand     String    @default("") @map("printer_brand") @db.VarChar(100)
+  printMethod      String    @default("1") @map("print_method") @db.VarChar(50)
+  colPreChar       Int       @default(40) @map("col_pre_char")
+  ipAdress         String?   @map("ip_adress") @db.VarChar(100)
+  createdBy        BigInt?   @map("createdby")
+  createdOn        DateTime  @default(now()) @map("createdon")
+  updatedBy        BigInt?   @map("updatedby")
+  updatedOn        DateTime? @map("updatedon")
+  syncId           String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource       String?   @default("server") @map("sync_source") @db.VarChar(20)
 
   @@map("tbl_master_printer")
 }

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/database'
 import { checkLocationPermission } from '@/lib/auth/accessControl'
+import { extractMenuCategoryCodes } from '@/lib/utils/menuItemFormat'
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,8 +24,12 @@ export async function GET(request: NextRequest) {
 
     const menuItem = await (prisma as any).menuItem.findUnique({
       where: { menuItemId },
-      select: { menuItemCode: true }
+      select: { menuItemCode: true, isDelete: true }
     })
+
+    if (!menuItem || menuItem.isDelete) {
+      return NextResponse.json([])
+    }
 
     const menuItemCode = menuItem?.menuItemCode
 
@@ -55,12 +60,13 @@ export async function GET(request: NextRequest) {
 
     const [groups, items] = await Promise.all([
       (prisma as any).modifierGroup.findMany({
-        where: { modifierGroupCode: { in: codes } }
+        where: { modifierGroupCode: { in: codes }, isDelete: false }
       }),
       (prisma as any).modifierItem.findMany({
         where: {
           modifierGroupCode: { in: codes },
-          isActive: 1
+          isActive: 1,
+          isDelete: false,
         },
         orderBy: { displayOrder: 'asc' }
       })
@@ -189,7 +195,7 @@ export async function POST(request: NextRequest) {
 
     if (selectedModifierIds.length > 0) {
       const groups = await (prisma as any).modifierGroup.findMany({
-        where: { id: { in: selectedModifierIds } }
+        where: { id: { in: selectedModifierIds }, isDelete: false }
       })
 
       for (const group of groups) {
@@ -218,11 +224,14 @@ export async function POST(request: NextRequest) {
     // If inheritance is enabled, add inherited modifiers from category
     if (inheritModifiers && menuItem.menuCategoryCode) {
       const selectedCodes = new Set(rowsToCreate.map((row) => row.modifierGroupCode))
+      const categoryCodes = extractMenuCategoryCodes(menuItem.menuCategoryCode)
 
-      const inheritedRows = await prisma.$queryRawUnsafe<Array<{ modifier_group_code: string }>>(
-        `SELECT modifier_group_code FROM tbl_menu_category_modifier WHERE menu_category_code = $1`,
-        menuItem.menuCategoryCode
-      )
+      const inheritedRows = categoryCodes.length > 0
+        ? await prisma.$queryRaw<Array<{ modifier_group_code: string }>>`
+            SELECT modifier_group_code FROM tbl_menu_category_modifier 
+            WHERE menu_category_code = ANY(${categoryCodes}::text[])
+          `
+        : []
 
       for (const row of inheritedRows) {
         const code = row?.modifier_group_code

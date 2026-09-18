@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getUserAccessInfo, getSelectedStoreCode, canAccessStore, checkLocationPermission } from '@/lib/auth/accessControl'
 import { prisma, checkConnection } from '@/lib/database'
-import { normalizeToStructuredFormat, MenuCategoryMapping, isStructuredFormat } from '@/lib/utils/menuItemFormat'
+import { normalizeToStructuredFormat, MenuCategoryMapping, isStructuredFormat, extractMenuCategoryCodes } from '@/lib/utils/menuItemFormat'
 
 // Helper function to handle database operations with retry
 async function withRetry<T>(operation: () => Promise<T>, maxRetries = 3): Promise<T> {
@@ -99,7 +99,7 @@ export async function GET(
         
         if (groupCodes.length > 0) {
           const modifierGroups = await (prisma as any).modifierGroup.findMany({
-            where: { modifierGroupCode: { in: groupCodes } }
+            where: { modifierGroupCode: { in: groupCodes }, isDelete: false }
           })
 
           // Map to include IDs for the form - include ALL assigned modifiers (both inherited and explicit)
@@ -191,7 +191,8 @@ export async function GET(
             // Fetch categories for conversion
             const allCategories = await prisma.menuCategory.findMany({
               where: {
-                storeCode: (menuItem as any).storeCode || undefined
+                storeCode: (menuItem as any).storeCode || undefined,
+                isDelete: false,
               },
               select: {
                 menuCategoryCode: true,
@@ -301,6 +302,10 @@ export async function PUT(
       isOnlineOrderByApp,
       isOnlineOrdering,
       isCustomerInvoice,
+      isSetToZeroStock,
+      isOpenItem,
+      isEditStock,
+      isAllowMultipleDiscount,
       menuMasterCode,
       menuCategoryCode,
       taxCode,
@@ -355,7 +360,8 @@ export async function PUT(
         // Fetch categories to get their menuMasterCode mapping
         const allCategories = await prisma.menuCategory.findMany({
           where: {
-            storeCode: existingItem.storeCode || selectedStoreCode || undefined
+            storeCode: existingItem.storeCode || selectedStoreCode || undefined,
+            isDelete: false,
           },
           select: {
             menuCategoryCode: true,
@@ -438,6 +444,10 @@ export async function PUT(
           isOnlineOrderByApp: isOnlineOrderByApp !== undefined ? (isOnlineOrderByApp ? 1 : 0) : null,
           isOnlineOrdering: isOnlineOrdering !== undefined ? (isOnlineOrdering ? 1 : 0) : null,
           isCustomerInvoice: isCustomerInvoice !== undefined ? (isCustomerInvoice ? 1 : 0) : null,
+          isSetToZeroStock: isSetToZeroStock !== undefined ? Boolean(isSetToZeroStock) : undefined,
+          isOpenItem: isOpenItem !== undefined ? Boolean(isOpenItem) : undefined,
+          isEditStock: isEditStock !== undefined ? Boolean(isEditStock) : undefined,
+          isAllowMultipleDiscount: isAllowMultipleDiscount !== undefined ? Boolean(isAllowMultipleDiscount) : undefined,
           taxCode: taxCode || null,
           inheritTaxInclusion: inheritTaxInclusion !== undefined ? inheritTaxInclusion : undefined,
           isTaxIncluded: isTaxIncluded !== undefined ? isTaxIncluded : undefined,
@@ -519,13 +529,13 @@ export async function PUT(
 
         // Inherit from categories
         if (inheritModifiers && current?.menuCategoryCode) {
-          const categoryCodes = Array.isArray(current.menuCategoryCode) 
-            ? current.menuCategoryCode 
-            : [current.menuCategoryCode]
-          const mcmRows = await prisma.$queryRaw<Array<{ modifier_group_code: string }>>`
-            SELECT modifier_group_code FROM tbl_menu_category_modifier 
-            WHERE menu_category_code = ANY(${categoryCodes}::text[])
-          `
+          const categoryCodes = extractMenuCategoryCodes(current.menuCategoryCode)
+          const mcmRows = categoryCodes.length > 0
+            ? await prisma.$queryRaw<Array<{ modifier_group_code: string }>>`
+                SELECT modifier_group_code FROM tbl_menu_category_modifier 
+                WHERE menu_category_code = ANY(${categoryCodes}::text[])
+              `
+            : []
           for (const row of mcmRows) {
             const code = row.modifier_group_code
             if (code && !seenGroups.has(code)) {
@@ -550,7 +560,7 @@ export async function PUT(
         // Add explicit selected modifier groups (always allowed, independent of inheritance)
         if (Array.isArray(selectedModifiers) && selectedModifiers.length > 0) {
           const groups = await (prisma as any).modifierGroup.findMany({
-            where: { id: { in: selectedModifiers.map((n: any) => BigInt(n)) } }
+            where: { id: { in: selectedModifiers.map((n: any) => BigInt(n)) }, isDelete: false }
           })
           for (const g of groups) {
             if (g.modifierGroupCode) {

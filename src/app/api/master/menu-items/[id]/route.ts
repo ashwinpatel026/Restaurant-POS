@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { masterPrisma } from '@/lib/databaseManager'
 import { Prisma } from '@prisma/master-client'
-import { normalizeToStructuredFormat, MenuCategoryMapping, isStructuredFormat } from '@/lib/utils/menuItemFormat'
+import { normalizeToStructuredFormat, MenuCategoryMapping, isStructuredFormat, extractMenuCategoryCodes } from '@/lib/utils/menuItemFormat'
 
 // Helper function to map menu item response
 function mapMenuItemResponse(item: any, categories?: Array<{ menuCategoryCode: string; menuMasterCode: string }>): any {
@@ -191,6 +191,10 @@ export async function PUT(
       isOnlineOrderByApp,
       isOnlineOrdering,
       isCustomerInvoice,
+      isSetToZeroStock,
+      isOpenItem,
+      isEditStock,
+      isAllowMultipleDiscount,
       menuMasterCode,
       menuCategoryCode,
       taxCode,
@@ -325,6 +329,10 @@ export async function PUT(
         isOnlineOrderByApp: isOnlineOrderByApp !== undefined ? (isOnlineOrderByApp ? 1 : 0) : null,
         isOnlineOrdering: isOnlineOrdering !== undefined ? (isOnlineOrdering ? 1 : 0) : null,
         isCustomerInvoice: isCustomerInvoice !== undefined ? (isCustomerInvoice ? 1 : 0) : null,
+        isSetToZeroStock: isSetToZeroStock !== undefined ? Boolean(isSetToZeroStock) : undefined,
+        isOpenItem: isOpenItem !== undefined ? Boolean(isOpenItem) : undefined,
+        isEditStock: isEditStock !== undefined ? Boolean(isEditStock) : undefined,
+        isAllowMultipleDiscount: isAllowMultipleDiscount !== undefined ? Boolean(isAllowMultipleDiscount) : undefined,
         taxCode: taxCode || null,
         menuMasterCode: storedMenuMasterCode as any,
         menuCategoryCode: storedMenuCategoryCode as any, // Store as structured format
@@ -353,11 +361,7 @@ export async function PUT(
 
         // Inherit from categories
         if (inheritModifiers && menuItem.menuCategoryCode) {
-          const categoryCodes: string[] = Array.isArray(menuItem.menuCategoryCode) 
-            ? menuItem.menuCategoryCode.filter((code): code is string => typeof code === 'string')
-            : typeof menuItem.menuCategoryCode === 'string' 
-              ? [menuItem.menuCategoryCode]
-              : []
+          const categoryCodes = extractMenuCategoryCodes(menuItem.menuCategoryCode)
           const categoryModifiers = categoryCodes.length > 0
             ? await masterPrisma.masterMenuCategoryModifier.findMany({
                 where: { menuCategoryCode: { in: categoryCodes } }

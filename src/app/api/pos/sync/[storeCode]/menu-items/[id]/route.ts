@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticatePOSRequest, addPOSSyncMetadata } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
+import { extractMenuCategoryCodes } from '@/lib/utils/menuItemFormat'
 
 /**
  * @api {get} /api/pos/sync/:storeCode/menu-items/:id Get menu item
@@ -44,7 +45,7 @@ export async function GET(
       )
     }
 
-    // Try to find by ID first, then by menuItemCode
+    // Try to find by ID first, then by menuItemCode (exclude soft-deleted)
     let menuItem = null
     const itemId = BigInt(id)
     
@@ -52,7 +53,8 @@ export async function GET(
       menuItem = await locationPrisma.menuItem.findFirst({
         where: {
           menuItemId: itemId,
-          storeCode
+          storeCode,
+          isDelete: false
         }
       })
     } catch {
@@ -63,7 +65,8 @@ export async function GET(
       menuItem = await locationPrisma.menuItem.findFirst({
         where: {
           menuItemCode: id,
-          storeCode
+          storeCode,
+          isDelete: false
         }
       })
     }
@@ -329,13 +332,9 @@ export async function PUT(
 
         // 1. If inheritModifierGroup is true, fetch modifiers from menu categories
         if (finalInheritModifierGroup) {
-          const categoryCodes = updateData.menuCategoryCode 
-            ? (Array.isArray(updateData.menuCategoryCode) ? updateData.menuCategoryCode : [updateData.menuCategoryCode])
-            : (existingItem.menuCategoryCode 
-              ? (Array.isArray(existingItem.menuCategoryCode as any) 
-                ? (existingItem.menuCategoryCode as any) 
-                : [existingItem.menuCategoryCode])
-              : [])
+          const categoryCodes = extractMenuCategoryCodes(
+            updateData.menuCategoryCode ?? existingItem.menuCategoryCode
+          )
 
           if (categoryCodes.length > 0) {
             const categoryModifiers = await locationPrisma.menuCategoryModifier.findMany({

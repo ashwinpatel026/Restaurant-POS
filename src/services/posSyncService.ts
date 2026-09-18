@@ -308,6 +308,9 @@ class POSSyncService {
       'modifier_items': 'modifierItem',
       'modifier_item': 'modifierItem',
       'tbl_modifier_item': 'modifierItem',
+      'menu_item_modifiers': 'menuItemModifierGroup',
+      'menu_item_modifier': 'menuItemModifierGroup',
+      'tbl_menu_item_modifier_group': 'menuItemModifierGroup',
       'menu_masters': 'menuMaster',
       'menu_master': 'menuMaster',
       'tbl_menu_master': 'menuMaster',
@@ -368,8 +371,8 @@ class POSSyncService {
       'printer': 'printerCode',
       'orders': 'orderNumber',
       'order': 'orderNumber',
-      'tables': 'tableNumber',
-      'table': 'tableNumber'
+      'tables': 'tableCode',
+      'table': 'tableCode'
     }
 
     return uniqueFieldMap[tableName.toLowerCase()] || null
@@ -461,6 +464,9 @@ export function getModelName(tableName: string): string {
     'modifier_items': 'modifierItem',
     'modifier_item': 'modifierItem',
     'tbl_modifier_item': 'modifierItem',
+    'menu_item_modifiers': 'menuItemModifierGroup',
+    'menu_item_modifier': 'menuItemModifierGroup',
+    'tbl_menu_item_modifier_group': 'menuItemModifierGroup',
     'menu_masters': 'menuMaster',
     'menu_master': 'menuMaster',
     'tbl_menu_master': 'menuMaster',

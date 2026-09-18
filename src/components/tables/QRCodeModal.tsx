@@ -29,8 +29,9 @@ export default function QRCodeModal({
   const generateQRCode = async () => {
     if (!table) return;
 
-    // Use tableNumber for QR code URL (or tableId if tableNumber is not available)
-    const tableIdentifier = table.tableNumber || table.tableId || table.id;
+    // Use code / tableCode for QR code URL
+    const tableIdentifier =
+      table.code || table.tableCode || table.tableId || table.id;
 
     if (!tableIdentifier) {
       console.error("Table identifier not found");
@@ -60,7 +61,7 @@ export default function QRCodeModal({
     if (!qrDataUrl) return;
 
     const link = document.createElement("a");
-    link.download = `table-${table.tableNumber}-qr.png`;
+    link.download = `table-${table.code || table.tableCode || table.tableId}-qr.png`;
     link.href = qrDataUrl;
     link.click();
   };
@@ -73,7 +74,7 @@ export default function QRCodeModal({
       printWindow.document.write(`
         <html>
           <head>
-            <title>Table ${table?.tableNumber} QR Code</title>
+            <title>Table ${table?.tableName || table?.code} QR Code</title>
             <style>
               body {
                 display: flex;
@@ -89,7 +90,7 @@ export default function QRCodeModal({
             </style>
           </head>
           <body>
-            <h1>Table ${table?.tableNumber}</h1>
+            <h1>Table ${table?.tableName || table?.code}</h1>
             <img src="${qrDataUrl}" alt="QR Code" />
             <p>Scan to order</p>
           </body>
@@ -131,7 +132,7 @@ export default function QRCodeModal({
               <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
                 <div className="flex items-center justify-between mb-4">
                   <Dialog.Title className="text-xl font-bold text-gray-900 dark:text-white">
-                    Table {table.tableNumber || table.id || table.tableId} QR
+                    Table {table.tableName || table.code || table.tableId} QR
                     Code
                   </Dialog.Title>
                   <button

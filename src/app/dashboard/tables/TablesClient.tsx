@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import {
   PlusIcon,
@@ -15,85 +14,61 @@ import toast from "react-hot-toast";
 import TableModal from "@/components/tables/TableModal";
 import QRCodeModal from "@/components/tables/QRCodeModal";
 import DeleteConfirmationModal from "@/components/modals/DeleteConfirmationModal";
+import { PageSkeleton } from "@/components/ui/SkeletonLoader";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
+import { usePagePermission } from "@/hooks/usePagePermission";
 
 export interface Table {
   tableId: string | number;
-  tableNumber: string;
+  tableCode: string;
+  code: string;
+  tableName: string;
   seatingCapacity: number;
-  currentOccupancy: number;
-  location: string | null;
-  status: number | null; // 0 = Available, 1 = Occupied, 2 = Reserved, 3 = Maintenance
-  createdDate: string;
-  qrCode?: string;
+  status: string | null; // Free, Available, Occupied
+  isActive?: number | null;
+  createdOn?: string | null;
+  storeCode?: string | null;
 }
 
-// Map status number to string
-const getStatusString = (status: number | null): string => {
-  switch (status) {
-    case 0:
-      return "AVAILABLE";
-    case 1:
-      return "OCCUPIED";
-    case 2:
-      return "RESERVED";
-    case 3:
-      return "MAINTENANCE";
-    default:
-      return "AVAILABLE";
-  }
+const normalizeStatus = (status: string | null | undefined): string => {
+  if (!status) return "Free";
+  const raw = String(status).trim();
+  if (raw === "0" || raw.toLowerCase() === "free") return "Free";
+  if (raw === "1" || raw.toLowerCase() === "available") return "Available";
+  if (raw === "2" || raw.toLowerCase() === "occupied") return "Occupied";
+  return "Free";
 };
 
-// Map status string to number
-const getStatusNumber = (status: string): number => {
-  switch (status) {
-    case "OCCUPIED":
-      return 1;
-    case "RESERVED":
-      return 2;
-    case "MAINTENANCE":
-      return 3;
-    default:
-      return 0; // AVAILABLE
-  }
-};
-
-// Get status color classes
-const getStatusColor = (status: number | null) => {
-  const statusStr = getStatusString(status);
-  switch (statusStr) {
-    case "OCCUPIED":
+const getStatusColor = (status: string | null) => {
+  switch (normalizeStatus(status)) {
+    case "Occupied":
       return "bg-red-100 dark:bg-red-900/20 text-red-800 dark:text-red-400 border-red-200 dark:border-red-800";
-    case "RESERVED":
+    case "Available":
       return "bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400 border-blue-200 dark:border-blue-800";
-    case "MAINTENANCE":
-      return "bg-yellow-100 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800";
     default:
       return "bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-400 border-green-200 dark:border-green-800";
   }
 };
 
-// Get border color based on status
-const getBorderColor = (status: number | null): string => {
-  const statusStr = getStatusString(status);
-  switch (statusStr) {
-    case "OCCUPIED":
+const getBorderColor = (status: string | null): string => {
+  switch (normalizeStatus(status)) {
+    case "Occupied":
       return "border-2 border-red-400 dark:border-red-600";
-    case "RESERVED":
+    case "Available":
       return "border-2 border-blue-400 dark:border-blue-600";
-    case "MAINTENANCE":
-      return "border-2 border-yellow-400 dark:border-yellow-600";
     default:
       return "border-2 border-green-400 dark:border-green-600";
   }
 };
 
-interface TablesClientProps {
-  initialTables: Table[];
-}
+export default function TablesClient() {
+  const { selectedStoreCode, buildApiUrl } = useApiWithStore();
+  const { hasPermission, loading: permissionLoading } = usePagePermission({
+    requiredPermissions: ["tables.view"],
+  });
 
-export default function TablesClient({ initialTables }: TablesClientProps) {
-  const router = useRouter();
-  const [tables, setTables] = useState<Table[]>(initialTables);
+  const [tables, setTables] = useState<Table[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -102,37 +77,59 @@ export default function TablesClient({ initialTables }: TablesClientProps) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const fetchTables = async () => {
+    if (!selectedStoreCode) {
+      setTables([]);
+      setLoading(false);
+      return;
+    }
+
     try {
-      const response = await fetch("/api/dashboard/tables");
+      setLoading(true);
+      const response = await fetch(buildApiUrl("/api/dashboard/tables"), {
+        cache: "no-store",
+      });
       if (response.ok) {
         const data = await response.json();
-        // Sort by createdDate descending (most recent first)
-        const sortedData = data.sort((a: Table, b: Table) => {
-          const dateA = new Date(a.createdDate || 0).getTime();
-          const dateB = new Date(b.createdDate || 0).getTime();
+        const list = Array.isArray(data) ? data : [];
+        const sortedData = [...list].sort((a: Table, b: Table) => {
+          const dateA = new Date(a.createdOn || 0).getTime();
+          const dateB = new Date(b.createdOn || 0).getTime();
           return dateB - dateA;
         });
         setTables(sortedData);
       } else {
-        toast.error("Failed to fetch tables");
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.error || "Failed to fetch tables");
+        setTables([]);
       }
     } catch (error) {
       toast.error("Failed to fetch tables");
       console.error("Error:", error);
+      setTables([]);
+    } finally {
+      setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (permissionLoading || !hasPermission) return;
+    fetchTables();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStoreCode, permissionLoading, hasPermission]);
 
   const handleStatusChange = async (
     tableId: string | number,
     newStatus: string,
   ) => {
     try {
-      const statusNumber = getStatusNumber(newStatus);
-      const response = await fetch(`/api/dashboard/tables/${tableId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: statusNumber }),
-      });
+      const response = await fetch(
+        buildApiUrl(`/api/dashboard/tables/${tableId}`),
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus }),
+        },
+      );
 
       if (response.ok) {
         toast.success("Table status updated");
@@ -157,7 +154,7 @@ export default function TablesClient({ initialTables }: TablesClientProps) {
 
     try {
       const response = await fetch(
-        `/api/dashboard/tables/${tableToDelete.tableId}`,
+        buildApiUrl(`/api/dashboard/tables/${tableToDelete.tableId}`),
         {
           method: "DELETE",
         },
@@ -178,22 +175,33 @@ export default function TablesClient({ initialTables }: TablesClientProps) {
     }
   };
 
-  const statusOptions = ["AVAILABLE", "OCCUPIED", "RESERVED", "MAINTENANCE"];
+  if (permissionLoading || loading) {
+    return (
+      <DashboardLayout>
+        <PageSkeleton />
+      </DashboardLayout>
+    );
+  }
 
-  const activeTables = tables.filter(
-    (t) => getStatusString(t.status) === "AVAILABLE",
+  if (!hasPermission) {
+    return null;
+  }
+
+  const statusOptions = ["Free", "Available", "Occupied"];
+
+  const freeTables = tables.filter(
+    (t) => normalizeStatus(t.status) === "Free",
+  ).length;
+  const availableTables = tables.filter(
+    (t) => normalizeStatus(t.status) === "Available",
   ).length;
   const occupiedTables = tables.filter(
-    (t) => getStatusString(t.status) === "OCCUPIED",
-  ).length;
-  const reservedTables = tables.filter(
-    (t) => getStatusString(t.status) === "RESERVED",
+    (t) => normalizeStatus(t.status) === "Occupied",
   ).length;
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
@@ -201,10 +209,10 @@ export default function TablesClient({ initialTables }: TablesClientProps) {
             </h1>
             <p className="text-gray-600 dark:text-gray-400 mt-1">
               Manage restaurant tables and seating
+              {selectedStoreCode ? ` · ${selectedStoreCode}` : ""}
             </p>
           </div>
           <div className="flex items-center space-x-3">
-            {/* View Toggle */}
             <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
               <button
                 onClick={() => setViewMode("grid")}
@@ -234,7 +242,8 @@ export default function TablesClient({ initialTables }: TablesClientProps) {
                 setSelectedTable(null);
                 setModalOpen(true);
               }}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              disabled={!selectedStoreCode}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <PlusIcon className="w-5 h-5 mr-2" />
               Add Table
@@ -242,94 +251,47 @@ export default function TablesClient({ initialTables }: TablesClientProps) {
           </div>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
-                  <span className="text-blue-600 dark:text-blue-400 font-semibold text-sm">
-                    🪑
-                  </span>
-                </div>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Total Tables
-                </p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {tables.length}
-                </p>
-              </div>
-            </div>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              Total Tables
+            </p>
+            <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+              {tables.length}
+            </p>
           </div>
-
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
-                  <span className="text-green-600 dark:text-green-400 font-semibold text-sm">
-                    ✓
-                  </span>
-                </div>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Available
-                </p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {activeTables}
-                </p>
-              </div>
-            </div>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              Free
+            </p>
+            <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+              {freeTables}
+            </p>
           </div>
-
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-red-100 dark:bg-red-900/20 rounded-lg flex items-center justify-center">
-                  <span className="text-red-600 dark:text-red-400 font-semibold text-sm">
-                    👥
-                  </span>
-                </div>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Occupied
-                </p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {occupiedTables}
-                </p>
-              </div>
-            </div>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              Available
+            </p>
+            <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+              {availableTables}
+            </p>
           </div>
-
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
-                  <span className="text-blue-600 dark:text-blue-400 font-semibold text-sm">
-                    📅
-                  </span>
-                </div>
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Reserved
-                </p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">
-                  {reservedTables}
-                </p>
-              </div>
-            </div>
+            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              Occupied
+            </p>
+            <p className="text-2xl font-semibold text-gray-900 dark:text-white">
+              {occupiedTables}
+            </p>
           </div>
         </div>
 
-        {/* Tables View */}
         {tables.length === 0 ? (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow text-center py-12">
             <p className="text-gray-600 dark:text-gray-400">
-              No tables found. Add your first table to get started.
+              {!selectedStoreCode
+                ? "Select a store to view tables."
+                : "No tables found for this store. Add your first table to get started."}
             </p>
           </div>
         ) : viewMode === "grid" ? (
@@ -343,23 +305,19 @@ export default function TablesClient({ initialTables }: TablesClientProps) {
               >
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
-                      Table {table.tableNumber}
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                      {table.tableName}
                     </h3>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Code: {table.code}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                      {table.tableCode}
+                    </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                       {table.seatingCapacity}{" "}
                       {table.seatingCapacity === 1 ? "seat" : "seats"}
                     </p>
-                    {table.currentOccupancy > 0 && (
-                      <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-                        Currently: {table.currentOccupancy} guests
-                      </p>
-                    )}
-                    {table.location && (
-                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                        📍 {table.location}
-                      </p>
-                    )}
                   </div>
                   <button
                     onClick={() => {
@@ -383,12 +341,12 @@ export default function TablesClient({ initialTables }: TablesClientProps) {
                         table.status,
                       )}`}
                     >
-                      {getStatusString(table.status)}
+                      {normalizeStatus(table.status)}
                     </span>
                   </div>
 
                   <select
-                    value={getStatusString(table.status)}
+                    value={normalizeStatus(table.status)}
                     onChange={(e) =>
                       handleStatusChange(table.tableId, e.target.value)
                     }
@@ -433,19 +391,19 @@ export default function TablesClient({ initialTables }: TablesClientProps) {
                 <thead className="bg-gray-50 dark:bg-gray-900">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Table Number
+                      Table Name
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Seating
+                      Code
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Location
+                      Table Code
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Seats
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Current Guests
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Actions
@@ -459,26 +417,22 @@ export default function TablesClient({ initialTables }: TablesClientProps) {
                       className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                            Table {table.tableNumber}
-                          </h3>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-900 dark:text-white">
-                          {table.seatingCapacity}{" "}
-                          {table.seatingCapacity === 1 ? "seat" : "seats"}
+                        <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                          {table.tableName}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
-                          {table.location || "-"}
-                        </span>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {table.code}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                        {table.tableCode}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {table.seatingCapacity}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <select
-                          value={getStatusString(table.status)}
+                          value={normalizeStatus(table.status)}
                           onChange={(e) =>
                             handleStatusChange(table.tableId, e.target.value)
                           }
@@ -490,17 +444,6 @@ export default function TablesClient({ initialTables }: TablesClientProps) {
                             </option>
                           ))}
                         </select>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-900 dark:text-white">
-                          {table.currentOccupancy > 0 ? (
-                            <span className="text-orange-600 dark:text-orange-400">
-                              {table.currentOccupancy} guests
-                            </span>
-                          ) : (
-                            "-"
-                          )}
-                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center space-x-2">
@@ -542,7 +485,6 @@ export default function TablesClient({ initialTables }: TablesClientProps) {
         )}
       </div>
 
-      {/* Modals */}
       <TableModal
         isOpen={modalOpen}
         onClose={() => {
@@ -571,7 +513,9 @@ export default function TablesClient({ initialTables }: TablesClientProps) {
         onConfirm={handleDeleteConfirm}
         title="Delete Table"
         itemName={
-          tableToDelete?.tableNumber ? `Table ${tableToDelete.tableNumber}` : ""
+          tableToDelete?.tableName
+            ? tableToDelete.tableName
+            : tableToDelete?.code || ""
         }
       />
     </DashboardLayout>

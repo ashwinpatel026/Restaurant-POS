@@ -56,7 +56,7 @@ export async function GET(
     const limit = url.searchParams.get('limit')
     const offset = url.searchParams.get('offset')
 
-    const where: any = { storeCode }
+    const where: any = { storeCode, isDelete: false }
     if (incremental && lastSyncAt) {
       where.updatedOn = { gte: new Date(lastSyncAt) }
     }

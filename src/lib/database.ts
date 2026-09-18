@@ -4,11 +4,30 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
-})
+function createPrismaClient() {
+  return new PrismaClient({
+    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+  })
+}
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
+function getPrismaClient() {
+  const existing = globalForPrisma.prisma
+  if (existing && typeof (existing as any).stationSetting !== 'undefined') {
+    return existing
+  }
+
+  if (existing) {
+    existing.$disconnect().catch(() => {})
+  }
+
+  const client = createPrismaClient()
+  if (process.env.NODE_ENV !== 'production') {
+    globalForPrisma.prisma = client
+  }
+  return client
+}
+
+export const prisma = getPrismaClient()
 
 // Warm up database connection on server startup (non-blocking)
 if (typeof window === 'undefined' && !globalForPrisma.prisma) {

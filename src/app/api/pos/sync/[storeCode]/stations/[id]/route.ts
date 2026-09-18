@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticatePOSRequest, addPOSSyncMetadata } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
 
+function mapStation(station: any) {
+  return {
+    ...station,
+    tblStationId: station.tblStationId.toString(),
+    updatedBy: station.updatedBy != null ? station.updatedBy.toString() : null,
+  }
+}
+
 /**
  * @api {get} /api/pos/sync/:storeCode/stations/:id Get station
  * @apiName GetStation
@@ -71,10 +79,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      data: {
-        ...station,
-        tblStationId: station.tblStationId.toString()
-      }
+      data: mapStation(station)
     })
   } catch (error: any) {
     console.error('Error fetching station:', error)
@@ -208,10 +213,7 @@ export async function PUT(
     return NextResponse.json({
       success: true,
       message: 'Station updated successfully',
-      data: {
-        ...updatedStation,
-        tblStationId: updatedStation.tblStationId.toString()
-      }
+      data: mapStation(updatedStation)
     })
   } catch (error: any) {
     console.error('Error updating station:', error)

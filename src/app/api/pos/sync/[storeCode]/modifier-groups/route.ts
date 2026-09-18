@@ -63,8 +63,8 @@ export async function GET(
     const lastSyncAt = url.searchParams.get('lastSyncAt')
     const incremental = url.searchParams.get('incremental') === 'true'
 
-    // Build where clause
-    const where: any = { storeCode }
+    // Build where clause — exclude soft-deleted
+    const where: any = { storeCode, isDelete: false }
     if (incremental && lastSyncAt) {
       where.updatedOn = { gte: new Date(lastSyncAt) }
     }
@@ -76,7 +76,7 @@ export async function GET(
       orderBy: { createdOn: 'desc' }
       }),
       locationPrisma.modifierItem.findMany({
-        where: { storeCode },
+        where: { storeCode, isDelete: false },
         orderBy: { displayOrder: 'asc' }
       })
     ])

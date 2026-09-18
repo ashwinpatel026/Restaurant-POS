@@ -33,7 +33,7 @@ export default function MenuItemTabbedForm({
   onCancel,
 }: MenuItemFormProps) {
   const { selectedStoreCode, buildApiUrl } = useApiWithStore();
-  
+
   // Refs for auto-focus on validation errors
   const nameRef = useRef<HTMLInputElement>(null);
   const labelNameRef = useRef<HTMLInputElement>(null);
@@ -81,6 +81,10 @@ export default function MenuItemTabbedForm({
     isOnlineOrderByApp: 0,
     isOnlineOrdering: 0,
     isCustomerInvoice: 0,
+    isSetToZeroStock: 0,
+    isOpenItem: 0,
+    isEditStock: 0,
+    isAllowMultipleDiscount: 0,
     dimension: "",
     weight: "",
     prepTimeMinutes: 0,
@@ -119,32 +123,43 @@ export default function MenuItemTabbedForm({
   const [inheritedModifiers, setInheritedModifiers] = useState<any[]>([]);
   const [prepZones, setPrepZones] = useState<any[]>([]);
   const [selectedPrepZones, setSelectedPrepZones] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
-  const [selectedCategoryMap, setSelectedCategoryMap] = useState<Map<string, string[]>>(
-    new Map()
-  );
+  const [selectedCategoryMap, setSelectedCategoryMap] = useState<
+    Map<string, string[]>
+  >(new Map());
   const [filteredCategories, setFilteredCategories] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
 
   // Time Event Configuration state
-  const [timeEvents, setTimeEvents] = useState<Array<{
-    event_name: string;
-    final_price: number;
-    eventCode?: string;
-    byFixedValue?: boolean;
-  }>>([]);
-  const [timeEventDetails, setTimeEventDetails] = useState<Record<string, {
-    eventCode: string;
-    eventName: string;
-    byFixedValue: boolean;
-    isDelete?: boolean;
-    isOverride?: boolean;
-  }>>({});
-  const [timeEventFormulas, setTimeEventFormulas] = useState<Record<string, number>>({});
+  const [timeEvents, setTimeEvents] = useState<
+    Array<{
+      event_name: string;
+      final_price: number;
+      eventCode?: string;
+      byFixedValue?: boolean;
+    }>
+  >([]);
+  const [timeEventDetails, setTimeEventDetails] = useState<
+    Record<
+      string,
+      {
+        eventCode: string;
+        eventName: string;
+        byFixedValue: boolean;
+        isDelete?: boolean;
+        isOverride?: boolean;
+      }
+    >
+  >({});
+  const [timeEventFormulas, setTimeEventFormulas] = useState<
+    Record<string, number>
+  >({});
   const [loadingTimeEvents, setLoadingTimeEvents] = useState(false);
-  const [updatingEventCode, setUpdatingEventCode] = useState<string | null>(null);
-  const [originalDeptCode, setOriginalDeptCode] = useState<string>('');
+  const [updatingEventCode, setUpdatingEventCode] = useState<string | null>(
+    null,
+  );
+  const [originalDeptCode, setOriginalDeptCode] = useState<string>("");
 
   useEffect(() => {
     if (selectedStoreCode) {
@@ -157,9 +172,12 @@ export default function MenuItemTabbedForm({
 
   // Update selectedMenuMasters when menuMasterCode changes
   useEffect(() => {
-    if (Array.isArray(formData.menuMasterCode) && formData.menuMasterCode.length > 0) {
+    if (
+      Array.isArray(formData.menuMasterCode) &&
+      formData.menuMasterCode.length > 0
+    ) {
       const masters = menuMasters.filter((m) =>
-        formData.menuMasterCode.includes(m.menuMasterCode)
+        formData.menuMasterCode.includes(m.menuMasterCode),
       );
       setSelectedMenuMasters(masters);
     } else {
@@ -169,9 +187,12 @@ export default function MenuItemTabbedForm({
 
   // Filter categories when menu masters change
   useEffect(() => {
-    if (Array.isArray(formData.menuMasterCode) && formData.menuMasterCode.length > 0) {
+    if (
+      Array.isArray(formData.menuMasterCode) &&
+      formData.menuMasterCode.length > 0
+    ) {
       const filtered = categories.filter((cat) =>
-        formData.menuMasterCode.includes(cat.menuMasterCode || "")
+        formData.menuMasterCode.includes(cat.menuMasterCode || ""),
       );
       setFilteredCategories(filtered);
       // Clear selected categories if they don't belong to any selected menu master
@@ -181,9 +202,12 @@ export default function MenuItemTabbedForm({
           if (formData.menuMasterCode.includes(masterCode)) {
             const validCategories = categoryCodes.filter((categoryCode) => {
               const category = categories.find(
-                (cat) => cat.menuCategoryCode === categoryCode
+                (cat) => cat.menuCategoryCode === categoryCode,
               );
-              return category && formData.menuMasterCode.includes(category.menuMasterCode || "");
+              return (
+                category &&
+                formData.menuMasterCode.includes(category.menuMasterCode || "")
+              );
             });
             if (validCategories.length > 0) {
               valid.set(masterCode, validCategories);
@@ -200,16 +224,23 @@ export default function MenuItemTabbedForm({
 
   // Auto-update department when categories change
   useEffect(() => {
-    if (selectedCategoryMap.size > 0 && Array.isArray(formData.menuMasterCode) && formData.menuMasterCode.length > 0) {
+    if (
+      selectedCategoryMap.size > 0 &&
+      Array.isArray(formData.menuMasterCode) &&
+      formData.menuMasterCode.length > 0
+    ) {
       // Get department from first selected category or menu master
       const firstMasterCode = Array.from(selectedCategoryMap.keys())[0];
       const firstCategoryCodes = selectedCategoryMap.get(firstMasterCode);
-      const firstCategoryCode = firstCategoryCodes && firstCategoryCodes.length > 0 ? firstCategoryCodes[0] : null;
-      const firstCategory = firstCategoryCode ? categories.find(
-        (cat) => cat.menuCategoryCode === firstCategoryCode
-      ) : null;
+      const firstCategoryCode =
+        firstCategoryCodes && firstCategoryCodes.length > 0
+          ? firstCategoryCodes[0]
+          : null;
+      const firstCategory = firstCategoryCode
+        ? categories.find((cat) => cat.menuCategoryCode === firstCategoryCode)
+        : null;
       const master = menuMasters.find(
-        (m) => m.menuMasterCode === firstMasterCode
+        (m) => m.menuMasterCode === firstMasterCode,
       );
 
       // Only auto-update if current deptCode is empty
@@ -225,18 +256,21 @@ export default function MenuItemTabbedForm({
   // Handle menu master and category selection from modal
   const handleMenuMasterCategorySelect = (
     masters: any[],
-    categoryMap: Map<string, string[]>
+    categoryMap: Map<string, string[]>,
   ) => {
     if (masters.length > 0 && categoryMap.size > 0) {
       // Auto-select department from first menu master or first selected category
       const firstMaster = masters[0];
       const firstMasterCode = firstMaster.menuMasterCode;
       const firstCategoryCodes = categoryMap.get(firstMasterCode);
-      const firstCategoryCode = firstCategoryCodes && firstCategoryCodes.length > 0 ? firstCategoryCodes[0] : null;
+      const firstCategoryCode =
+        firstCategoryCodes && firstCategoryCodes.length > 0
+          ? firstCategoryCodes[0]
+          : null;
       let autoDeptCode = firstMaster.deptCode || "";
       if (!autoDeptCode && firstCategoryCode) {
         const firstCategory = categories.find(
-          (cat) => cat.menuCategoryCode === firstCategoryCode
+          (cat) => cat.menuCategoryCode === firstCategoryCode,
         );
         autoDeptCode = firstCategory?.deptCode || "";
       }
@@ -279,8 +313,18 @@ export default function MenuItemTabbedForm({
           menuItem.itemContainAlcohol ?? menuItem.isAlcohol ?? 0,
         menuImg: menuItem.menuImg || "",
         priceStrategy: menuItem.priceStrategy || 1,
-        basePrice: menuItem.basePrice != null ? Number(menuItem.basePrice) : (menuItem.price != null ? Number(menuItem.price) : 0),
-        retailPrice: menuItem.basePrice != null ? Number(menuItem.basePrice) : (menuItem.price != null ? Number(menuItem.price) : 0),
+        basePrice:
+          menuItem.basePrice != null
+            ? Number(menuItem.basePrice)
+            : menuItem.price != null
+              ? Number(menuItem.price)
+              : 0,
+        retailPrice:
+          menuItem.basePrice != null
+            ? Number(menuItem.basePrice)
+            : menuItem.price != null
+              ? Number(menuItem.price)
+              : 0,
         isPrice: menuItem.isPrice ?? 1,
         menuMasterCode: (() => {
           // Handle menuMasterCode - could be string, array, or JSON string
@@ -325,6 +369,19 @@ export default function MenuItemTabbedForm({
         isOnlineOrderByApp: menuItem.isOnlineOrderByApp ?? 0,
         isOnlineOrdering: menuItem.isOnlineOrdering ?? 0,
         isCustomerInvoice: menuItem.isCustomerInvoice ?? 0,
+        isSetToZeroStock:
+          menuItem.isSetToZeroStock === true || menuItem.isSetToZeroStock === 1
+            ? 1
+            : 0,
+        isOpenItem:
+          menuItem.isOpenItem === true || menuItem.isOpenItem === 1 ? 1 : 0,
+        isEditStock:
+          menuItem.isEditStock === true || menuItem.isEditStock === 1 ? 1 : 0,
+        isAllowMultipleDiscount:
+          menuItem.isAllowMultipleDiscount === true ||
+          menuItem.isAllowMultipleDiscount === 1
+            ? 1
+            : 0,
         dimension: menuItem.dimension || "",
         weight: menuItem.weight || "",
         prepTimeMinutes: menuItem.prepTimeMinutes ?? 0,
@@ -353,37 +410,55 @@ export default function MenuItemTabbedForm({
 
       // Handle menuCategoryCode - supports both structured format and old format
       const categoryMap = new Map<string, string[]>();
-      
+
       if (menuItem.menuCategoryCode) {
-        let structuredArray: Array<{ menuMasterCode: string; menuCategoryCode: string }> = [];
-        
+        let structuredArray: Array<{
+          menuMasterCode: string;
+          menuCategoryCode: string;
+        }> = [];
+
         try {
           let parsed: any = menuItem.menuCategoryCode;
           if (typeof parsed === "string") {
             parsed = JSON.parse(parsed);
           }
-          
+
           if (Array.isArray(parsed) && parsed.length > 0) {
             const firstItem = parsed[0];
             // Check if it's structured format
-            if (firstItem && typeof firstItem === 'object' && 'menuMasterCode' in firstItem && 'menuCategoryCode' in firstItem) {
+            if (
+              firstItem &&
+              typeof firstItem === "object" &&
+              "menuMasterCode" in firstItem &&
+              "menuCategoryCode" in firstItem
+            ) {
               // Structured format - use directly
               structuredArray = parsed;
             } else {
               // Old format - convert to structured format using categories lookup
-              const masterCodes = Array.isArray(formData.menuMasterCode) 
-                ? formData.menuMasterCode 
-                : (formData.menuMasterCode ? [formData.menuMasterCode] : []);
-              
+              const masterCodes = Array.isArray(formData.menuMasterCode)
+                ? formData.menuMasterCode
+                : formData.menuMasterCode
+                  ? [formData.menuMasterCode]
+                  : [];
+
               parsed.forEach((categoryCode: string) => {
-                const category = categories.find(cat => cat.menuCategoryCode === categoryCode);
+                const category = categories.find(
+                  (cat) => cat.menuCategoryCode === categoryCode,
+                );
                 if (category) {
                   const masterCode = category.menuMasterCode;
                   if (masterCodes.includes(masterCode)) {
-                    structuredArray.push({ menuMasterCode: masterCode, menuCategoryCode: categoryCode });
+                    structuredArray.push({
+                      menuMasterCode: masterCode,
+                      menuCategoryCode: categoryCode,
+                    });
                   } else if (masterCodes.length > 0) {
                     // Fallback to first master if unmatched
-                    structuredArray.push({ menuMasterCode: masterCodes[0], menuCategoryCode: categoryCode });
+                    structuredArray.push({
+                      menuMasterCode: masterCodes[0],
+                      menuCategoryCode: categoryCode,
+                    });
                   }
                 }
               });
@@ -391,17 +466,19 @@ export default function MenuItemTabbedForm({
           }
         } catch (e) {
           // If parsing fails, try to handle as single value (backward compatibility)
-          const masterCodes = Array.isArray(formData.menuMasterCode) 
-            ? formData.menuMasterCode 
-            : (formData.menuMasterCode ? [formData.menuMasterCode] : []);
+          const masterCodes = Array.isArray(formData.menuMasterCode)
+            ? formData.menuMasterCode
+            : formData.menuMasterCode
+              ? [formData.menuMasterCode]
+              : [];
           if (masterCodes.length > 0) {
-            structuredArray.push({ 
-              menuMasterCode: masterCodes[0], 
-              menuCategoryCode: String(menuItem.menuCategoryCode) 
+            structuredArray.push({
+              menuMasterCode: masterCodes[0],
+              menuCategoryCode: String(menuItem.menuCategoryCode),
             });
           }
         }
-        
+
         // Build category map from structured array
         structuredArray.forEach(({ menuMasterCode, menuCategoryCode }) => {
           if (!categoryMap.has(menuMasterCode)) {
@@ -419,7 +496,7 @@ export default function MenuItemTabbedForm({
         Array.isArray(menuItem.assignedModifiers)
       ) {
         const explicitModifiers = menuItem.assignedModifiers.filter(
-          (modifier: any) => Number(modifier.inheritFromMenuGroup) === 0
+          (modifier: any) => Number(modifier.inheritFromMenuGroup) === 0,
         );
         const explicitIds = explicitModifiers
           .map((modifier: any) => modifier.tblModifierId || modifier.id)
@@ -457,7 +534,7 @@ export default function MenuItemTabbedForm({
         // Fallback to inheritModifierGroup if inheritModifiers is not set
         setInheritModifiers(menuItem.inheritModifierGroup);
       }
-      
+
       // Set original department code for tracking changes
       setOriginalDeptCode(menuItem.deptCode || "");
     }
@@ -496,8 +573,10 @@ export default function MenuItemTabbedForm({
 
       // Check if all conditions are met
       // menuMasterCode must be an array with at least one item
-      const hasMenuMaster = Array.isArray(currentMenuMasterCode) && currentMenuMasterCode.length > 0;
-      
+      const hasMenuMaster =
+        Array.isArray(currentMenuMasterCode) &&
+        currentMenuMasterCode.length > 0;
+
       // Fetch events if menu master is selected, pricing is enabled, base price is set, and store is selected
       // Department is optional - can fetch menu master events without department
       if (
@@ -510,16 +589,20 @@ export default function MenuItemTabbedForm({
         try {
           // Build query parameters
           const menuMasterCodeParam = Array.isArray(currentMenuMasterCode)
-            ? currentMenuMasterCode.join(',')
-            : '';
-          
+            ? currentMenuMasterCode.join(",")
+            : "";
+
           // Build URL with optional department code
-          const deptCodeParam = currentDeptCode ? `&deptCode=${encodeURIComponent(currentDeptCode)}` : '';
-          
+          const deptCodeParam = currentDeptCode
+            ? `&deptCode=${encodeURIComponent(currentDeptCode)}`
+            : "";
+
           // Call PostgreSQL function to get calculated prices (location dashboard endpoint)
           const functionResponse = await fetch(
-            buildApiUrl(`/api/dashboard/menu-items/time-events?basePrice=${currentRetailPrice}&menuMasterCode=${encodeURIComponent(menuMasterCodeParam)}${deptCodeParam}`),
-            { signal: abortController.signal }
+            buildApiUrl(
+              `/api/dashboard/menu-items/time-events?basePrice=${currentRetailPrice}&menuMasterCode=${encodeURIComponent(menuMasterCodeParam)}${deptCodeParam}`,
+            ),
+            { signal: abortController.signal },
           );
 
           // Check if request was aborted
@@ -536,17 +619,17 @@ export default function MenuItemTabbedForm({
           // Fetch time event details to get eventCode and byFixedValue (filtered by storeCode)
           // Build URL with optional department code and menu master code
           const queryParams = new URLSearchParams();
-          queryParams.append('storeCode', currentStoreCode);
+          queryParams.append("storeCode", currentStoreCode);
           if (currentDeptCode) {
-            queryParams.append('deptCode', currentDeptCode);
+            queryParams.append("deptCode", currentDeptCode);
           }
           if (menuMasterCodeParam) {
-            queryParams.append('menuMasterCode', menuMasterCodeParam);
+            queryParams.append("menuMasterCode", menuMasterCodeParam);
           }
-          
+
           const detailsResponse = await fetch(
             buildApiUrl(`/api/dashboard/events?${queryParams.toString()}`),
-            { signal: abortController.signal }
+            { signal: abortController.signal },
           );
 
           // Check if request was aborted
@@ -554,13 +637,16 @@ export default function MenuItemTabbedForm({
             return;
           }
 
-          let eventDetailsMap: Record<string, {
-            eventCode: string;
-            eventName: string;
-            byFixedValue: boolean;
-            isDelete?: boolean;
-            isOverride?: boolean;
-          }> = {};
+          let eventDetailsMap: Record<
+            string,
+            {
+              eventCode: string;
+              eventName: string;
+              byFixedValue: boolean;
+              isDelete?: boolean;
+              isOverride?: boolean;
+            }
+          > = {};
 
           if (detailsResponse.ok) {
             const eventDetails = await detailsResponse.json();
@@ -605,8 +691,10 @@ export default function MenuItemTabbedForm({
             try {
               const itemId = menuItem.menuItemId || menuItem.tblMenuItemId;
               const existingFormulasResponse = await fetch(
-                buildApiUrl(`/api/dashboard/menu-items/${itemId}/time-events?storeCode=${encodeURIComponent(currentStoreCode)}`),
-                { signal: abortController.signal }
+                buildApiUrl(
+                  `/api/dashboard/menu-items/${itemId}/time-events?storeCode=${encodeURIComponent(currentStoreCode)}`,
+                ),
+                { signal: abortController.signal },
               );
 
               // Check if request was aborted
@@ -619,7 +707,8 @@ export default function MenuItemTabbedForm({
                 // Override with saved values if they exist and update event details
                 Object.keys(existingFormulas).forEach((eventCode) => {
                   if (initialFormulas[eventCode] !== undefined) {
-                    initialFormulas[eventCode] = existingFormulas[eventCode].formulaValue;
+                    initialFormulas[eventCode] =
+                      existingFormulas[eventCode].formulaValue;
                   }
                   // Update event details with isDelete and isOverride if they exist
                   if (eventDetailsMap[eventCode]) {
@@ -627,7 +716,8 @@ export default function MenuItemTabbedForm({
                     eventDetailsMap[eventCode] = {
                       ...existing,
                       isDelete: existingFormulas[eventCode]?.isDelete || false,
-                      isOverride: existingFormulas[eventCode]?.isOverride || false,
+                      isOverride:
+                        existingFormulas[eventCode]?.isOverride || false,
                     };
                   }
                 });
@@ -636,7 +726,7 @@ export default function MenuItemTabbedForm({
               }
             } catch (e) {
               // Don't show error for aborted requests
-              if (e instanceof Error && e.name === 'AbortError') {
+              if (e instanceof Error && e.name === "AbortError") {
                 return;
               }
               console.error("Error fetching existing formula values:", e);
@@ -645,7 +735,7 @@ export default function MenuItemTabbedForm({
           }
         } catch (error: any) {
           // Don't show error toast for aborted requests
-          if (error?.name === 'AbortError' || abortController.signal.aborted) {
+          if (error?.name === "AbortError" || abortController.signal.aborted) {
             return;
           }
           console.error("Error fetching time events:", error);
@@ -661,9 +751,13 @@ export default function MenuItemTabbedForm({
         }
       } else {
         // Only clear state if it's not already empty to prevent unnecessary re-renders
-        setTimeEvents((prev) => prev.length > 0 ? [] : prev);
-        setTimeEventFormulas((prev) => Object.keys(prev).length > 0 ? {} : prev);
-        setTimeEventDetails((prev) => Object.keys(prev).length > 0 ? {} : prev);
+        setTimeEvents((prev) => (prev.length > 0 ? [] : prev));
+        setTimeEventFormulas((prev) =>
+          Object.keys(prev).length > 0 ? {} : prev,
+        );
+        setTimeEventDetails((prev) =>
+          Object.keys(prev).length > 0 ? {} : prev,
+        );
       }
     }, 500); // 500ms debounce delay
 
@@ -680,7 +774,16 @@ export default function MenuItemTabbedForm({
         abortControllerRef.current = null;
       }
     };
-  }, [formData.deptCode, formData.isPrice, formData.retailPrice, formData.menuMasterCode, menuItem?.menuItemId, menuItem?.tblMenuItemId, selectedStoreCode, buildApiUrl]);
+  }, [
+    formData.deptCode,
+    formData.isPrice,
+    formData.retailPrice,
+    formData.menuMasterCode,
+    menuItem?.menuItemId,
+    menuItem?.tblMenuItemId,
+    selectedStoreCode,
+    buildApiUrl,
+  ]);
 
   // Create a stable dependency for selected categories
   const selectedCategoriesKey = useMemo(() => {
@@ -713,9 +816,9 @@ export default function MenuItemTabbedForm({
             const res = await fetch(
               buildApiUrl(
                 `/api/dashboard/modifier-groups?menuCategoryCode=${encodeURIComponent(
-                  categoryCode
-                )}`
-              )
+                  categoryCode,
+                )}`,
+              ),
             );
             if (res.ok) {
               const data = await res.json();
@@ -735,7 +838,7 @@ export default function MenuItemTabbedForm({
           } catch (e) {
             console.error(
               `Error loading modifiers for category ${categoryCode}:`,
-              e
+              e,
             );
           }
         }
@@ -751,7 +854,7 @@ export default function MenuItemTabbedForm({
   const fetchModifiers = async () => {
     try {
       const response = await fetch(
-        buildApiUrl("/api/dashboard/modifier-groups")
+        buildApiUrl("/api/dashboard/modifier-groups"),
       );
       if (response.ok) {
         const modifiersData = await response.json();
@@ -806,12 +909,18 @@ export default function MenuItemTabbedForm({
       kitchenName: formData.kitchenName,
       colorCode: formData.colorCode,
       forColorCode: formData.forColorCode,
-      menuMasterCode: Array.isArray(formData.menuMasterCode) 
-        ? (formData.menuMasterCode.length > 0 ? formData.menuMasterCode.join(",") : "")
-        : (formData.menuMasterCode || ""),
+      menuMasterCode: Array.isArray(formData.menuMasterCode)
+        ? formData.menuMasterCode.length > 0
+          ? formData.menuMasterCode.join(",")
+          : ""
+        : formData.menuMasterCode || "",
       menuCategoryCode: (() => {
-        const firstMasterCategories = Array.from(selectedCategoryMap.values())[0];
-        return firstMasterCategories && firstMasterCategories.length > 0 ? firstMasterCategories[0] : "";
+        const firstMasterCategories = Array.from(
+          selectedCategoryMap.values(),
+        )[0];
+        return firstMasterCategories && firstMasterCategories.length > 0
+          ? firstMasterCategories[0]
+          : "";
       })(),
       calories: formData.calories,
       description: formData.description,
@@ -840,6 +949,10 @@ export default function MenuItemTabbedForm({
       isOnlineOrderByApp: formData.isOnlineOrderByApp,
       isOnlineOrdering: formData.isOnlineOrdering,
       isCustomerInvoice: formData.isCustomerInvoice,
+      isSetToZeroStock: formData.isSetToZeroStock,
+      isOpenItem: formData.isOpenItem,
+      isEditStock: formData.isEditStock,
+      isAllowMultipleDiscount: formData.isAllowMultipleDiscount,
       dimension: formData.dimension,
       weight: formData.weight,
       prepTimeMinutes: formData.prepTimeMinutes,
@@ -857,27 +970,34 @@ export default function MenuItemTabbedForm({
       formik.setFieldValue("forColorCode", formData.forColorCode, false);
       formik.setFieldValue("menuMasterCode", formData.menuMasterCode, false);
       // Validate that each master has at least one category
-      const missingCategories = Array.isArray(formData.menuMasterCode) ? formData.menuMasterCode.filter(
-        (masterCode) => {
-          const categories = selectedCategoryMap.get(masterCode);
-          return !categories || categories.length === 0;
-        }
-      ) : [];
-      
+      const missingCategories = Array.isArray(formData.menuMasterCode)
+        ? formData.menuMasterCode.filter((masterCode) => {
+            const categories = selectedCategoryMap.get(masterCode);
+            return !categories || categories.length === 0;
+          })
+        : [];
+
       if (missingCategories.length > 0 || selectedCategoryMap.size === 0) {
         setTouched({
           menuMasterCode: true,
           menuCategoryCode: true,
         });
-        setFieldError("menuCategoryCode", "Please select at least one category for each menu master");
+        setFieldError(
+          "menuCategoryCode",
+          "Please select at least one category for each menu master",
+        );
         toast.error("Please select at least one category for each menu master");
         return;
       }
 
       // Set menuCategoryCode as array for validation (to match what will be submitted)
       const allCategoryCodes = Array.from(selectedCategoryMap.values()).flat();
-      formik.setFieldValue("menuCategoryCode", allCategoryCodes.length > 0 ? allCategoryCodes[0] : "", false);
-      
+      formik.setFieldValue(
+        "menuCategoryCode",
+        allCategoryCodes.length > 0 ? allCategoryCodes[0] : "",
+        false,
+      );
+
       // Mark all fields as touched to show errors
       setTouched({
         name: true,
@@ -890,14 +1010,14 @@ export default function MenuItemTabbedForm({
         retailPrice: true,
         isPrice: true,
       });
-      
+
       // Validate and check for errors
       await formik.validateForm();
-      
+
       // If there are errors, don't submit
       if (Object.keys(formik.errors).length > 0) {
         toast.error("Please fix the validation errors");
-        
+
         // Ensure retailPrice is marked as touched if it has an error
         if (formik.errors.retailPrice) {
           formik.setFieldTouched("retailPrice", true);
@@ -916,7 +1036,7 @@ export default function MenuItemTabbedForm({
         }
         return;
       }
-      
+
       // No errors, proceed with submission
       onSubmitForm();
     },
@@ -934,7 +1054,17 @@ export default function MenuItemTabbedForm({
     formik.setFieldValue("priceStrategy", formData.priceStrategy);
     formik.setFieldValue("retailPrice", formData.retailPrice);
     formik.setFieldValue("isPrice", formData.isPrice);
-  }, [formData.name, formData.labelName, formData.kitchenName, formData.colorCode, formData.forColorCode, formData.menuMasterCode, formData.priceStrategy, formData.retailPrice, formData.isPrice]);
+  }, [
+    formData.name,
+    formData.labelName,
+    formData.kitchenName,
+    formData.colorCode,
+    formData.forColorCode,
+    formData.menuMasterCode,
+    formData.priceStrategy,
+    formData.retailPrice,
+    formData.isPrice,
+  ]);
 
   // Auto-focus on first error field
   useFormikAutoFocus(formik, {
@@ -966,24 +1096,29 @@ export default function MenuItemTabbedForm({
               ? parseFloat(formData.retailPrice.toString())
               : null
             : formData.priceStrategy === 3
-            ? 0
-            : null,
+              ? 0
+              : null,
         // Keep cardPrice and cashPrice for backward compatibility (set to null)
         cardPrice: null,
         cashPrice: null,
         menuMasterCode: formData.menuMasterCode || null,
         menuCategoryCode:
           selectedCategoryMap.size > 0
-            ? Array.from(selectedCategoryMap.entries()).flatMap(([menuMasterCode, categoryCodes]) =>
-                categoryCodes.map(menuCategoryCode => ({
-                  menuMasterCode,
-                  menuCategoryCode,
-                }))
+            ? Array.from(selectedCategoryMap.entries()).flatMap(
+                ([menuMasterCode, categoryCodes]) =>
+                  categoryCodes.map((menuCategoryCode) => ({
+                    menuMasterCode,
+                    menuCategoryCode,
+                  })),
               )
             : null,
         itemContainAlcohol: formData.itemContainAlcohol === 1 ? 1 : 0,
         isPrice: formData.isPrice === 1 ? 1 : 0,
         isActive: formData.isActive === 1 ? 1 : 0,
+        isSetToZeroStock: formData.isSetToZeroStock === 1,
+        isOpenItem: formData.isOpenItem === 1,
+        isEditStock: formData.isEditStock === 1,
+        isAllowMultipleDiscount: formData.isAllowMultipleDiscount === 1,
         stockinhand: formData.stockinhand
           ? parseFloat(formData.stockinhand.toString())
           : null,
@@ -1015,18 +1150,33 @@ export default function MenuItemTabbedForm({
       const savedMenuItem = await onSave(submitData);
 
       // Get menuItemId - use savedMenuItem.menuItemId or fall back to existing menuItem
-      const menuItemId = savedMenuItem?.menuItemId || menuItem?.menuItemId || menuItem?.tblMenuItemId;
-      const menuItemCode = savedMenuItem?.menuItemCode || menuItem?.menuItemCode;
+      const menuItemId =
+        savedMenuItem?.menuItemId ||
+        menuItem?.menuItemId ||
+        menuItem?.tblMenuItemId;
+      const menuItemCode =
+        savedMenuItem?.menuItemCode || menuItem?.menuItemCode;
 
       // Check if department changed (for edit mode)
-      const departmentChanged = menuItem && formData.deptCode && formData.originalDeptCode &&
+      const departmentChanged =
+        menuItem &&
+        formData.deptCode &&
+        formData.originalDeptCode &&
         formData.deptCode !== formData.originalDeptCode;
 
       // If department changed, mark old time events as deleted first (even if no new events)
-      if (departmentChanged && menuItemId && menuItemCode && formData.originalDeptCode && selectedStoreCode) {
+      if (
+        departmentChanged &&
+        menuItemId &&
+        menuItemCode &&
+        formData.originalDeptCode &&
+        selectedStoreCode
+      ) {
         try {
           const markDeletedResponse = await fetch(
-            buildApiUrl(`/api/dashboard/menu-items/${menuItemId}/time-events/mark-deleted?storeCode=${encodeURIComponent(selectedStoreCode)}`),
+            buildApiUrl(
+              `/api/dashboard/menu-items/${menuItemId}/time-events/mark-deleted?storeCode=${encodeURIComponent(selectedStoreCode)}`,
+            ),
             {
               method: "POST",
               headers: {
@@ -1036,43 +1186,63 @@ export default function MenuItemTabbedForm({
                 menuItemCode: menuItemCode,
                 oldDeptCode: formData.originalDeptCode,
               }),
-            }
+            },
           );
 
           if (markDeletedResponse.ok) {
             const markResult = await markDeletedResponse.json();
-            console.log("Marked old time events as deleted:", markResult.markedDeleted);
+            console.log(
+              "Marked old time events as deleted:",
+              markResult.markedDeleted,
+            );
           } else {
             console.warn("Failed to mark old time events as deleted");
           }
         } catch (markDeletedError) {
-          console.error("Error marking old time events as deleted:", markDeletedError);
+          console.error(
+            "Error marking old time events as deleted:",
+            markDeletedError,
+          );
         }
       }
 
       // If menu item was saved successfully and we have time events, save them
-      if (menuItemId && menuItemCode && timeEvents.length > 0 && formData.deptCode && formData.isPrice === 1 && formData.retailPrice > 0 && selectedStoreCode) {
+      if (
+        menuItemId &&
+        menuItemCode &&
+        timeEvents.length > 0 &&
+        formData.deptCode &&
+        formData.isPrice === 1 &&
+        formData.retailPrice > 0 &&
+        selectedStoreCode
+      ) {
         try {
           // Prepare time events data for bulk save
           const timeEventsData = timeEvents.map((event) => {
             const eventCode = event.eventCode || "";
-            const eventDetail = Object.values(timeEventDetails).find(d => d.eventCode === eventCode) as {
-              eventCode: string;
-              eventName: string;
-              byFixedValue: boolean;
-              isDelete?: boolean;
-              isOverride?: boolean;
-            } | undefined;
+            const eventDetail = Object.values(timeEventDetails).find(
+              (d) => d.eventCode === eventCode,
+            ) as
+              | {
+                  eventCode: string;
+                  eventName: string;
+                  byFixedValue: boolean;
+                  isDelete?: boolean;
+                  isOverride?: boolean;
+                }
+              | undefined;
 
             // Use updated formula value if user changed it, otherwise use calculated value
-            const formulaValue = timeEventFormulas[eventCode] !== undefined
-              ? timeEventFormulas[eventCode]
-              : event.final_price;
+            const formulaValue =
+              timeEventFormulas[eventCode] !== undefined
+                ? timeEventFormulas[eventCode]
+                : event.final_price;
 
             return {
               timeEventCode: eventCode,
               formulaValue: formulaValue,
-              isFixedValue: eventDetail?.byFixedValue || event.byFixedValue || false,
+              isFixedValue:
+                eventDetail?.byFixedValue || event.byFixedValue || false,
               isDelete: false, // New events are not deleted
               isOverride: eventDetail?.isOverride || false,
             };
@@ -1080,7 +1250,9 @@ export default function MenuItemTabbedForm({
 
           // Call bulk save endpoint
           const bulkSaveResponse = await fetch(
-            buildApiUrl(`/api/dashboard/menu-items/${menuItemId}/time-events/bulk?storeCode=${encodeURIComponent(selectedStoreCode)}`),
+            buildApiUrl(
+              `/api/dashboard/menu-items/${menuItemId}/time-events/bulk?storeCode=${encodeURIComponent(selectedStoreCode)}`,
+            ),
             {
               method: "POST",
               headers: {
@@ -1090,20 +1262,29 @@ export default function MenuItemTabbedForm({
                 menuItemCode: menuItemCode,
                 timeEvents: timeEventsData,
               }),
-            }
+            },
           );
 
           if (bulkSaveResponse.ok) {
             const bulkResult = await bulkSaveResponse.json();
             console.log("Time events saved:", bulkResult);
             if (bulkResult.errors && bulkResult.errors.length > 0) {
-              console.warn("Some time events failed to save:", bulkResult.errors);
-              toast.error(`Menu item saved, but ${bulkResult.errors.length} time event(s) failed to save`);
+              console.warn(
+                "Some time events failed to save:",
+                bulkResult.errors,
+              );
+              toast.error(
+                `Menu item saved, but ${bulkResult.errors.length} time event(s) failed to save`,
+              );
             } else {
               if (menuItem) {
-                toast.success(`Menu item and ${bulkResult.created || timeEvents.length} time event(s) updated successfully!`);
+                toast.success(
+                  `Menu item and ${bulkResult.created || timeEvents.length} time event(s) updated successfully!`,
+                );
               } else {
-                toast.success(`Menu item and ${bulkResult.created || timeEvents.length} time event(s) created successfully!`);
+                toast.success(
+                  `Menu item and ${bulkResult.created || timeEvents.length} time event(s) created successfully!`,
+                );
               }
             }
             // Navigate after a short delay to allow toast to show
@@ -1113,7 +1294,10 @@ export default function MenuItemTabbedForm({
           } else {
             const errorData = await bulkSaveResponse.json();
             console.error("Failed to save time events:", errorData);
-            toast.error(errorData.error || "Menu item saved but failed to save time events");
+            toast.error(
+              errorData.error ||
+                "Menu item saved but failed to save time events",
+            );
             // Still navigate even if time events failed
             setTimeout(() => {
               onCancel();
@@ -1129,7 +1313,12 @@ export default function MenuItemTabbedForm({
         }
       } else if (savedMenuItem) {
         // Only show success toast if no time events were processed or if it's a new item without time events
-        if (!timeEvents.length || !formData.deptCode || formData.isPrice !== 1 || formData.retailPrice <= 0) {
+        if (
+          !timeEvents.length ||
+          !formData.deptCode ||
+          formData.isPrice !== 1 ||
+          formData.retailPrice <= 0
+        ) {
           if (menuItem) {
             toast.success("Menu item updated successfully!");
           } else {
@@ -1153,7 +1342,7 @@ export default function MenuItemTabbedForm({
     setSelectedModifiers((prev) =>
       prev.includes(modifierId)
         ? prev.filter((id) => id !== modifierId)
-        : [...prev, modifierId]
+        : [...prev, modifierId],
     );
     setModifierOptions((prev) => {
       const next = { ...prev } as any;
@@ -1216,14 +1405,19 @@ export default function MenuItemTabbedForm({
                     name="name"
                     value={formData.name}
                     onChange={(e) => {
-                      const capitalizedValue = capitalizeFirstLetter(e.target.value);
+                      const capitalizedValue = capitalizeFirstLetter(
+                        e.target.value,
+                      );
                       setFormData({ ...formData, name: capitalizedValue });
                       formik.setFieldValue("name", capitalizedValue);
                     }}
                     onBlur={(e) => {
                       formik.handleBlur(e);
                       // Only copy if labelName is blank/empty
-                      if (!formData.labelName || formData.labelName.trim() === "") {
+                      if (
+                        !formData.labelName ||
+                        formData.labelName.trim() === ""
+                      ) {
                         setFormData({ ...formData, labelName: e.target.value });
                         formik.setFieldValue("labelName", e.target.value);
                       }
@@ -1305,35 +1499,42 @@ export default function MenuItemTabbedForm({
               </div>
 
               <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Menu Master & Categories <span className="text-red-500">*</span>
-                    </label>
-                    <div className="space-y-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowMenuMasterCategoryModal(true)}
-                        className="w-full px-4 py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-left"
-                      >
-                        {selectedMenuMasters.length > 0 && Array.from(selectedCategoryMap.values()).reduce((sum, cats) => sum + cats.length, 0) > 0
-                          ? `${selectedMenuMasters.length} menu master${selectedMenuMasters.length === 1 ? "" : "s"} - ${Array.from(selectedCategoryMap.values()).reduce((sum, cats) => sum + cats.length, 0)} categor${Array.from(selectedCategoryMap.values()).reduce((sum, cats) => sum + cats.length, 0) === 1 ? "y" : "ies"} selected`
-                          : selectedMenuMasters.length > 0
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Menu Master & Categories{" "}
+                    <span className="text-red-500">*</span>
+                  </label>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowMenuMasterCategoryModal(true)}
+                      className="w-full px-4 py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-left"
+                    >
+                      {selectedMenuMasters.length > 0 &&
+                      Array.from(selectedCategoryMap.values()).reduce(
+                        (sum, cats) => sum + cats.length,
+                        0,
+                      ) > 0
+                        ? `${selectedMenuMasters.length} menu master${selectedMenuMasters.length === 1 ? "" : "s"} - ${Array.from(selectedCategoryMap.values()).reduce((sum, cats) => sum + cats.length, 0)} categor${Array.from(selectedCategoryMap.values()).reduce((sum, cats) => sum + cats.length, 0) === 1 ? "y" : "ies"} selected`
+                        : selectedMenuMasters.length > 0
                           ? `${selectedMenuMasters.length} menu master${selectedMenuMasters.length === 1 ? "" : "s"} - No categories selected`
                           : "Click to select Menu Masters & Categories"}
-                      </button>
+                    </button>
 
                     {/* Display Selected Menu Masters and Categories */}
                     {selectedMenuMasters.length > 0 && (
                       <div className="space-y-3">
                         {selectedMenuMasters.map((master) => {
-                          const categoryCodes = selectedCategoryMap.get(master.menuMasterCode) || [];
+                          const categoryCodes =
+                            selectedCategoryMap.get(master.menuMasterCode) ||
+                            [];
                           const selectedCategories = categoryCodes
                             .map((code) =>
                               categories.find(
                                 (c) =>
                                   c.menuCategoryCode === code ||
-                                  c.menuCategoryId?.toString() === code
-                              )
+                                  c.menuCategoryId?.toString() === code,
+                              ),
                             )
                             .filter(Boolean);
 
@@ -1348,7 +1549,9 @@ export default function MenuItemTabbedForm({
                                     Menu Master:
                                   </div>
                                   <div className="font-medium text-gray-900 dark:text-white">
-                                    {master.name || master.labelName || master.menuMasterCode}
+                                    {master.name ||
+                                      master.labelName ||
+                                      master.menuMasterCode}
                                   </div>
                                   {master.labelName &&
                                     master.labelName !== master.name && (
@@ -1362,29 +1565,51 @@ export default function MenuItemTabbedForm({
                                   {selectedCategories.length > 0 && (
                                     <div className="mt-2 pt-2 border-t border-blue-200 dark:border-blue-700">
                                       <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
-                                        Selected Categories ({selectedCategories.length}):
+                                        Selected Categories (
+                                        {selectedCategories.length}):
                                       </div>
                                       <div className="flex flex-wrap gap-2">
                                         {selectedCategories.map((category) => (
                                           <div
-                                            key={category.menuCategoryCode || category.menuCategoryId}
+                                            key={
+                                              category.menuCategoryCode ||
+                                              category.menuCategoryId
+                                            }
                                             className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded text-sm font-medium"
                                           >
                                             {category.name}
                                             <button
                                               type="button"
                                               onClick={() => {
-                                                const updatedMap = new Map(selectedCategoryMap);
-                                                const currentCategories = updatedMap.get(master.menuMasterCode) || [];
-                                                const updatedCategories = currentCategories.filter(
-                                                  (code) => code !== (category.menuCategoryCode || category.menuCategoryId?.toString())
+                                                const updatedMap = new Map(
+                                                  selectedCategoryMap,
                                                 );
-                                                if (updatedCategories.length > 0) {
-                                                  updatedMap.set(master.menuMasterCode, updatedCategories);
+                                                const currentCategories =
+                                                  updatedMap.get(
+                                                    master.menuMasterCode,
+                                                  ) || [];
+                                                const updatedCategories =
+                                                  currentCategories.filter(
+                                                    (code) =>
+                                                      code !==
+                                                      (category.menuCategoryCode ||
+                                                        category.menuCategoryId?.toString()),
+                                                  );
+                                                if (
+                                                  updatedCategories.length > 0
+                                                ) {
+                                                  updatedMap.set(
+                                                    master.menuMasterCode,
+                                                    updatedCategories,
+                                                  );
                                                 } else {
-                                                  updatedMap.delete(master.menuMasterCode);
+                                                  updatedMap.delete(
+                                                    master.menuMasterCode,
+                                                  );
                                                 }
-                                                setSelectedCategoryMap(updatedMap);
+                                                setSelectedCategoryMap(
+                                                  updatedMap,
+                                                );
                                               }}
                                               className="ml-1 text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-200"
                                             >
@@ -1398,7 +1623,8 @@ export default function MenuItemTabbedForm({
                                   {selectedCategories.length === 0 && (
                                     <div className="mt-2 pt-2 border-t border-red-200 dark:border-red-700">
                                       <div className="text-xs text-red-600 dark:text-red-400">
-                                        ⚠ At least one category required for this menu master
+                                        ⚠ At least one category required for
+                                        this menu master
                                       </div>
                                     </div>
                                   )}
@@ -1406,12 +1632,20 @@ export default function MenuItemTabbedForm({
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const updatedMasters = selectedMenuMasters.filter(
-                                      (m) => m.menuMasterCode !== master.menuMasterCode
+                                    const updatedMasters =
+                                      selectedMenuMasters.filter(
+                                        (m) =>
+                                          m.menuMasterCode !==
+                                          master.menuMasterCode,
+                                      );
+                                    const updatedMap = new Map(
+                                      selectedCategoryMap,
                                     );
-                                    const updatedMap = new Map(selectedCategoryMap);
                                     updatedMap.delete(master.menuMasterCode);
-                                    handleMenuMasterCategorySelect(updatedMasters, updatedMap);
+                                    handleMenuMasterCategorySelect(
+                                      updatedMasters,
+                                      updatedMap,
+                                    );
                                   }}
                                   className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                                 >
@@ -1424,14 +1658,21 @@ export default function MenuItemTabbedForm({
                       </div>
                     )}
                   </div>
-                  {(formik.errors.menuMasterCode && formik.touched.menuMasterCode) || 
-                   (formik.errors.menuCategoryCode && formik.touched.menuCategoryCode) || 
-                   (Array.from(selectedMenuMasters).some(m => {
-                     const categories = selectedCategoryMap.get(m.menuMasterCode);
-                     return !categories || categories.length === 0;
-                   }) && formik.touched.menuCategoryCode) ? (
+                  {(formik.errors.menuMasterCode &&
+                    formik.touched.menuMasterCode) ||
+                  (formik.errors.menuCategoryCode &&
+                    formik.touched.menuCategoryCode) ||
+                  (Array.from(selectedMenuMasters).some((m) => {
+                    const categories = selectedCategoryMap.get(
+                      m.menuMasterCode,
+                    );
+                    return !categories || categories.length === 0;
+                  }) &&
+                    formik.touched.menuCategoryCode) ? (
                     <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                      {formik.errors.menuMasterCode || formik.errors.menuCategoryCode || "Please select at least one category"}
+                      {formik.errors.menuMasterCode ||
+                        formik.errors.menuCategoryCode ||
+                        "Please select at least one category"}
                     </p>
                   ) : null}
                 </div>
@@ -1446,11 +1687,16 @@ export default function MenuItemTabbedForm({
                     onChange={(e) =>
                       setFormData({ ...formData, deptCode: e.target.value })
                     }
-                    disabled={!Array.isArray(formData.menuMasterCode) || formData.menuMasterCode.length === 0 || 
-                      Array.from(selectedMenuMasters).some(m => {
-                        const categories = selectedCategoryMap.get(m.menuMasterCode);
+                    disabled={
+                      !Array.isArray(formData.menuMasterCode) ||
+                      formData.menuMasterCode.length === 0 ||
+                      Array.from(selectedMenuMasters).some((m) => {
+                        const categories = selectedCategoryMap.get(
+                          m.menuMasterCode,
+                        );
                         return !categories || categories.length === 0;
-                      })}
+                      })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <option value="">Select Department</option>
@@ -1460,13 +1706,17 @@ export default function MenuItemTabbedForm({
                       </option>
                     ))}
                   </select>
-                  {(!Array.isArray(formData.menuMasterCode) || formData.menuMasterCode.length === 0 || 
-                    Array.from(selectedMenuMasters).some(m => {
-                      const categories = selectedCategoryMap.get(m.menuMasterCode);
+                  {(!Array.isArray(formData.menuMasterCode) ||
+                    formData.menuMasterCode.length === 0 ||
+                    Array.from(selectedMenuMasters).some((m) => {
+                      const categories = selectedCategoryMap.get(
+                        m.menuMasterCode,
+                      );
                       return !categories || categories.length === 0;
                     })) && (
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      Please select menu masters and at least one category for each master
+                      Please select menu masters and at least one category for
+                      each master
                     </p>
                   )}
                 </div>
@@ -1498,11 +1748,12 @@ export default function MenuItemTabbedForm({
                           formik.setFieldValue("forColorCode", color);
                         }}
                       />
-                      {formik.errors.forColorCode && formik.touched.forColorCode && (
-                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                          {formik.errors.forColorCode}
-                        </p>
-                      )}
+                      {formik.errors.forColorCode &&
+                        formik.touched.forColorCode && (
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                            {formik.errors.forColorCode}
+                          </p>
+                        )}
                     </div>
                   </div>
 
@@ -1528,21 +1779,27 @@ export default function MenuItemTabbedForm({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-2">
                 {[
                   { key: "isActive", label: "Active" },
-                  { key: "itemContainAlcohol", label: "Contains Alcohol" },
-                  { key: "isOutStock", label: "Out of Stock" },
-                  { key: "isPosVisible", label: "POS Visible" },
                   { key: "disableInPOS", label: "Disable In POS" },
-                  { key: "isKioskOrderPay", label: "Kiosk Order Pay" },
-                  { key: "isOnlineOrderByApp", label: "Online Order by App" },
+                  { key: "isKioskOrderPay", label: "Kiosk Ordering" },
+                  { key: "isOnlineOrderByApp", label: "Mobile App" },
                   { key: "isOnlineOrdering", label: "Online Ordering" },
                   { key: "isCustomerInvoice", label: "Customer Invoice" },
+                  { key: "isOutStock", label: "Out of Stock" },
+                  {
+                    key: "isAllowMultipleDiscount",
+                    label: "Allow Multiple Discount",
+                  },
+                  { key: "isOpenItem", label: "Open Item" },
+                  { key: "isEditStock", label: "Edit Stock" },
+                  { key: "isSetToZeroStock", label: "Track Quantity Disable" },
+                  { key: "itemContainAlcohol", label: "Contains Alcohol" },
                 ].map((t) => (
                   <div
                     key={t.key}
-                    className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg"
+                    className="flex items-center justify-between p-2 border border-gray-200 dark:border-gray-700 rounded-lg"
                   >
                     <span className="text-sm text-gray-700 dark:text-gray-300">
                       {t.label}
@@ -1603,7 +1860,9 @@ export default function MenuItemTabbedForm({
                           setSelectedPrepZones(new Set());
                         } else {
                           const allCodes = new Set(
-                            prepZones.map((z) => z.prepZoneCode).filter(Boolean)
+                            prepZones
+                              .map((z) => z.prepZoneCode)
+                              .filter(Boolean),
                           );
                           setSelectedPrepZones(allCodes);
                         }
@@ -1777,7 +2036,9 @@ export default function MenuItemTabbedForm({
                   >
                     <span
                       className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        formData.isPrice === 1 ? "translate-x-5" : "translate-x-0"
+                        formData.isPrice === 1
+                          ? "translate-x-5"
+                          : "translate-x-0"
                       }`}
                     />
                   </button>
@@ -1869,7 +2130,11 @@ export default function MenuItemTabbedForm({
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Retail Price {formData.isPrice === 1 && formData.priceStrategy === 1 && <span className="text-red-500">*</span>}
+                          Retail Price{" "}
+                          {formData.isPrice === 1 &&
+                            formData.priceStrategy === 1 && (
+                              <span className="text-red-500">*</span>
+                            )}
                         </label>
                         <input
                           ref={retailPriceRef}
@@ -1880,7 +2145,10 @@ export default function MenuItemTabbedForm({
                           onChange={(e) => {
                             const inputValue = e.target.value;
                             // If input is empty, set to null for better validation, otherwise parse as float
-                            const value = inputValue === "" ? null : (parseFloat(inputValue) || 0);
+                            const value =
+                              inputValue === ""
+                                ? null
+                                : parseFloat(inputValue) || 0;
                             setFormData({
                               ...formData,
                               retailPrice: value ?? 0, // Keep 0 for display purposes
@@ -1893,17 +2161,19 @@ export default function MenuItemTabbedForm({
                             formik.setFieldTouched("retailPrice", true);
                           }}
                           className={`w-1/3 px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                            formik.touched.retailPrice && formik.errors.retailPrice
+                            formik.touched.retailPrice &&
+                            formik.errors.retailPrice
                               ? "border-red-500 dark:border-red-500"
                               : "border-gray-300 dark:border-gray-600"
                           }`}
                           placeholder="0.00"
                         />
-                        {formik.touched.retailPrice && formik.errors.retailPrice && (
-                          <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                            {formik.errors.retailPrice}
-                          </p>
-                        )}
+                        {formik.touched.retailPrice &&
+                          formik.errors.retailPrice && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                              {formik.errors.retailPrice}
+                            </p>
+                          )}
                       </div>
                     </div>
                   ) : (
@@ -1927,8 +2197,8 @@ export default function MenuItemTabbedForm({
                             Open Price Strategy
                           </h4>
                           <p className="text-sm text-gray-600 dark:text-gray-400">
-                            This item uses open pricing. Prices will be set at the
-                            point of sale.
+                            This item uses open pricing. Prices will be set at
+                            the point of sale.
                           </p>
                         </div>
                       </div>
@@ -1951,12 +2221,19 @@ export default function MenuItemTabbedForm({
                 </p>
               </div>
 
-              {formData.isPrice !== 1 || formData.retailPrice <= 0 || !Array.isArray(formData.menuMasterCode) || formData.menuMasterCode.length === 0 || !selectedStoreCode ? (
+              {formData.isPrice !== 1 ||
+              formData.retailPrice <= 0 ||
+              !Array.isArray(formData.menuMasterCode) ||
+              formData.menuMasterCode.length === 0 ||
+              !selectedStoreCode ? (
                 <div className="text-center py-8 bg-gray-50 dark:bg-gray-800 rounded-lg">
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {!formData.deptCode && formData.isPrice !== 1 && formData.retailPrice <= 0
+                    {!formData.deptCode &&
+                    formData.isPrice !== 1 &&
+                    formData.retailPrice <= 0
                       ? "Please select Menu Master and enable Pricing with base price to view time events"
-                      : !Array.isArray(formData.menuMasterCode) || formData.menuMasterCode.length === 0
+                      : !Array.isArray(formData.menuMasterCode) ||
+                          formData.menuMasterCode.length === 0
                         ? "Please select Menu Master to view time events"
                         : formData.isPrice !== 1
                           ? "Please enable Pricing to view time events"
@@ -1996,11 +2273,18 @@ export default function MenuItemTabbedForm({
                       <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                         {timeEvents.map((event, index) => {
                           const eventCode = event.eventCode || "";
-                          const eventDetail = Object.values(timeEventDetails).find(d => d.eventCode === eventCode);
-                          const byFixedValue = eventDetail?.byFixedValue ?? event.byFixedValue ?? false;
-                          const currentFormulaValue = timeEventFormulas[eventCode] ?? event.final_price;
+                          const eventDetail = Object.values(
+                            timeEventDetails,
+                          ).find((d) => d.eventCode === eventCode);
+                          const byFixedValue =
+                            eventDetail?.byFixedValue ??
+                            event.byFixedValue ??
+                            false;
+                          const currentFormulaValue =
+                            timeEventFormulas[eventCode] ?? event.final_price;
                           const originalFormulaValue = event.final_price;
-                          const hasChanged = currentFormulaValue !== originalFormulaValue;
+                          const hasChanged =
+                            currentFormulaValue !== originalFormulaValue;
                           const isUpdating = updatingEventCode === eventCode;
 
                           return (
@@ -2017,17 +2301,19 @@ export default function MenuItemTabbedForm({
                                   min="0"
                                   value={currentFormulaValue}
                                   onChange={(e) => {
-                                    const newValue = parseFloat(e.target.value) || 0;
+                                    const newValue =
+                                      parseFloat(e.target.value) || 0;
                                     setTimeEventFormulas((prev) => ({
                                       ...prev,
                                       [eventCode]: newValue,
                                     }));
                                   }}
                                   disabled={!byFixedValue || isUpdating}
-                                  className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${!byFixedValue
-                                    ? "opacity-50 cursor-not-allowed border-gray-300 dark:border-gray-600"
-                                    : "border-gray-300 dark:border-gray-600"
-                                    }`}
+                                  className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                                    !byFixedValue
+                                      ? "opacity-50 cursor-not-allowed border-gray-300 dark:border-gray-600"
+                                      : "border-gray-300 dark:border-gray-600"
+                                  }`}
                                   placeholder="0.00"
                                 />
                               </td>
@@ -2035,18 +2321,29 @@ export default function MenuItemTabbedForm({
                                 <button
                                   type="button"
                                   onClick={async () => {
-                                    if (!eventCode || !byFixedValue || !hasChanged) return;
+                                    if (
+                                      !eventCode ||
+                                      !byFixedValue ||
+                                      !hasChanged
+                                    )
+                                      return;
 
-                                    const itemId = menuItem?.menuItemId || menuItem?.tblMenuItemId;
+                                    const itemId =
+                                      menuItem?.menuItemId ||
+                                      menuItem?.tblMenuItemId;
                                     if (!itemId) {
-                                      toast.error("Please save the menu item first before updating formula values");
+                                      toast.error(
+                                        "Please save the menu item first before updating formula values",
+                                      );
                                       return;
                                     }
 
                                     setUpdatingEventCode(eventCode);
                                     try {
                                       const response = await fetch(
-                                        buildApiUrl(`/api/dashboard/menu-items/${itemId}/time-events/${encodeURIComponent(eventCode)}?storeCode=${encodeURIComponent(selectedStoreCode || '')}`),
+                                        buildApiUrl(
+                                          `/api/dashboard/menu-items/${itemId}/time-events/${encodeURIComponent(eventCode)}?storeCode=${encodeURIComponent(selectedStoreCode || "")}`,
+                                        ),
                                         {
                                           method: "PUT",
                                           headers: {
@@ -2055,37 +2352,52 @@ export default function MenuItemTabbedForm({
                                           body: JSON.stringify({
                                             formulaValue: currentFormulaValue,
                                           }),
-                                        }
+                                        },
                                       );
 
                                       if (response.ok) {
-                                        toast.success("Formula value updated successfully");
+                                        toast.success(
+                                          "Formula value updated successfully",
+                                        );
                                         // Update the original value to reflect the change
                                         setTimeEvents((prev) =>
                                           prev.map((e) =>
                                             e.eventCode === eventCode
-                                              ? { ...e, final_price: currentFormulaValue }
-                                              : e
-                                          )
+                                              ? {
+                                                  ...e,
+                                                  final_price:
+                                                    currentFormulaValue,
+                                                }
+                                              : e,
+                                          ),
                                         );
                                       } else {
                                         const errorData = await response.json();
                                         toast.error(
-                                          errorData.error || "Failed to update formula value"
+                                          errorData.error ||
+                                            "Failed to update formula value",
                                         );
                                       }
                                     } catch (error) {
-                                      console.error("Error updating formula value:", error);
-                                      toast.error("Failed to update formula value");
+                                      console.error(
+                                        "Error updating formula value:",
+                                        error,
+                                      );
+                                      toast.error(
+                                        "Failed to update formula value",
+                                      );
                                     } finally {
                                       setUpdatingEventCode(null);
                                     }
                                   }}
-                                  disabled={!byFixedValue || !hasChanged || isUpdating}
-                                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${byFixedValue && hasChanged && !isUpdating
-                                    ? "bg-yellow-500 hover:bg-yellow-600 text-white"
-                                    : "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
-                                    }`}
+                                  disabled={
+                                    !byFixedValue || !hasChanged || isUpdating
+                                  }
+                                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                                    byFixedValue && hasChanged && !isUpdating
+                                      ? "bg-yellow-500 hover:bg-yellow-600 text-white"
+                                      : "bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+                                  }`}
                                 >
                                   {isUpdating ? "Updating..." : "Update"}
                                 </button>
@@ -2097,7 +2409,8 @@ export default function MenuItemTabbedForm({
                     </table>
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Note: Formula value can only be edited when 'Fixed Value' is enabled. Use the Update button to save changes.
+                    Note: Formula value can only be edited when 'Fixed Value' is
+                    enabled. Use the Update button to save changes.
                   </p>
                 </div>
               )}
@@ -2367,7 +2680,7 @@ export default function MenuItemTabbedForm({
                       const result = reader.result as string;
                       if (result.length > 1400000) {
                         toast.error(
-                          "Image is too large. Please use a smaller image."
+                          "Image is too large. Please use a smaller image.",
                         );
                         e.target.value = "";
                         setImageLoading(false);
@@ -2410,7 +2723,7 @@ export default function MenuItemTabbedForm({
                       onClick={() => {
                         setFormData({ ...formData, menuImg: "" });
                         const fileInput = document.querySelector(
-                          'input[type="file"]'
+                          'input[type="file"]',
                         ) as HTMLInputElement;
                         if (fileInput) fileInput.value = "";
                       }}
@@ -2478,14 +2791,15 @@ export default function MenuItemTabbedForm({
                           const inheritedCodes = new Set(
                             (inheritedModifiers || [])
                               .map((m: any) => m.modifierGroupCode)
-                              .filter(Boolean)
+                              .filter(Boolean),
                           );
                           return selectedModifiers
                             .filter((modifierId) => {
                               const modifier = modifiers.find(
                                 (m) =>
                                   Number(m.id) === Number(modifierId) ||
-                                  Number(m.tblModifierId) === Number(modifierId)
+                                  Number(m.tblModifierId) ===
+                                    Number(modifierId),
                               );
                               return (
                                 modifier &&
@@ -2496,7 +2810,8 @@ export default function MenuItemTabbedForm({
                               const modifier = modifiers.find(
                                 (m) =>
                                   Number(m.id) === Number(modifierId) ||
-                                  Number(m.tblModifierId) === Number(modifierId)
+                                  Number(m.tblModifierId) ===
+                                    Number(modifierId),
                               );
                               if (!modifier) return null;
                               const opts = modifierOptions[modifierId] || {
@@ -2512,7 +2827,10 @@ export default function MenuItemTabbedForm({
                                     <div className="flex items-center">
                                       <div>
                                         <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                          {modifier.groupName || modifier.labelName || modifier.name || 'Unnamed Modifier'}
+                                          {modifier.groupName ||
+                                            modifier.labelName ||
+                                            modifier.name ||
+                                            "Unnamed Modifier"}
                                         </div>
                                       </div>
                                     </div>
@@ -2526,7 +2844,7 @@ export default function MenuItemTabbedForm({
                                           [modifierId]: {
                                             ...(prev[modifierId] || opts),
                                             isRequired: parseInt(
-                                              e.target.value
+                                              e.target.value,
                                             ),
                                           },
                                         }))
@@ -2634,7 +2952,7 @@ export default function MenuItemTabbedForm({
                 <button
                   type="button"
                   onClick={() => setShowModifierModal(true)}
-                  className="mt-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  className="mt-3 inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 border border-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <svg
                     className="w-4 h-4 mr-2"
@@ -2701,8 +3019,8 @@ export default function MenuItemTabbedForm({
                           .map(
                             (code) =>
                               filteredCategories.find(
-                                (c) => c.menuCategoryCode === code
-                              )?.name
+                                (c) => c.menuCategoryCode === code,
+                              )?.name,
                           )
                           .filter(Boolean)
                           .join(", ") || "Selected Categories"}
@@ -2806,7 +3124,13 @@ export default function MenuItemTabbedForm({
           isOpen={showMenuMasterCategoryModal}
           onClose={() => setShowMenuMasterCategoryModal(false)}
           onConfirm={handleMenuMasterCategorySelect}
-          selectedMenuMasterCodes={Array.isArray(formData.menuMasterCode) ? formData.menuMasterCode : (formData.menuMasterCode ? [formData.menuMasterCode] : [])}
+          selectedMenuMasterCodes={
+            Array.isArray(formData.menuMasterCode)
+              ? formData.menuMasterCode
+              : formData.menuMasterCode
+                ? [formData.menuMasterCode]
+                : []
+          }
           selectedCategoryMap={(() => {
             // Convert Map<string, string[]> to Map<string, string[]> for modal (it expects this format)
             const mapForModal = new Map<string, string[]>();

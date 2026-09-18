@@ -30,7 +30,7 @@ export async function GET(
       where: { menuMasterId: masterId }
     })
 
-    if (!menuMaster) {
+    if (!menuMaster || menuMaster.isDelete) {
       return NextResponse.json({ error: 'Menu master not found' }, { status: 404 })
     }
 

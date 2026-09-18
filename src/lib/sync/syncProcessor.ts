@@ -80,6 +80,7 @@ export class SyncProcessor {
     'is_report',
     'isreceipt',    // Printer receipt type (boolean)
     'isdocument',   // Printer document type (boolean)
+    'is_serial',    // Printer serial/COM port type (boolean)
     'isActive',     // Location database users table column (camelCase)
   ]);
 
@@ -90,8 +91,8 @@ export class SyncProcessor {
     'tbl_permission': new Set(['is_active']),  // Master table name (for reverse lookup)
     'roles': new Set(['is_active', 'is_system_role']),  // Location table name
     'tbl_role': new Set(['is_active', 'is_system_role']),  // Master table name (for reverse lookup)
-    'tbl_printer': new Set(['isreceipt', 'isdocument', 'is_kitchen']),  // Location table name
-    'tbl_master_printer': new Set(['isreceipt', 'isdocument', 'is_kitchen']),  // Master table name (for reverse lookup)
+    'tbl_printer': new Set(['isreceipt', 'isdocument', 'is_kitchen', 'is_serial', 'is_delete']),  // Location table name
+    'tbl_master_printer': new Set(['isreceipt', 'isdocument', 'is_kitchen', 'is_serial', 'is_delete']),  // Master table name (for reverse lookup)
     'tbl_discount_master': new Set(['is_item_level', 'is_bill_level', 'requires_manager_approval', 'is_open_discount', 'is_delete', 'is_active']),  // Location table name
     'tbl_master_discount_master': new Set(['is_item_level', 'is_bill_level', 'requires_manager_approval', 'is_open_discount', 'is_delete', 'is_active']),  // Master table name (for reverse lookup)
     'tbl_suggestion': new Set(['is_delete']),  // Location table name
@@ -101,6 +102,8 @@ export class SyncProcessor {
   // Table-specific integer columns (columns that are integer in some tables)
   private readonly TABLE_INTEGER_COLUMNS: Record<string, Set<string>> = {
     'tbl_modifier_item': new Set(['is_default']), // is_default is integer in modifier_item
+    'tbl_printer': new Set(['character_per_line', 'col_pre_char']),
+    'tbl_master_printer': new Set(['character_per_line', 'col_pre_char']),
   };
 
   // List of integer columns that might come as boolean but should be converted to integer

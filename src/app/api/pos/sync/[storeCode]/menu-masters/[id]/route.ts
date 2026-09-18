@@ -36,7 +36,7 @@ export async function GET(
     try {
       const masterId = BigInt(id)
       menuMaster = await locationPrisma.menuMaster.findFirst({
-        where: { menuMasterId: masterId, storeCode }
+        where: { menuMasterId: masterId, storeCode, isDelete: false }
       })
     } catch {
       // ignore BigInt parse errors
@@ -44,7 +44,7 @@ export async function GET(
 
     if (!menuMaster) {
       menuMaster = await locationPrisma.menuMaster.findFirst({
-        where: { menuMasterCode: id, storeCode }
+        where: { menuMasterCode: id, storeCode, isDelete: false }
       })
     }
 

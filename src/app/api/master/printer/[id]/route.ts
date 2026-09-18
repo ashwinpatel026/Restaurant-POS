@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { masterPrisma } from '@/lib/databaseManager'
+import { parsePrinterFields } from '@/lib/printerPayload'
 
 // Helper function to map printer response
 function mapPrinterResponse(printer: any) {
@@ -28,8 +29,8 @@ export async function GET(
     const { id: idParam } = await params
     const printerId = BigInt(idParam)
 
-    const printer = await masterPrisma.masterPrinter.findUnique({
-      where: { printerId: printerId }
+    const printer = await masterPrisma.masterPrinter.findFirst({
+      where: { printerId: printerId, isDelete: false }
     })
 
     if (!printer) {
@@ -60,12 +61,20 @@ export async function PUT(
     const { id: idParam } = await params
     const printerId = BigInt(idParam)
     const body = await request.json()
+    const payload = parsePrinterFields(body)
+    delete (payload as any).isDelete
+    payload.isdocument = false
 
-    const { printerName, isActive, isreceipt, isdocument, isKitchen } = body
-
-    if (!printerName) {
+    if (!payload.printerName) {
       return NextResponse.json(
         { error: 'Printer name is required' },
+        { status: 400 }
+      )
+    }
+
+    if (payload.isSerial && !payload.comport) {
+      return NextResponse.json(
+        { error: 'COM Port is required when Serial is enabled' },
         { status: 400 }
       )
     }
@@ -73,11 +82,7 @@ export async function PUT(
     const printer = await masterPrisma.masterPrinter.update({
       where: { printerId: printerId },
       data: {
-        printerName,
-        isActive: isActive ? 1 : 0,
-        isreceipt: isreceipt ?? false,
-        isdocument: isdocument ?? false,
-        isKitchen: isKitchen ?? false,
+        ...payload,
         updatedBy: admin.adminId,
         updatedOn: new Date()
       }
@@ -115,8 +120,14 @@ export async function DELETE(
     const { id: idParam } = await params
     const printerId = BigInt(idParam)
 
-    await masterPrisma.masterPrinter.delete({
-      where: { printerId: printerId }
+    await masterPrisma.masterPrinter.update({
+      where: { printerId: printerId },
+      data: {
+        isDelete: true,
+        isActive: 0,
+        updatedBy: admin.adminId,
+        updatedOn: new Date()
+      }
     })
 
     return NextResponse.json({ message: 'Printer deleted successfully' })
@@ -136,4 +147,3 @@ export async function DELETE(
     )
   }
 }
-

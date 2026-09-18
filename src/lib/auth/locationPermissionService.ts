@@ -4,32 +4,32 @@
  * Used by location/dashboard API routes (/api/dashboard/*)
  */
 
-import { prisma } from '@/lib/database'
+import { prisma } from "@/lib/database";
 
 // Cache for permission lookups (in-memory cache)
-const permissionCache = new Map<string, Set<string>>()
-const cacheExpiry = new Map<string, number>()
-const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+const permissionCache = new Map<string, Set<string>>();
+const cacheExpiry = new Map<string, number>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Check if a role has a specific permission
  */
 export async function hasPermission(
   roleCode: string,
-  permissionCode: string
+  permissionCode: string,
 ): Promise<boolean> {
   // SUPER_ADMIN always has all permissions
-  if (roleCode === 'SUPER_ADMIN') {
-    return true
+  if (roleCode === "SUPER_ADMIN") {
+    return true;
   }
 
   // Check cache first
-  const cacheKey = `${roleCode}:permissions`
-  const cached = permissionCache.get(cacheKey)
-  const expiry = cacheExpiry.get(cacheKey) || 0
+  const cacheKey = `${roleCode}:permissions`;
+  const cached = permissionCache.get(cacheKey);
+  const expiry = cacheExpiry.get(cacheKey) || 0;
 
   if (cached && Date.now() < expiry) {
-    return cached.has(permissionCode)
+    return cached.has(permissionCode);
   }
 
   // Query location database
@@ -44,13 +44,13 @@ export async function hasPermission(
         isActive: true,
       },
     },
-  })
+  });
 
-  const hasPerm = !!rolePermission
+  const hasPerm = !!rolePermission;
 
   // Update cache
   if (cached) {
-    cached.add(permissionCode)
+    cached.add(permissionCode);
   } else {
     // Load all permissions for this role into cache
     const allPermissions = await prisma.rolePermission.findMany({
@@ -66,14 +66,16 @@ export async function hasPermission(
       select: {
         permissionCode: true,
       },
-    })
+    });
 
-    const permissionSet = new Set(allPermissions.map(rp => rp.permissionCode))
-    permissionCache.set(cacheKey, permissionSet)
-    cacheExpiry.set(cacheKey, Date.now() + CACHE_TTL)
+    const permissionSet = new Set(
+      allPermissions.map((rp) => rp.permissionCode),
+    );
+    permissionCache.set(cacheKey, permissionSet);
+    cacheExpiry.set(cacheKey, Date.now() + CACHE_TTL);
   }
 
-  return hasPerm
+  return hasPerm;
 }
 
 /**
@@ -81,21 +83,21 @@ export async function hasPermission(
  */
 export async function getUserPermissions(roleCode: string): Promise<string[]> {
   // SUPER_ADMIN has all permissions
-  if (roleCode === 'SUPER_ADMIN') {
+  if (roleCode === "SUPER_ADMIN") {
     const allPermissions = await prisma.permission.findMany({
       where: { isActive: true },
       select: { permissionCode: true },
-    })
-    return allPermissions.map(p => p.permissionCode)
+    });
+    return allPermissions.map((p) => p.permissionCode);
   }
 
   // Check cache first
-  const cacheKey = `${roleCode}:permissions`
-  const cached = permissionCache.get(cacheKey)
-  const expiry = cacheExpiry.get(cacheKey) || 0
+  const cacheKey = `${roleCode}:permissions`;
+  const cached = permissionCache.get(cacheKey);
+  const expiry = cacheExpiry.get(cacheKey) || 0;
 
   if (cached && Date.now() < expiry) {
-    return Array.from(cached)
+    return Array.from(cached);
   }
 
   // Query location database
@@ -112,9 +114,9 @@ export async function getUserPermissions(roleCode: string): Promise<string[]> {
     select: {
       permissionCode: true,
     },
-  })
+  });
 
-  const permissions = rolePermissions.map(rp => rp.permissionCode)
+  const permissions = rolePermissions.map((rp) => rp.permissionCode);
 
   // Debug logging (commented out - uncomment if needed for debugging)
   // console.log(`[locationPermissionService] Role: ${roleCode}, Found ${permissions.length} permissions in location DB`)
@@ -123,11 +125,11 @@ export async function getUserPermissions(roleCode: string): Promise<string[]> {
   // }
 
   // Update cache
-  const permissionSet = new Set(permissions)
-  permissionCache.set(cacheKey, permissionSet)
-  cacheExpiry.set(cacheKey, Date.now() + CACHE_TTL)
+  const permissionSet = new Set(permissions);
+  permissionCache.set(cacheKey, permissionSet);
+  cacheExpiry.set(cacheKey, Date.now() + CACHE_TTL);
 
-  return permissions
+  return permissions;
 }
 
 /**
@@ -135,11 +137,10 @@ export async function getUserPermissions(roleCode: string): Promise<string[]> {
  */
 export function clearPermissionCache(roleCode?: string): void {
   if (roleCode) {
-    permissionCache.delete(`${roleCode}:permissions`)
-    cacheExpiry.delete(`${roleCode}:permissions`)
+    permissionCache.delete(`${roleCode}:permissions`);
+    cacheExpiry.delete(`${roleCode}:permissions`);
   } else {
-    permissionCache.clear()
-    cacheExpiry.clear()
+    permissionCache.clear();
+    cacheExpiry.clear();
   }
 }
-

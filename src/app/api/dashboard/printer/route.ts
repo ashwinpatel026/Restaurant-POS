@@ -9,6 +9,7 @@ import {
 } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 import { checkDuplicate } from '@/lib/validation'
+import { parsePrinterFields } from '@/lib/printerPayload'
 
 // Helper function to generate unique printer code
 async function generatePrinterCode(storeCode: string): Promise<string> {
@@ -78,6 +79,7 @@ export async function GET(request: NextRequest) {
     const printers = await prisma.printer.findMany({
       where: {
         ...storeFilter,
+        isDelete: false,
       },
       orderBy: { createdOn: 'desc' },
     })
@@ -127,18 +129,25 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { printerName, isActive, isreceipt, isdocument, isKitchen } = body
+    const payload = { ...parsePrinterFields(body), isDelete: false, isdocument: false }
 
     // Validate required fields
-    if (!printerName) {
+    if (!payload.printerName) {
       return NextResponse.json(
         { error: 'Printer name is required' },
         { status: 400 }
       )
     }
 
+    if (payload.isSerial && !payload.comport) {
+      return NextResponse.json(
+        { error: 'COM Port is required when Serial is enabled' },
+        { status: 400 }
+      )
+    }
+
     // Check for duplicate name
-    const isDuplicate = await checkDuplicate('printer', 'printerName', printerName, {
+    const isDuplicate = await checkDuplicate('printer', 'printerName', payload.printerName, {
       storeCode: selectedStoreCode
     })
     if (isDuplicate) {
@@ -154,11 +163,7 @@ export async function POST(request: NextRequest) {
     const printer = await prisma.printer.create({
       data: {
         printerCode,
-        printerName,
-        isActive: isActive ? 1 : 0,
-        isreceipt: isreceipt ?? false,
-        isdocument: isdocument ?? false,
-        isKitchen: isKitchen ?? false,
+        ...payload,
         createdBy: parseInt(session.user.id),
         storeCode: selectedStoreCode,
         // Mark records created from dashboard/location

@@ -49,7 +49,7 @@ export async function GET(
       }
     })
 
-    if (!modifierItem) {
+    if (!modifierItem || modifierItem.isDelete) {
       return NextResponse.json({ error: 'Modifier item not found' }, { status: 404 })
     }
 
@@ -108,7 +108,7 @@ export async function PUT(
       where: { id: itemId }
     })
 
-    if (!existingItem) {
+    if (!existingItem || existingItem.isDelete) {
       return NextResponse.json({ error: 'Modifier item not found' }, { status: 404 })
     }
 
@@ -189,7 +189,7 @@ export async function DELETE(
       where: { id: itemId }
     })
 
-    if (!existingItem) {
+    if (!existingItem || existingItem.isDelete) {
       return NextResponse.json({ error: 'Modifier item not found' }, { status: 404 })
     }
 
@@ -198,8 +198,9 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    await (prisma as any).modifierItem.delete({
-      where: { id: itemId }
+    await (prisma as any).modifierItem.update({
+      where: { id: itemId },
+      data: { isDelete: true, isActive: 0, syncSource: 'location' },
     })
 
     return NextResponse.json({ message: 'Modifier item deleted successfully' })

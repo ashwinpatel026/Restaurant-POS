@@ -99,6 +99,7 @@ export async function GET(
  * @apiBody {Boolean} [alwaysPrintTicket] Always print ticket
  * @apiBody {String} [printerCode] Primary printer code
  * @apiBody {String} [backupPrinterCode] Backup printer code
+ * @apiBody {String} [profileCode] Printer profile code
  * @apiBody {Number} [createdBy] User ID (integer) who created the prep zone
  *
  * @apiParamExample {json} Request Body
@@ -178,6 +179,7 @@ export async function POST(
       alwaysPrintTicket: body.alwaysPrintTicket ? 1 : 0,
       printerCode: body.printerCode || null,
       backupPrinterCode: body.backupPrinterCode || null,
+      profileCode: body.profileCode || null,
       createdBy: body.createdBy ? parseInt(body.createdBy) : null,
       createdOn: new Date()
     }, storeCode)

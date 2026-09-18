@@ -52,7 +52,7 @@ model UserStoreAccess {
   isDefault   Boolean   @default(false) @map("is_default")
   createdAt   DateTime  @default(now()) @map("created_at")
   syncId      String?   @unique @default(uuid()) @map("sync_id") @db.Uuid
-  syncSource  String?   @default("server") @map("sync_source") @db.VarChar(20)
+  syncSource  String?   @default("location") @map("sync_source") @db.VarChar(20)
   
   // Note: Foreign key constraint removed to allow sync flexibility
   // user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -108,7 +108,7 @@ model TimeEvent {
   isSyncToWeb            Int?      @map("is_sync_to_web")
   isSyncToLocal          Int?      @map("is_sync_to_local")
   syncId                 String?   @unique @default(uuid()) @map("sync_id") @db.Uuid
-  syncSource             String?   @default("server") @map("sync_source") @db.VarChar(20)
+  syncSource             String?   @default("location") @map("sync_source") @db.VarChar(20)
 
   // Relationships
   menuMasterEvents       MenuMasterEvent[]
@@ -126,6 +126,7 @@ model PrepZone {
   alwaysPrintTicket  Int?      @map("always_print_ticket")
   printerCode        String?   @map("printer_code") @db.VarChar(100)
   backupPrinterCode  String?   @map("backup_printer_code") @db.VarChar(100)
+  profileCode        String?   @map("profile_code") @db.VarChar(50)
   createdBy          Int?      @map("createdby")
   createdOn          DateTime  @default(now()) @map("createdon")
   updatedBy          Int?      @map("updatedby")
@@ -134,35 +135,35 @@ model PrepZone {
   isSyncToLocal      Int       @default(0) @map("is_sync_to_local")
   storeCode          String?   @map("store_code") @db.VarChar(100)
   syncId             String?   @unique @default(uuid()) @map("sync_id") @db.Uuid
-  syncSource         String?   @default("server") @map("sync_source") @db.VarChar(20)
+  syncSource         String?   @default("location") @map("sync_source") @db.VarChar(20)
 
   @@map("tbl_prep_zone")
 }
 
 model MenuMaster {
-  menuMasterId      BigInt    @id @default(autoincrement()) @map("menu_master_id")
-  menuMasterCode    String    @unique @map("menu_master_code") @db.VarChar(100)
-  name              String?   @map("name") @db.VarChar(500)
-  labelName         String?   @map("label_name") @db.VarChar(500)
-  colorCode         String?   @map("color_code") @db.VarChar(100)
-  prepZoneCode      Json?     @map("prep_zone_code")
-  stationCode       Json?     @map("station_code")
-  isEventMenu       Int?      @map("is_event_menu")
-  deptCode          String?    @map("dept_code") @db.VarChar(100)
-  forColorCode      String?    @map("forcolor_code") @db.VarChar(100)
-  isActive          Int       @default(1) @map("is_active")
-  createdBy         Int?      @map("createdby")
-  createdOn         DateTime  @default(now()) @map("createdon")
-  updatedBy         Int?      @map("updatedby")
-  updatedOn         DateTime? @map("updatedon")
-  globalCode        String?   @map("global_code") @db.VarChar(30)
-  isSyncToWeb       Int       @default(0) @map("is_sync_to_web")
-  isSyncToLocal     Int       @default(0) @map("is_sync_to_local")
-  storeCode         String?   @map("store_code") @db.VarChar(100)
-  syncId            String?   @unique @default(uuid()) @map("sync_id") @db.Uuid
-  syncSource        String?   @default("server") @map("sync_source") @db.VarChar(20)
-  isDelete          Boolean   @default(false) @map("is_delete")
-  disableInPOS      Int       @default(0) @map("disable_in_pos")
+  menuMasterId                    BigInt    @id @default(autoincrement()) @map("menu_master_id")
+  menuMasterCode                  String    @unique @map("menu_master_code") @db.VarChar(100)
+  name                            String?   @map("name") @db.VarChar(500)
+  labelName                       String?   @map("label_name") @db.VarChar(500)
+  colorCode                       String?   @map("color_code") @db.VarChar(100)
+  prepZoneCode                    Json?     @map("prep_zone_code")
+  stationCode                     Json?     @map("station_code")
+  isEventMenu                     Int?      @map("is_event_menu")
+  deptCode                        String?    @map("dept_code") @db.VarChar(100)
+  forColorCode                    String?    @map("forcolor_code") @db.VarChar(100)
+  isActive                        Int       @default(1) @map("is_active")
+  createdBy                       Int?      @map("createdby")
+  createdOn                       DateTime  @default(now()) @map("createdon")
+  updatedBy                       Int?      @map("updatedby")
+  updatedOn                       DateTime? @map("updatedon")
+  globalCode                      String?   @map("global_code") @db.VarChar(30)
+  isSyncToWeb                     Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal                   Int       @default(0) @map("is_sync_to_local")
+  storeCode                       String?   @map("store_code") @db.VarChar(100)
+  syncId                          String?   @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource                      String?   @default("location") @map("sync_source") @db.VarChar(20)
+  isDelete                        Boolean   @default(false) @map("is_delete")
+  disableInPOS                    Int       @default(0) @map("disable_in_pos")
 
   // Relationships
   menuMasterEvents  MenuMasterEvent[]
@@ -208,7 +209,7 @@ model MenuCategory {
   isSyncToLocal     Int       @default(0) @map("is_sync_to_local")
   storeCode         String?   @map("store_code") @db.VarChar(100)
   syncId            String?   @unique @default(uuid()) @map("sync_id") @db.Uuid
-  syncSource        String?   @default("server") @map("sync_source") @db.VarChar(20)
+  syncSource        String?   @default("location") @map("sync_source") @db.VarChar(20)
   isDelete          Boolean   @default(false) @map("is_delete")
   disableInPOS      Int       @default(0) @map("disable_in_pos")
 
@@ -285,9 +286,13 @@ model MenuItem {
   isSyncToLocal                  Int       @default(0) @map("is_sync_to_local")
   storeCode                      String?   @map("store_code") @db.VarChar(100)
   syncId                         String?   @unique @default(uuid()) @map("sync_id") @db.Uuid
-  syncSource                     String?   @default("server") @map("sync_source") @db.VarChar(20)
+  syncSource                     String?   @default("location") @map("sync_source") @db.VarChar(20)
   isDelete                       Boolean   @default(false) @map("is_delete")
   disableInPOS                   Int       @default(0) @map("disable_in_pos")
+  isSetToZeroStock                Boolean   @default(false) @map("is_set_to_zero_stock")
+  isOpenItem                      Boolean   @default(false) @map("open_item")
+  isEditStock                     Boolean   @default(false) @map("is_edit_stock")
+  isAllowMultipleDiscount         Boolean   @default(false) @map("allow_multiple_discount")
 
   @@map("tbl_menu_item")
 }
@@ -410,6 +415,7 @@ model ModifierGroup {
   storeCode               String?  @map("store_code") @db.VarChar(100)
   syncId                  String?  @unique @default(uuid()) @map("sync_id") @db.Uuid
   syncSource              String?  @default("server") @map("sync_source") @db.VarChar(20)
+  isDelete                Boolean  @default(false) @map("is_delete")
 
   // Items in this group (by code)
   // Note: Relation is via code; Prisma cannot enforce without FK. Use manual joins in API.
@@ -438,6 +444,7 @@ model ModifierItem {
   storeCode          String?  @map("store_code") @db.VarChar(100)
   syncId             String?  @unique @default(uuid()) @map("sync_id") @db.Uuid
   syncSource         String?  @default("server") @map("sync_source") @db.VarChar(20)
+  isDelete           Boolean  @default(false) @map("is_delete")
 
   @@map("tbl_modifier_item")
 }
@@ -487,7 +494,7 @@ model Station {
   isSyncToLocal Int     @default(0) @map("is_sync_to_local")
   storeCode     String? @map("store_code") @db.VarChar(100)
   syncId        String? @unique @default(uuid()) @map("sync_id") @db.Uuid
-  syncSource    String? @default("server") @map("sync_source") @db.VarChar(20)
+  syncSource    String? @default("location") @map("sync_source") @db.VarChar(20)
 
   // Relationship
   // shifts Shift[]
@@ -533,37 +540,266 @@ model Shift {
 }
 
 model Printer {
-  printerId     BigInt    @id @default(autoincrement()) @map("printer_id")
-  printerCode   String    @unique @map("printer_code") @db.VarChar(100)
-  printerName   String?   @map("printer_name") @db.VarChar(200)
-  isActive      Int?      @map("is_active")
-  isreceipt     Boolean   @default(false) @map("isreceipt")
-  isdocument    Boolean   @default(false) @map("isdocument")
-  isKitchen     Boolean   @default(false) @map("is_kitchen")
-  createdBy     Int?      @map("createdby")
-  createdOn     DateTime  @default(now()) @map("createdon")
-  updatedBy     BigInt?   @map("updatedby")
-  updatedOn     DateTime? @map("updatedon")
-  isSyncToWeb   Int       @default(0) @map("is_sync_to_web")
-  isSyncToLocal Int       @default(0) @map("is_sync_to_local")
-  storeCode     String?   @map("store_code") @db.VarChar(100)
-  syncId        String?   @unique @default(uuid()) @map("sync_id") @db.Uuid
-  syncSource    String?   @default("server") @map("sync_source") @db.VarChar(20)
+  printerId        BigInt    @id @default(autoincrement()) @map("printer_id")
+  printerCode      String    @unique @map("printer_code") @db.VarChar(100)
+  printerName      String?   @map("printer_name") @db.VarChar(200)
+  isActive         Int?      @map("is_active")
+  isreceipt        Boolean   @default(false) @map("isreceipt")
+  isdocument       Boolean   @default(false) @map("isdocument")
+  isKitchen        Boolean   @default(false) @map("is_kitchen")
+  isDelete         Boolean   @default(false) @map("is_delete")
+  stationCode      String?   @map("station_code") @db.VarChar(100)
+  isSerial         Boolean   @default(false) @map("is_serial")
+  comport          String?   @map("comport") @db.VarChar(10)
+  displayName      String?   @map("display_name") @db.VarChar(200)
+  characterPerLine Int       @default(40) @map("character_per_line")
+  printerBrand     String    @default("") @map("printer_brand") @db.VarChar(100)
+  printMethod      String    @default("1") @map("print_method") @db.VarChar(50)
+  colPreChar       Int       @default(40) @map("col_pre_char")
+  ipAdress         String?   @map("ip_adress") @db.VarChar(100)
+  createdBy        Int?      @map("createdby")
+  createdOn        DateTime  @default(now()) @map("createdon")
+  updatedBy        BigInt?   @map("updatedby")
+  updatedOn        DateTime? @map("updatedon")
+  isSyncToWeb      Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal    Int       @default(0) @map("is_sync_to_local")
+  storeCode        String?   @map("store_code") @db.VarChar(100)
+  syncId           String?   @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource       String?   @default("location") @map("sync_source") @db.VarChar(20)
 
   @@map("tbl_printer")
 }
 
+model PrinterProfile {
+  profileId     BigInt    @id @default(autoincrement()) @map("profile_id")
+  profileCode   String    @unique @map("profile_code") @db.VarChar(50)
+  name          String    @map("name") @db.VarChar(100)
+  printerType   String    @map("printer_type") @db.VarChar(20)
+  isActive      Boolean   @default(true) @map("is_active")
+  isDelete      Boolean   @default(false) @map("is_delete")
+  createdBy     Int?      @map("createdby")
+  createdOn     DateTime  @default(now()) @map("createdon")
+  updatedBy     Int?      @map("updatedby")
+  updatedOn     DateTime? @map("updatedon")
+  isSyncToWeb   Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal Int       @default(0) @map("is_sync_to_local")
+  storeCode     String?   @map("store_code") @db.VarChar(100)
+  syncId        String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource    String?   @default("location") @map("sync_source") @db.VarChar(20)
+
+  @@index([profileCode])
+  @@index([storeCode])
+  @@index([syncId])
+  @@map("tbl_printer_profile")
+}
+
+model StationProfileSetting {
+  profileSettingId    BigInt    @id @default(autoincrement()) @map("profile_setting_id")
+  profileSettingCode  String    @unique @map("profile_setting_code") @db.VarChar(50)
+  stationCode         String    @map("station_code") @db.VarChar(50)
+  profileCode         String    @map("profile_code") @db.VarChar(50)
+  localPrinterCode    String?   @map("local_printer_code") @db.VarChar(50)
+  backupPrinterCode   String?   @map("backup_printer_code") @db.VarChar(50)
+  isActive            Boolean   @default(true) @map("is_active")
+  isDelete            Boolean   @default(false) @map("is_delete")
+  createdBy           Int?      @map("createdby")
+  createdOn           DateTime  @default(now()) @map("createdon")
+  updatedBy           Int?      @map("updatedby")
+  updatedOn           DateTime? @map("updatedon")
+  isSyncToWeb         Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal       Int       @default(0) @map("is_sync_to_local")
+  storeCode           String?   @map("store_code") @db.VarChar(100)
+  syncId              String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource          String?   @default("location") @map("sync_source") @db.VarChar(20)
+
+  @@index([profileSettingCode])
+  @@index([stationCode])
+  @@index([profileCode])
+  @@index([storeCode])
+  @@index([syncId])
+  @@map("tbl_station_profile_setting")
+}
+
+model StationSetting {
+  stationSettingId       Int       @id @default(autoincrement()) @map("stationsetting_id")
+  stationCode            String    @unique @map("station_code") @db.VarChar(50)
+  theme                  String?   @default("Dark") @map("theme") @db.VarChar(50)
+  isBurg                 Boolean?  @default(false) @map("is_burg")
+  burgComPort            String?   @map("burg_com_port") @db.VarChar(50)
+  localPrinterCode       String?   @map("local_printer_code") @db.VarChar(30)
+  backupPrinterCode      String?   @map("backup_printer_code") @db.VarChar(30)
+  isCashDrawer           Boolean?  @default(false) @map("is_cash_drawer")
+  cashDrawerCode         String?   @map("cash_drawer_code") @db.VarChar(50)
+  cashDrawerComport      String?   @map("cash_drawer_comport") @db.VarChar(50)
+  isBarcodeScanner       Boolean?  @default(false) @map("is_barcode_scanner")
+  liquorDispenserCode    String?   @map("liquor_dispenser_code") @db.VarChar(50)
+  tabSelectionReqDin     Boolean?  @default(false) @map("tab_selection_req_din")
+  enableMobileKeyboard   Boolean?  @default(false) @map("enable_mobile_keyboard")
+  isAutoPicked           Boolean?  @default(false) @map("is_auto_picked")
+  isAutoDelivered        Boolean?  @default(false) @map("is_auto_delivered")
+  openCheckSelection     String?   @default("Dine-In") @map("open_check_selection") @db.VarChar(50)
+  idealTimeLogout        String?   @default("0") @map("ideal_time_logout") @db.VarChar(10)
+  isTipAdjustmentReceipt Boolean?  @default(true) @map("is_tip_adjustment_receipt")
+  fontSize               Int?      @default(13) @map("font_size")
+  isDelete               Boolean?  @default(false) @map("is_delete")
+  isActive               Boolean?  @default(true) @map("active")
+  createdBy              Int?      @map("createdby")
+  createdOn              DateTime  @default(now()) @map("createdon")
+  updatedBy              Int?      @map("updatedby")
+  updatedOn              DateTime? @map("updatedon")
+  isSyncToWeb            Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal          Int       @default(0) @map("is_sync_to_local")
+  storeCode              String?   @map("store_code") @db.VarChar(100)
+  syncId                 String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource             String?   @default("location") @map("sync_source") @db.VarChar(20)
+
+  @@index([stationCode])
+  @@index([storeCode])
+  @@index([syncId])
+  @@map("tbl_station_setting")
+}
+
+model ExternalPayMaster {
+  externalPayId    BigInt    @id @default(autoincrement()) @map("external_pay_id")
+  externalPayCode  String    @unique @map("external_pay_code") @db.VarChar(50)
+  externalPayName  String?   @map("external_pay_name") @db.VarChar(100)
+  stationCode      String?   @map("station_code") @db.VarChar(50)
+  storeCode        String    @map("store_code") @db.VarChar(100)
+  isActive         Boolean   @default(true) @map("is_active")
+  isDelete         Boolean   @default(false) @map("is_delete")
+  createdBy        Int?      @map("createdby")
+  createdOn        DateTime  @default(now()) @map("createdon")
+  updatedBy        Int?      @map("updatedby")
+  updatedOn        DateTime? @map("updatedon")
+  isSyncToWeb      Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal    Int       @default(0) @map("is_sync_to_local")
+  syncId           String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource       String?   @default("location") @map("sync_source") @db.VarChar(20)
+
+  @@index([externalPayCode])
+  @@index([stationCode])
+  @@index([storeCode])
+  @@index([syncId])
+  @@map("tbl_external_pay_master")
+}
+
+model TenderType {
+  tenderTypeId        BigInt    @id @default(autoincrement()) @map("tender_type_id")
+  tenderCode          String    @unique @map("tender_code") @db.VarChar(50)
+  tenderName          String    @map("tender_name") @db.VarChar(100)
+  tenderType          String?   @map("tender_type") @db.VarChar(50)
+  deviceSelectionCode String?   @map("device_selection_code") @db.VarChar(100)
+  cashDrawerCode      String?   @map("cash_drawer_code") @db.VarChar(50)
+  isActive            Boolean   @default(true) @map("is_active")
+  displayOrder        Int       @default(0) @map("display_order")
+  storeCode           String    @map("store_code") @db.VarChar(100)
+  stationCode         String?   @map("station_code") @db.VarChar(50)
+  isDelete            Boolean   @default(false) @map("is_delete")
+  createdBy           Int?      @map("createdby")
+  createdOn           DateTime  @default(now()) @map("createdon")
+  updatedBy           Int?      @map("updatedby")
+  updatedOn           DateTime? @map("updatedon")
+  isSyncToWeb         Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal       Int       @default(0) @map("is_sync_to_local")
+  syncId              String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource          String?   @default("location") @map("sync_source") @db.VarChar(20)
+  externalPayCode     String?   @map("external_pay_code") @db.VarChar(50)
+  requiresDevice      Boolean   @default(false) @map("requires_device")
+  allowTip            Boolean   @default(false) @map("allow_tip")
+  feeCode             String?   @map("fee_code") @db.VarChar(50)
+  surchargePer        Decimal   @default(0) @map("surcharge_per") @db.Decimal(18, 2)
+  preAuthAmount       Decimal   @default(0) @map("pre_auth_amount") @db.Decimal(18, 2)
+  preAuthAllow        Boolean   @default(false) @map("pre_auth_allow")
+  signatureAllow      Boolean   @default(false) @map("signature_allow")
+  taxExempt           Boolean   @default(false) @map("tax_exampt")
+
+  @@index([tenderCode])
+  @@index([stationCode])
+  @@index([storeCode])
+  @@index([syncId])
+  @@map("tbl_tender_type")
+}
+
+model PaymentDeviceConfig {
+  configId       BigInt    @id @default(autoincrement()) @map("config_id")
+  payDeviceCode  String    @unique @map("pay_device_code") @db.VarChar(100)
+  payDeviceName  String    @map("pay_device_name") @db.VarChar(100)
+  apiUrl         String?   @map("api_url")
+  apiKey         String?   @map("api_key")
+  appId          String?   @map("app_id")
+  appKey         String?   @map("app_key")
+  epi            String?   @map("epi")
+  chennelId      String?   @map("chennelid")
+  ipAddress      String?   @map("ip_address") @db.VarChar(50)
+  portNo         Int?      @map("port_no")
+  isActive       Boolean   @default(true) @map("is_active")
+  stationCode    String?   @map("station_code") @db.VarChar(100)
+  storeCode      String    @map("store_code") @db.VarChar(100)
+  isDelete       Boolean   @default(false) @map("is_delete")
+  createdBy      Int?      @map("createdby")
+  createdOn      DateTime  @default(now()) @map("createdon")
+  updatedBy      Int?      @map("updatedby")
+  updatedOn      DateTime? @map("updatedon")
+  isSyncToWeb    Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal  Int       @default(0) @map("is_sync_to_local")
+  syncId         String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource     String?   @default("location") @map("sync_source") @db.VarChar(20)
+  payDeviceType  String?   @default("") @map("pay_device_type") @db.VarChar(100)
+  isvKey         String?   @map("isv_key") @db.VarChar(200)
+  isDeviceLive   Boolean   @default(false) @map("is_device_live")
+
+  @@index([payDeviceCode])
+  @@index([stationCode])
+  @@index([storeCode])
+  @@index([syncId])
+  @@map("tbl_payment_device_config")
+}
+
+model CashDrawerMaster {
+  cashDrawerId    BigInt    @id @default(autoincrement()) @map("cash_drawer_id")
+  cashDrawerCode  String    @unique @map("cash_drawer_code") @db.VarChar(50)
+  cashDrawerName  String?   @map("cash_drawer_name") @db.VarChar(100)
+  comPort         String?   @map("com_port") @db.VarChar(10)
+  stationCode     String?   @map("station_code") @db.VarChar(50)
+  storeCode       String    @map("store_code") @db.VarChar(100)
+  isActive        Boolean   @default(true) @map("is_active")
+  isDelete        Boolean   @default(false) @map("is_delete")
+  createdBy       Int?      @map("createdby")
+  createdOn       DateTime  @default(now()) @map("createdon")
+  updatedBy       Int?      @map("updatedby")
+  updatedOn       DateTime? @map("updatedon")
+  isSyncToWeb     Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal   Int       @default(0) @map("is_sync_to_local")
+  syncId          String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource      String?   @default("location") @map("sync_source") @db.VarChar(20)
+  connectionType  String?   @map("connection_type") @db.VarChar(50)
+  printerCode     String?   @map("printer_code") @db.VarChar(30)
+
+  @@index([cashDrawerCode])
+  @@index([stationCode])
+  @@index([storeCode])
+  @@index([syncId])
+  @@map("tbl_cash_drawer_master")
+}
+
 model Table {
-  tableId           Int      @id @default(autoincrement()) @map("table_id")
-  tableNumber       String   @unique @map("table_number") @db.VarChar(50)
-  seatingCapacity   Int      @map("seating_capacity")
-  currentOccupancy  Int      @default(0) @map("current_occupancy")
-  location          String?  @map("location") @db.VarChar(100)
-  status            Int?     @map("status")
-  createdDate       DateTime @default(now()) @map("created_date")
-  isSyncToWeb       Int      @default(0) @map("is_sync_to_web")
-  isSyncToLocal     Int      @default(0) @map("is_sync_to_local")
-  storeCode         String?  @map("store_code") @db.VarChar(100)
+  tableId           Int       @id @default(autoincrement()) @map("table_id")
+  tableCode         String    @unique @map("tablecode") @db.VarChar(100)
+  code              String    @map("table_code") @db.VarChar(100)
+  tableName         String    @map("table_name") @db.VarChar(100)
+  seatingCapacity   Int       @map("seats")
+  status            String?   @default("Free") @map("status") @db.VarChar(50) // Free, Available, Occupied
+  isActive          Int?      @map("is_active")
+  isDelete          Boolean   @default(false) @map("is_delete")
+  createdBy         Int?      @map("createdby")
+  createdOn         DateTime  @default(now()) @map("createdon")
+  updatedBy         Int?      @map("updatedby")
+  updatedOn         DateTime? @map("updatedon")
+  isSyncToWeb       Int       @default(0) @map("is_sync_to_web")
+  isSyncToLocal     Int       @default(0) @map("is_sync_to_local")
+  storeCode         String?   @map("store_code") @db.VarChar(100)
+  syncId            String    @unique @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource        String?   @default("location") @map("sync_source") @db.VarChar(20)
 
   // Relationships
   orders Order[]
@@ -674,7 +910,7 @@ model Suggestion {
   suggestionDesc   String?   @map("suggestion_desc") @db.VarChar(1000)
   isDelete         Boolean   @default(false) @map("is_delete")
   syncId           String?   @unique @default(uuid()) @map("sync_id") @db.Uuid
-  syncSource       String?   @default("server") @map("sync_source") @db.VarChar(20)
+  syncSource       String?   @default("location") @map("sync_source") @db.VarChar(20)
 
   @@index([suggestionCode])
   @@index([category])
@@ -714,7 +950,7 @@ model Permission {
   description     String?   @map("description") @db.Text
   isActive        Boolean   @default(true) @map("is_active")
   syncId          String    @unique @default(uuid()) @map("sync_id") @db.Uuid
-  syncSource      String?   @default("server") @map("sync_source") @db.VarChar(20)
+  syncSource      String?   @default("location") @map("sync_source") @db.VarChar(20)
   createdOn       DateTime  @default(now()) @map("created_on")
   updatedOn       DateTime? @map("updated_on")
 
@@ -734,7 +970,7 @@ model Role {
   isSystemRole    Boolean   @default(false) @map("is_system_role")
   isActive        Boolean   @default(true) @map("is_active")
   syncId          String    @unique @default(uuid()) @map("sync_id") @db.Uuid
-  syncSource      String?   @default("server") @map("sync_source") @db.VarChar(20)
+  syncSource      String?   @default("location") @map("sync_source") @db.VarChar(20)
   createdOn       DateTime  @default(now()) @map("created_on")
   updatedOn       DateTime? @map("updated_on")
 
@@ -750,7 +986,7 @@ model RolePermission {
   roleCode         String    @map("role_code") @db.VarChar(100)
   permissionCode   String    @map("permission_code") @db.VarChar(100)
   syncId           String    @unique @default(uuid()) @map("sync_id") @db.Uuid
-  syncSource       String?   @default("server") @map("sync_source") @db.VarChar(20)
+  syncSource       String?   @default("location") @map("sync_source") @db.VarChar(20)
   createdOn        DateTime  @default(now()) @map("created_on")
 
   role             Role      @relation(fields: [roleCode], references: [roleCode])
@@ -790,7 +1026,7 @@ model DiscountMaster {
   updatedOn                 DateTime  @default(now()) @updatedAt @map("updated_on")
   storeCode                 String?   @map("store_code") @db.VarChar(100)
   syncId                    String    @unique @default(uuid()) @map("sync_id") @db.Uuid
-  syncSource                String?   @default("server") @map("sync_source") @db.VarChar(20)
+  syncSource                String?   @default("location") @map("sync_source") @db.VarChar(20)
 
   @@index([discountCode])
   @@index([syncId])
@@ -933,7 +1169,7 @@ model GiftCard {
   updatedOn     DateTime? @map("updatedon")
   storeCode     String?   @map("store_code") @db.VarChar(100)
   syncId        String    @default(uuid()) @map("sync_id") @db.Uuid
-  syncSource    String?   @default("server") @map("sync_source") @db.VarChar(20)
+  syncSource    String?   @default("location") @map("sync_source") @db.VarChar(20)
 
   @@index([storeCode])
   @@index([giftCardNo])

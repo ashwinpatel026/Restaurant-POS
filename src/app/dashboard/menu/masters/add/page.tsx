@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layouts/DashboardLayout";
 import { ArrowLeftIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
@@ -11,6 +11,7 @@ import SystemColorPicker, {
 import TextColorPicker from "@/components/ui/TextColorPicker";
 import { CheckIcon } from "@heroicons/react/24/solid";
 import StatusToggle from "@/components/forms/StatusToggle";
+import { FormSkeleton } from "@/components/ui/SkeletonLoader";
 import { useApiWithStore } from "@/hooks/useApiWithStore";
 import { useFormik } from "formik";
 import { menuMasterSchema } from "@/validation/menuMasterSchema";
@@ -45,10 +46,16 @@ interface Department {
   isActive: number;
 }
 
-export default function AddMenuMasterPage() {
+interface MenuMasterEvent {
+  eventCode: string;
+}
+
+function AddMenuMasterContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { selectedStoreCode, buildApiUrl } = useApiWithStore();
   const [loading, setLoading] = useState(false);
+  const [loadingClone, setLoadingClone] = useState(false);
   const [prepZones, setPrepZones] = useState<PrepZone[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
   const [timeEvents, setTimeEvents] = useState<TimeEvent[]>([]);
@@ -116,13 +123,96 @@ export default function AddMenuMasterPage() {
   });
 
   useEffect(() => {
-    // Set default color to primary color on mount
-    formik.setFieldValue("colorCode", getPrimaryColor());
-    formik.setFieldValue("forColorCode", "#FFFFFF");
     if (selectedStoreCode) {
+      const cloneId = searchParams.get("cloneId");
+      if (!cloneId) {
+        formik.setFieldValue("colorCode", getPrimaryColor());
+        formik.setFieldValue("forColorCode", "#FFFFFF");
+      }
       fetchData();
     }
   }, [selectedStoreCode]);
+
+  useEffect(() => {
+    const cloneId = searchParams.get("cloneId");
+    if (cloneId && selectedStoreCode) {
+      fetchClonedMaster(cloneId);
+    }
+  }, [searchParams, selectedStoreCode]);
+
+  const parseCodeArray = (value?: string | string[] | null): string[] => {
+    if (!value) return [];
+    try {
+      if (typeof value === "string") {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [value];
+      }
+      if (Array.isArray(value)) {
+        return value;
+      }
+    } catch {
+      return typeof value === "string" ? [value] : [];
+    }
+    return [];
+  };
+
+  const fetchClonedMaster = async (cloneId: string) => {
+    try {
+      setLoadingClone(true);
+      const response = await fetch(
+        buildApiUrl(`/api/dashboard/menu/masters/${cloneId}`),
+        { cache: "no-store" }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch menu master for cloning");
+      }
+
+      const masterData = await response.json();
+
+      // Prefill form with cloned data (append " (Copy)" to names)
+      formik.setValues({
+        name: masterData.name ? `${masterData.name} (Copy)` : "",
+        labelName: masterData.labelName
+          ? `${masterData.labelName} (Copy)`
+          : "",
+        colorCode: masterData.colorCode || getPrimaryColor(),
+        forColorCode: masterData.forColorCode || "#FFFFFF",
+        deptCode: masterData.deptCode || "",
+        isEventMenu: masterData.isEventMenu ? 1 : 0,
+        isActive:
+          typeof masterData.isActive === "number" ? masterData.isActive : 1,
+        disableInPOS:
+          typeof masterData.disableInPOS === "number"
+            ? masterData.disableInPOS
+            : 0,
+      });
+
+      setSelectedPrepZones(new Set(parseCodeArray(masterData.prepZoneCode)));
+      setSelectedStations(new Set(parseCodeArray(masterData.stationCode)));
+
+      // Fetch associated events if it's an event menu
+      if (masterData.isEventMenu === 1) {
+        const eventAssocRes = await fetch(
+          buildApiUrl(`/api/dashboard/menu/masters/${cloneId}/events`),
+          { cache: "no-store" }
+        );
+        if (eventAssocRes.ok) {
+          const eventAssocData = await eventAssocRes.json();
+          const eventCodes = eventAssocData.map(
+            (e: MenuMasterEvent) => e.eventCode
+          );
+          setSelectedEvents(new Set(eventCodes));
+        }
+      }
+    } catch (error) {
+      toast.error("Failed to load menu master for cloning");
+      console.error("Error fetching cloned menu master:", error);
+      router.push("/dashboard/menu/masters");
+    } finally {
+      setLoadingClone(false);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -275,6 +365,27 @@ export default function AddMenuMasterPage() {
     }
   }
 
+  if (loadingClone) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          <div className="flex items-center space-x-4">
+            <div className="p-2 text-gray-500 dark:text-gray-400">
+              <ArrowLeftIcon className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+              <div className="h-4 w-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+            </div>
+          </div>
+          <FormSkeleton />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const isCloning = !!searchParams.get("cloneId");
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -288,10 +399,12 @@ export default function AddMenuMasterPage() {
           </button>
           <div>
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Add Menu Master
+              {isCloning ? "Clone Menu Master" : "Add Menu Master"}
             </h1>
             <p className="text-gray-600 dark:text-gray-400 mt-2">
-              Create a new menu master for your restaurant
+              {isCloning
+                ? "Create a copy of an existing menu master"
+                : "Create a new menu master for your restaurant"}
             </p>
           </div>
         </div>
@@ -655,5 +768,30 @@ export default function AddMenuMasterPage() {
         </div>
       </div>
     </DashboardLayout>
+  );
+}
+
+export default function AddMenuMasterPage() {
+  return (
+    <Suspense
+      fallback={
+        <DashboardLayout>
+          <div className="space-y-6">
+            <div className="flex items-center space-x-4">
+              <div className="p-2 text-gray-500 dark:text-gray-400">
+                <ArrowLeftIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                <div className="h-4 w-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              </div>
+            </div>
+            <FormSkeleton />
+          </div>
+        </DashboardLayout>
+      }
+    >
+      <AddMenuMasterContent />
+    </Suspense>
   );
 }

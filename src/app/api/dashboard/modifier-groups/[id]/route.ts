@@ -71,7 +71,7 @@ export async function GET(
     const groupId = BigInt(id)
 
     const group = await (prisma as any).modifierGroup.findUnique({ where: { id: groupId } })
-    if (!group) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (!group || group.isDelete) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     // If storeCode is provided, verify the group belongs to that store or user has access
     if (selectedStoreCode && group.storeCode !== selectedStoreCode) {
@@ -86,15 +86,16 @@ export async function GET(
           `SELECT mcm.menu_category_code, mc.name AS category_name
            FROM tbl_menu_category_modifier mcm
            JOIN tbl_menu_category mc ON mc.menu_category_code = mcm.menu_category_code
-           WHERE mcm.modifier_group_code = $1`,
+           WHERE mcm.modifier_group_code = $1
+             AND (mc.is_delete = false OR mc.is_delete IS NULL)`,
           group.modifierGroupCode
         )
       : []
 
-    // Fetch modifier items for this group
+    // Fetch modifier items for this group (exclude soft-deleted)
     const items = group.modifierGroupCode
       ? await (prisma as any).modifierItem.findMany({
-          where: { modifierGroupCode: group.modifierGroupCode },
+          where: { modifierGroupCode: group.modifierGroupCode, isDelete: false },
           orderBy: [{ displayOrder: 'asc' }, { createdOn: 'asc' }]
         })
       : []
@@ -155,7 +156,7 @@ export async function PUT(
       where: { id: groupId } 
     })
     
-    if (!existingGroup) {
+    if (!existingGroup || existingGroup.isDelete) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
@@ -262,19 +263,25 @@ export async function DELETE(
     const groupId = BigInt(id)
 
     const group = await (prisma as any).modifierGroup.findUnique({ where: { id: groupId } })
-    if (!group) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (!group || group.isDelete) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     // Verify user has access to this group's store
     if (group.storeCode && !canAccessStore(accessInfo, group.storeCode)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    // If items exist under this group, delete them first, then delete group
+    // Soft-delete items under this group, then soft-delete the group
     if (group.modifierGroupCode) {
-      await (prisma as any).modifierItem.deleteMany({ where: { modifierGroupCode: group.modifierGroupCode } })
+      await (prisma as any).modifierItem.updateMany({
+        where: { modifierGroupCode: group.modifierGroupCode, isDelete: false },
+        data: { isDelete: true, syncSource: 'location' },
+      })
     }
 
-    await (prisma as any).modifierGroup.delete({ where: { id: groupId } })
+    await (prisma as any).modifierGroup.update({
+      where: { id: groupId },
+      data: { isDelete: true, isActive: 0, syncSource: 'location' },
+    })
     return NextResponse.json({ message: 'Deleted successfully' })
   } catch (error) {
     console.error('Error deleting modifier group:', error)

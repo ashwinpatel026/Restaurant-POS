@@ -37,7 +37,8 @@ export async function GET(request: NextRequest) {
     const modifierGroupCode = searchParams.get('modifierGroupCode') || undefined
 
     const where: any = {
-      ...storeFilter
+      ...storeFilter,
+      isDelete: false,
     }
     if (modifierGroupCode) where.modifierGroupCode = modifierGroupCode
 

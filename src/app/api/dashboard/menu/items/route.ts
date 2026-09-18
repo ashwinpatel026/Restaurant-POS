@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { getUserAccessInfo, getSelectedStoreCode, buildStoreFilter, checkLocationPermission } from '@/lib/auth/accessControl'
 import { prisma, checkConnection } from '@/lib/database'
 import { checkDuplicate } from '@/lib/validation'
-import { normalizeToStructuredFormat, MenuCategoryMapping, isStructuredFormat } from '@/lib/utils/menuItemFormat'
+import { normalizeToStructuredFormat, MenuCategoryMapping, isStructuredFormat, extractMenuCategoryCodes } from '@/lib/utils/menuItemFormat'
 
 // Helper function to generate unique menu item code
 async function generateMenuItemCode(storeCode: string): Promise<string> {
@@ -272,6 +272,10 @@ export async function POST(request: NextRequest) {
       isOnlineOrderByApp,
       isOnlineOrdering,
       isCustomerInvoice,
+      isSetToZeroStock,
+      isOpenItem,
+      isEditStock,
+      isAllowMultipleDiscount,
       menuMasterCode,
       menuCategoryCode,
       taxCode,
@@ -341,7 +345,8 @@ export async function POST(request: NextRequest) {
         const allCategories = await prisma.menuCategory.findMany({
           where: {
             ...storeFilter,
-            ...(selectedStoreCode ? { storeCode: selectedStoreCode } : {})
+            ...(selectedStoreCode ? { storeCode: selectedStoreCode } : {}),
+            isDelete: false,
           },
           select: {
             menuCategoryCode: true,
@@ -424,6 +429,10 @@ export async function POST(request: NextRequest) {
           isOnlineOrderByApp: isOnlineOrderByApp !== undefined ? (isOnlineOrderByApp ? 1 : 0) : null,
           isOnlineOrdering: isOnlineOrdering !== undefined ? (isOnlineOrdering ? 1 : 0) : null,
           isCustomerInvoice: isCustomerInvoice !== undefined ? (isCustomerInvoice ? 1 : 0) : null,
+          isSetToZeroStock: isSetToZeroStock !== undefined ? Boolean(isSetToZeroStock) : false,
+          isOpenItem: isOpenItem !== undefined ? Boolean(isOpenItem) : false,
+          isEditStock: isEditStock !== undefined ? Boolean(isEditStock) : false,
+          isAllowMultipleDiscount: isAllowMultipleDiscount !== undefined ? Boolean(isAllowMultipleDiscount) : false,
           taxCode: taxCode || null,
           inheritTaxInclusion: inheritTaxInclusion !== undefined ? inheritTaxInclusion : true,
           isTaxIncluded: isTaxIncluded !== undefined ? isTaxIncluded : false,
@@ -468,14 +477,14 @@ export async function POST(request: NextRequest) {
 
         // If inherit from category, add all modifier groups for the categories
         if (inheritModifiers && (menuItem as any).menuCategoryCode) {
-          const categoryCodes = Array.isArray((menuItem as any).menuCategoryCode) 
-            ? (menuItem as any).menuCategoryCode 
-            : [(menuItem as any).menuCategoryCode]
+          const categoryCodes = extractMenuCategoryCodes((menuItem as any).menuCategoryCode)
           // Fetch modifier group codes assigned to these categories via junction table
-          const mcmRows = await prisma.$queryRaw<Array<{ modifier_group_code: string }>>`
-            SELECT modifier_group_code FROM tbl_menu_category_modifier 
-            WHERE menu_category_code = ANY(${categoryCodes}::text[])
-          `
+          const mcmRows = categoryCodes.length > 0
+            ? await prisma.$queryRaw<Array<{ modifier_group_code: string }>>`
+                SELECT modifier_group_code FROM tbl_menu_category_modifier 
+                WHERE menu_category_code = ANY(${categoryCodes}::text[])
+              `
+            : []
           for (const row of mcmRows) {
             const code = row.modifier_group_code
             if (code && !seenGroups.has(code)) {
@@ -506,7 +515,7 @@ export async function POST(request: NextRequest) {
             }
           }
           const groups = await (prisma as any).modifierGroup.findMany({
-            where: { id: { in: selectedModifiers.map((n: any) => BigInt(n)) } }
+            where: { id: { in: selectedModifiers.map((n: any) => BigInt(n)) }, isDelete: false }
           })
           for (const g of groups) {
             if (g.modifierGroupCode) {

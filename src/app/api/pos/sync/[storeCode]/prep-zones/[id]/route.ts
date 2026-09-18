@@ -103,6 +103,7 @@ export async function GET(
  * @apiBody {Boolean} [alwaysPrintTicket] Always print ticket
  * @apiBody {String} [printerCode] Primary printer code
  * @apiBody {String} [backupPrinterCode] Backup printer code
+ * @apiBody {String} [profileCode] Printer profile code
  * @apiBody {Number} [updatedBy] User ID (integer) who updated the prep zone
  *
  * @apiParamExample {json} Request Body
@@ -193,6 +194,7 @@ export async function PUT(
     if (body.alwaysPrintTicket !== undefined) updateData.alwaysPrintTicket = body.alwaysPrintTicket ? 1 : 0
     if (body.printerCode !== undefined) updateData.printerCode = body.printerCode
     if (body.backupPrinterCode !== undefined) updateData.backupPrinterCode = body.backupPrinterCode
+    if (body.profileCode !== undefined) updateData.profileCode = body.profileCode
 
     // Update prep zone
     const updatedZone = await locationPrisma.prepZone.update({

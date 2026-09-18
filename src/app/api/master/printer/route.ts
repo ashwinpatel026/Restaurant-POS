@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { masterPrisma } from '@/lib/databaseManager'
 import { checkDuplicate } from '@/lib/validation'
+import { parsePrinterFields } from '@/lib/printerPayload'
 
 // Helper function to generate unique printer code
 async function generatePrinterCode(): Promise<string> {
@@ -46,6 +47,7 @@ export async function GET(request: NextRequest) {
     }
 
     const printers = await masterPrisma.masterPrinter.findMany({
+      where: { isDelete: false },
       orderBy: { printerName: 'asc' }
     })
 
@@ -70,17 +72,24 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { printerName, isActive, isreceipt, isdocument, isKitchen } = body
+    const payload = { ...parsePrinterFields(body), isDelete: false, isdocument: false }
 
-    if (!printerName) {
+    if (!payload.printerName) {
       return NextResponse.json(
         { error: 'Printer name is required' },
         { status: 400 }
       )
     }
 
+    if (payload.isSerial && !payload.comport) {
+      return NextResponse.json(
+        { error: 'COM Port is required when Serial is enabled' },
+        { status: 400 }
+      )
+    }
+
     // Check for duplicate name
-    const isDuplicate = await checkDuplicate('masterPrinter', 'printerName', printerName)
+    const isDuplicate = await checkDuplicate('masterPrinter', 'printerName', payload.printerName)
     if (isDuplicate) {
       return NextResponse.json(
         { error: 'Printer with this name already exists' },
@@ -94,11 +103,7 @@ export async function POST(request: NextRequest) {
     const printer = await masterPrisma.masterPrinter.create({
       data: {
         printerCode: printerCode,
-        printerName,
-        isActive: isActive ? 1 : 0,
-        isreceipt: isreceipt ?? false,
-        isdocument: isdocument ?? false,
-        isKitchen: isKitchen ?? false,
+        ...payload,
         createdBy: admin.adminId
       }
     })
@@ -120,4 +125,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

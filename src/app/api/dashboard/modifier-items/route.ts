@@ -73,7 +73,8 @@ export async function GET(request: NextRequest) {
     const modifierGroupCode = searchParams.get('modifierGroupCode') || undefined
 
     const where: any = {
-      ...storeFilter
+      ...storeFilter,
+      isDelete: false,
     }
     if (modifierGroupCode) where.modifierGroupCode = modifierGroupCode
 
@@ -135,7 +136,7 @@ export async function POST(request: NextRequest) {
     let finalStoreCode = selectedStoreCode
     if (modifierGroupCode) {
       const modifierGroup = await (prisma as any).modifierGroup.findFirst({
-        where: { modifierGroupCode },
+        where: { modifierGroupCode, isDelete: false },
         select: { storeCode: true }
       })
       

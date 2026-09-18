@@ -109,7 +109,7 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { prepZoneName, sendToExpediter, alwaysPrintTicket, printerCode, backupPrinterCode, isActive } = body
+    const { prepZoneName, profileCode, isActive } = body
 
     if (!prepZoneName) {
       return NextResponse.json(
@@ -123,10 +123,7 @@ export async function PUT(
       data: {
         prepZoneName,
         isActive: isActive ? 1 : 0,
-        sendToExpediter: sendToExpediter ? 1 : 0,
-        alwaysPrintTicket: alwaysPrintTicket ? 1 : 0,
-        printerCode: printerCode || null,
-        backupPrinterCode: backupPrinterCode || null,
+        profileCode: profileCode || null,
         updatedBy: parseInt(session.user.id),
         updatedOn: new Date(),
         isSyncToWeb: 0,

@@ -4,6 +4,8 @@ import { useState, useEffect, Fragment } from "react";
 import { Dialog, Transition } from "@headlessui/react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
+import StatusToggle from "@/components/forms/StatusToggle";
 
 interface TableModalProps {
   isOpen: boolean;
@@ -18,57 +20,68 @@ export default function TableModal({
   onSuccess,
   table,
 }: TableModalProps) {
+  const { buildApiUrl, selectedStoreCode } = useApiWithStore();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    tableNumber: "",
+    code: "",
+    tableName: "",
     seatingCapacity: "4",
-    location: "",
-    status: "0", // 0 = Available
+    status: "Free",
+    isActive: true,
   });
 
   useEffect(() => {
     if (table) {
       setFormData({
-        tableNumber: table.tableNumber || "",
-        seatingCapacity: (
-          table.seatingCapacity ||
-          table.capacity ||
-          4
-        ).toString(),
-        location: table.location || "",
-        status:
-          table.status !== null && table.status !== undefined
-            ? table.status.toString()
-            : "0",
+        code: table.code || "",
+        tableName: table.tableName || "",
+        seatingCapacity: (table.seatingCapacity || 4).toString(),
+        status: table.status || "Free",
+        isActive: table.isActive === undefined || table.isActive === null
+          ? true
+          : Number(table.isActive) === 1,
       });
     } else {
       setFormData({
-        tableNumber: "",
+        code: "",
+        tableName: "",
         seatingCapacity: "4",
-        location: "",
-        status: "0",
+        status: "Free",
+        isActive: true,
       });
     }
-  }, [table]);
+  }, [table, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!selectedStoreCode) {
+      toast.error("Please select a store first");
+      return;
+    }
+
+    if (!formData.code.trim() || !formData.tableName.trim()) {
+      toast.error("Code and table name are required");
+      return;
+    }
+
     setLoading(true);
 
     try {
       const url = table
-        ? `/api/tables/${table.tableId || table.id}`
-        : "/api/tables";
+        ? buildApiUrl(`/api/dashboard/tables/${table.tableId || table.id}`)
+        : buildApiUrl("/api/dashboard/tables");
       const method = table ? "PUT" : "POST";
 
       const response = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          tableNumber: formData.tableNumber,
-          seatingCapacity: parseInt(formData.seatingCapacity),
-          location: formData.location || null,
-          status: parseInt(formData.status),
+          code: formData.code.trim(),
+          tableName: formData.tableName.trim(),
+          seatingCapacity: parseInt(formData.seatingCapacity, 10),
+          status: formData.status,
+          isActive: formData.isActive ? 1 : 0,
         }),
       });
 
@@ -130,28 +143,55 @@ export default function TableModal({
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  {table?.tableCode && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Table Code
+                      </label>
+                      <input
+                        type="text"
+                        disabled
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400"
+                        value={table.tableCode}
+                      />
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Table Number *
+                      Code *
                     </label>
                     <input
                       type="text"
                       required
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      value={formData.tableNumber}
+                      value={formData.code}
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          tableNumber: e.target.value,
-                        })
+                        setFormData({ ...formData, code: e.target.value })
                       }
-                      placeholder="e.g., T01, T02"
+                      placeholder="e.g., T01, A1"
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Seating Capacity *
+                      Table Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={formData.tableName}
+                      onChange={(e) =>
+                        setFormData({ ...formData, tableName: e.target.value })
+                      }
+                      placeholder="e.g., Window Table, Patio 1"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Seats *
                     </label>
                     <input
                       type="number"
@@ -170,28 +210,7 @@ export default function TableModal({
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Location
-                    </label>
-                    <select
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      value={formData.location}
-                      onChange={(e) =>
-                        setFormData({ ...formData, location: e.target.value })
-                      }
-                    >
-                      <option value="">Select location</option>
-                      <option value="Indoor">Indoor</option>
-                      <option value="Outdoor">Outdoor</option>
-                      <option value="Patio">Patio</option>
-                      <option value="VIP">VIP</option>
-                      <option value="Window">Window</option>
-                      <option value="Bar">Bar</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Initial Status
+                      Status
                     </label>
                     <select
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -200,12 +219,19 @@ export default function TableModal({
                         setFormData({ ...formData, status: e.target.value })
                       }
                     >
-                      <option value="0">Available</option>
-                      <option value="1">Occupied</option>
-                      <option value="2">Reserved</option>
-                      <option value="3">Maintenance</option>
+                      <option value="Free">Free</option>
+                      <option value="Available">Available</option>
+                      <option value="Occupied">Occupied</option>
                     </select>
                   </div>
+
+                  <StatusToggle
+                    value={formData.isActive}
+                    onChange={(checked) =>
+                      setFormData({ ...formData, isActive: checked })
+                    }
+                    label="Active"
+                  />
 
                   <div className="flex space-x-3 pt-4">
                     <button

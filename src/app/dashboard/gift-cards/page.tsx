@@ -217,12 +217,20 @@ export default function GiftCardManagementPage() {
   const tabButtonClass = (key: TabKey) =>
     `px-6 py-3 rounded-t-lg border transition-colors ${
       tab === key
-        ? "border-yellow-500 text-white bg-gray-800"
-        : "border-gray-700 text-gray-300 bg-gray-900 hover:bg-gray-800"
+        ? "border-yellow-500 bg-yellow-50 text-gray-900 dark:border-yellow-300 dark:bg-gray-800 dark:text-white"
+        : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
     }`;
 
   const cardClass =
-    "bg-gray-900/60 border border-gray-700 rounded-2xl p-6 shadow";
+    "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-6 shadow-sm";
+
+  const inputClass =
+    "w-full px-4 py-3 rounded-xl bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-2 focus:ring-yellow-500 focus:border-transparent";
+
+  const labelClass = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2";
+
+  const outlineButtonClass =
+    "rounded-xl border-2 border-yellow-500 text-gray-900 dark:text-white hover:bg-yellow-500/10 disabled:opacity-50";
 
   if (permissionLoading) {
     return (
@@ -243,8 +251,8 @@ export default function GiftCardManagementPage() {
           </h1>
         </div>
 
-        <div className="bg-gray-900/30 border border-gray-700 rounded-2xl p-4">
-          <div className="flex gap-3">
+        <div className="bg-white dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-2xl p-4 shadow-sm">
+          <div className="flex gap-3 flex-wrap">
             <button
               className={tabButtonClass("add")}
               onClick={() => setTab("add")}
@@ -265,51 +273,51 @@ export default function GiftCardManagementPage() {
             </button>
           </div>
 
-          <div className="border border-gray-700 rounded-2xl p-6 mt-4">
+          <div className="mt-4">
             {tab === "add" && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className={cardClass}>
-                  <h2 className="text-xl font-semibold text-white">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                     Bulk Generation
                   </h2>
-                  <p className="text-gray-400 mt-2">
+                  <p className="text-gray-600 dark:text-gray-400 mt-2">
                     Create a continuous series using prefix + incremented
                     number.
                   </p>
 
                   <div className="mt-6 space-y-5">
                     <div>
-                      <label className="block text-sm text-gray-300 mb-2">
-                        Prefix <span className="text-yellow-500">*</span>
+                      <label className={labelClass}>
+                        Prefix <span className="text-yellow-600 dark:text-yellow-500">*</span>
                       </label>
                       <input
                         value={bulkPrefix}
                         onChange={(e) => setBulkPrefix(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-slate-700/70 border border-slate-500 text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        className={inputClass}
                         placeholder="Enter Prefix"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm text-gray-300 mb-2">
-                        Start From <span className="text-yellow-500">*</span>
+                      <label className={labelClass}>
+                        Start From <span className="text-yellow-600 dark:text-yellow-500">*</span>
                       </label>
                       <input
                         value={bulkStartFrom}
                         onChange={(e) => setBulkStartFrom(e.target.value)}
                         inputMode="numeric"
-                        className="w-full px-4 py-3 rounded-xl bg-slate-700/70 border border-slate-500 text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        className={inputClass}
                         placeholder="Enter Start From"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm text-gray-300 mb-2">
-                        No Of Cards <span className="text-yellow-500">*</span>
+                      <label className={labelClass}>
+                        No Of Cards <span className="text-yellow-600 dark:text-yellow-500">*</span>
                       </label>
                       <input
                         value={bulkCount}
                         onChange={(e) => setBulkCount(e.target.value)}
                         inputMode="numeric"
-                        className="w-full px-4 py-3 rounded-xl bg-slate-700/70 border border-slate-500 text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        className={inputClass}
                         placeholder="Enter No Of Cards"
                       />
                     </div>
@@ -319,13 +327,13 @@ export default function GiftCardManagementPage() {
                     <button
                       onClick={onBulkSubmit}
                       disabled={submittingBulk}
-                      className="w-40 py-3 rounded-xl border-2 border-yellow-500 text-white hover:bg-yellow-500/10 disabled:opacity-50"
+                      className={`w-40 py-3 ${outlineButtonClass}`}
                     >
                       Submit
                     </button>
                     <button
                       onClick={onBulkClear}
-                      className="w-40 py-3 rounded-xl border-2 border-yellow-500 text-white hover:bg-yellow-500/10"
+                      className={`w-40 py-3 ${outlineButtonClass}`}
                     >
                       Clear
                     </button>
@@ -333,18 +341,18 @@ export default function GiftCardManagementPage() {
                 </div>
 
                 <div className={cardClass}>
-                  <h2 className="text-xl font-semibold text-white">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
                     Series Preview
                   </h2>
-                  <p className="text-gray-400 mt-2">
+                  <p className="text-gray-600 dark:text-gray-400 mt-2">
                     Preview the first few values before Submit Giftcard.
                   </p>
 
-                  <div className="mt-6 bg-gray-800/60 border border-gray-700 rounded-2xl p-6">
-                    <div className="text-gray-200 font-mono">
+                  <div className="mt-6 bg-gray-50 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-700 rounded-2xl p-6">
+                    <div className="text-gray-800 dark:text-gray-200 font-mono">
                       <div className="mb-3">Start of series:</div>
                       {preview.length === 0 ? (
-                        <div className="text-gray-500">—</div>
+                        <div className="text-gray-400 dark:text-gray-500">—</div>
                       ) : (
                         <div className="space-y-2">
                           {preview.map((v) => (
@@ -363,14 +371,16 @@ export default function GiftCardManagementPage() {
                 <div
                   className={`lg:col-span-2 ${cardClass} p-0 overflow-hidden`}
                 >
-                  <div className="bg-slate-700/70 px-6 py-4">
-                    <h2 className="text-lg font-semibold text-white">
+                  <div className="bg-gray-50 dark:bg-gray-700/70 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                       Gift Card No
                     </h2>
                   </div>
                   <div className="p-6 min-h-[420px]">
                     {manualList.length === 0 ? (
-                      <div className="text-gray-500">No gift cards added.</div>
+                      <div className="text-gray-500 dark:text-gray-400">
+                        No gift cards added.
+                      </div>
                     ) : (
                       <div className="space-y-2">
                         {manualList.map((no) => {
@@ -381,8 +391,8 @@ export default function GiftCardManagementPage() {
                               onClick={() => toggleManualSelected(no)}
                               className={`w-full text-left px-4 py-3 rounded-xl border ${
                                 selected
-                                  ? "border-yellow-500 bg-yellow-500/10 text-white"
-                                  : "border-gray-700 bg-gray-900/30 text-gray-200 hover:bg-gray-800/40"
+                                  ? "border-yellow-500 bg-yellow-50 text-gray-900 dark:bg-yellow-500/10 dark:text-white"
+                                  : "border-gray-200 bg-gray-50 text-gray-800 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-200 dark:hover:bg-gray-800/40"
                               }`}
                             >
                               {no}
@@ -395,14 +405,14 @@ export default function GiftCardManagementPage() {
                 </div>
 
                 <div className={cardClass}>
-                  <h2 className="text-lg font-semibold text-white">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                     Gift Card No
                   </h2>
                   <input
                     value={manualInput}
                     onChange={(e) => setManualInput(e.target.value)}
                     placeholder="Enter Gift Card No"
-                    className="w-full mt-4 px-4 py-3 rounded-xl bg-slate-700/70 border border-slate-500 text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                    className={`mt-4 ${inputClass}`}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") onManualAdd();
                     }}
@@ -417,14 +427,14 @@ export default function GiftCardManagementPage() {
                     </button>
                     <button
                       onClick={onManualRemoveSelected}
-                      className="w-full py-3 rounded-xl border-2 border-yellow-500 text-white hover:bg-yellow-500/10"
+                      className={`w-full py-3 ${outlineButtonClass}`}
                     >
                       Remove Selected
                     </button>
                     <button
                       onClick={onManualSave}
                       disabled={submittingManual}
-                      className="w-full py-3 rounded-xl border-2 border-yellow-500 text-white hover:bg-yellow-500/10 disabled:opacity-50"
+                      className={`w-full py-3 ${outlineButtonClass}`}
                     >
                       Save
                     </button>
@@ -438,18 +448,18 @@ export default function GiftCardManagementPage() {
                 <div className={cardClass}>
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
                     <div className="lg:col-span-5">
-                      <label className="block text-sm text-gray-300 mb-2">
+                      <label className={labelClass}>
                         Search by Gift Card No
                       </label>
                       <input
                         value={viewSearch}
                         onChange={(e) => setViewSearch(e.target.value)}
                         placeholder="Search gift card"
-                        className="w-full px-4 py-3 rounded-xl bg-slate-700/70 border border-slate-500 text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        className={inputClass}
                       />
                     </div>
                     <div className="lg:col-span-4">
-                      <label className="block text-sm text-gray-300 mb-2">
+                      <label className={labelClass}>
                         Filter
                       </label>
                       <select
@@ -457,7 +467,7 @@ export default function GiftCardManagementPage() {
                         onChange={(e) =>
                           setViewStatus(e.target.value as StatusFilter)
                         }
-                        className="w-full px-4 py-3 rounded-xl bg-slate-700/70 border border-slate-500 text-white focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        className={inputClass}
                       >
                         <option value="all">All</option>
                         <option value="active">Active Only</option>
@@ -467,7 +477,7 @@ export default function GiftCardManagementPage() {
                     <div className="lg:col-span-3 flex lg:justify-end">
                       <button
                         onClick={fetchGiftCards}
-                        className="w-full lg:w-44 py-3 rounded-xl border-2 border-yellow-500 text-white hover:bg-yellow-500/10"
+                        className={`w-full lg:w-44 py-3 ${outlineButtonClass}`}
                       >
                         Refresh
                       </button>
@@ -476,8 +486,8 @@ export default function GiftCardManagementPage() {
                 </div>
 
                 <div className={cardClass}>
-                  <div className="overflow-hidden rounded-xl border border-gray-700">
-                    <div className="bg-slate-700/70 grid grid-cols-12 gap-2 px-4 py-3 text-sm font-semibold text-gray-100">
+                  <div className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+                    <div className="bg-gray-50 dark:bg-gray-700/70 grid grid-cols-12 gap-2 px-4 py-3 text-sm font-semibold text-gray-700 dark:text-gray-100">
                       <div className="col-span-3">Gift Card No</div>
                       <div className="col-span-2 text-right">Card Amount</div>
                       <div className="col-span-2 text-right">
@@ -489,16 +499,18 @@ export default function GiftCardManagementPage() {
 
                     <div className="max-h-[520px] overflow-y-auto">
                       {viewLoading ? (
-                        <div className="p-6 text-gray-400">Loading…</div>
+                        <div className="p-6 text-gray-500 dark:text-gray-400">
+                          Loading…
+                        </div>
                       ) : giftCards.length === 0 ? (
-                        <div className="p-6 text-gray-400">
+                        <div className="p-6 text-gray-500 dark:text-gray-400">
                           No gift cards found.
                         </div>
                       ) : (
                         giftCards.map((row) => (
                           <div
                             key={String(row.giftCardId)}
-                            className="grid grid-cols-12 gap-2 px-4 py-3 border-t border-gray-800 text-sm text-gray-200"
+                            className="grid grid-cols-12 gap-2 px-4 py-3 border-t border-gray-100 dark:border-gray-800 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/30"
                           >
                             <div className="col-span-3">
                               {row.giftCardNo || ""}

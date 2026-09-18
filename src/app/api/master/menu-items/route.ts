@@ -3,7 +3,7 @@ import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { masterPrisma } from '@/lib/databaseManager'
 import { Prisma } from '@prisma/master-client'
 import { checkDuplicate } from '@/lib/validation'
-import { normalizeToStructuredFormat, MenuCategoryMapping, isStructuredFormat, convertToSimpleFormat } from '@/lib/utils/menuItemFormat'
+import { normalizeToStructuredFormat, MenuCategoryMapping, isStructuredFormat, convertToSimpleFormat, extractMenuCategoryCodes } from '@/lib/utils/menuItemFormat'
 
 // Helper function to generate unique menu item code
 async function generateMenuItemCode(): Promise<string> {
@@ -218,6 +218,10 @@ export async function POST(request: NextRequest) {
       isOnlineOrderByApp,
       isOnlineOrdering,
       isCustomerInvoice,
+      isSetToZeroStock,
+      isOpenItem,
+      isEditStock,
+      isAllowMultipleDiscount,
       menuMasterCode,
       menuCategoryCode,
       taxCode,
@@ -364,6 +368,10 @@ export async function POST(request: NextRequest) {
         isOnlineOrderByApp: isOnlineOrderByApp !== undefined ? (isOnlineOrderByApp ? 1 : 0) : null,
         isOnlineOrdering: isOnlineOrdering !== undefined ? (isOnlineOrdering ? 1 : 0) : null,
         isCustomerInvoice: isCustomerInvoice !== undefined ? (isCustomerInvoice ? 1 : 0) : null,
+        isSetToZeroStock: isSetToZeroStock !== undefined ? Boolean(isSetToZeroStock) : false,
+        isOpenItem: isOpenItem !== undefined ? Boolean(isOpenItem) : false,
+        isEditStock: isEditStock !== undefined ? Boolean(isEditStock) : false,
+        isAllowMultipleDiscount: isAllowMultipleDiscount !== undefined ? Boolean(isAllowMultipleDiscount) : false,
         taxCode: taxCode || null,
         inheritTaxInclusion: inheritTaxInclusion !== undefined ? inheritTaxInclusion : true,
         isTaxIncluded: isTaxIncluded !== undefined ? isTaxIncluded : false,
@@ -384,11 +392,7 @@ export async function POST(request: NextRequest) {
 
         // If inherit from categories, add all modifier groups for the categories
         if (inheritModifiers && menuItem.menuCategoryCode) {
-          const categoryCodes: string[] = Array.isArray(menuItem.menuCategoryCode) 
-            ? menuItem.menuCategoryCode.filter((code): code is string => typeof code === 'string')
-            : typeof menuItem.menuCategoryCode === 'string' 
-              ? [menuItem.menuCategoryCode]
-              : []
+          const categoryCodes = extractMenuCategoryCodes(menuItem.menuCategoryCode)
           const categoryModifiers = categoryCodes.length > 0
             ? await masterPrisma.masterMenuCategoryModifier.findMany({
                 where: { menuCategoryCode: { in: categoryCodes } }

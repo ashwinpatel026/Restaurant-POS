@@ -128,3 +128,53 @@ export function isStructuredFormat(menuCategoryCode: any): boolean {
   const firstItem = menuCategoryCode[0];
   return firstItem && typeof firstItem === 'object' && 'menuMasterCode' in firstItem && 'menuCategoryCode' in firstItem;
 }
+
+/**
+ * Extract unique menu category code strings from any supported menuCategoryCode shape.
+ * Handles: structured objects, plain string arrays, single string, JSON string.
+ */
+export function extractMenuCategoryCodes(menuCategoryCode: unknown): string[] {
+  if (!menuCategoryCode) {
+    return [];
+  }
+
+  let value: unknown = menuCategoryCode;
+
+  if (typeof value === 'string') {
+    const raw = value;
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      return raw.trim() ? [raw] : [];
+    }
+  }
+
+  if (!Array.isArray(value)) {
+    if (typeof value === 'object' && value !== null && 'menuCategoryCode' in value) {
+      const code = (value as { menuCategoryCode?: unknown }).menuCategoryCode;
+      return typeof code === 'string' && code.trim() ? [code] : [];
+    }
+    return typeof value === 'string' && value.trim() ? [value] : [];
+  }
+
+  const codes: string[] = [];
+  const seen = new Set<string>();
+
+  for (const item of value) {
+    let code: string | null = null;
+    if (typeof item === 'string') {
+      code = item;
+    } else if (item && typeof item === 'object' && 'menuCategoryCode' in item) {
+      const nested = (item as { menuCategoryCode?: unknown }).menuCategoryCode;
+      if (typeof nested === 'string') {
+        code = nested;
+      }
+    }
+    if (code && code.trim() && !seen.has(code)) {
+      seen.add(code);
+      codes.push(code);
+    }
+  }
+
+  return codes;
+}

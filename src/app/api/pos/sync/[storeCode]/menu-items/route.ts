@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticatePOSRequest, addPOSSyncMetadata } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
+import { extractMenuCategoryCodes } from '@/lib/utils/menuItemFormat'
 
 /**
  * @api {get} /api/pos/sync/:storeCode/menu-items List menu items
@@ -82,8 +83,8 @@ export async function GET(
     const limit = url.searchParams.get('limit')
     const offset = url.searchParams.get('offset')
 
-    // Build where clause
-    const where: any = { storeCode }
+    // Build where clause — exclude soft-deleted items
+    const where: any = { storeCode, isDelete: false }
     if (incremental && lastSyncAt) {
       where.updatedOn = { gte: new Date(lastSyncAt) }
     }
@@ -327,17 +328,19 @@ export async function POST(
 
     // 1. If inheritModifierGroup is true, fetch modifiers from menu categories
     if (inheritModifierGroup && menuCategoryCode) {
-      const categoryCodes = Array.isArray(menuCategoryCode) ? menuCategoryCode : [menuCategoryCode]
+      const categoryCodes = extractMenuCategoryCodes(menuCategoryCode)
       
-      const categoryModifiers = await locationPrisma.menuCategoryModifier.findMany({
-        where: {
-          menuCategoryCode: { in: categoryCodes },
-          storeCode
-        },
-        select: {
-          modifierGroupCode: true
-        }
-      })
+      const categoryModifiers = categoryCodes.length > 0
+        ? await locationPrisma.menuCategoryModifier.findMany({
+            where: {
+              menuCategoryCode: { in: categoryCodes },
+              storeCode
+            },
+            select: {
+              modifierGroupCode: true
+            }
+          })
+        : []
 
       // Get unique modifier group codes
       const inheritedCodes = [...new Set(categoryModifiers.map(m => m.modifierGroupCode).filter(Boolean))]

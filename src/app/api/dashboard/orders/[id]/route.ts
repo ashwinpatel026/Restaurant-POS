@@ -23,7 +23,9 @@ export async function GET(
       include: {
         table: {
           select: {
-            tableNumber: true,
+            tableName: true,
+            code: true,
+            tableCode: true,
           }
         },
         orderItems: true
@@ -44,7 +46,14 @@ export async function GET(
       subtotal: Number(order.subtotal),
       tax: Number(order.tax),
       discount: Number(order.discount),
-      table: order.table ? { tableNumber: order.table.tableNumber } : null,
+      table: order.table
+        ? {
+            tableName: order.table.tableName,
+            code: order.table.code,
+            tableCode: order.table.tableCode,
+            tableNumber: order.table.code || order.table.tableName,
+          }
+        : null,
       customerName: order.customerName,
       customerPhone: order.customerPhone,
       notes: order.notes,
@@ -113,7 +122,9 @@ export async function PATCH(
       include: {
         table: {
           select: {
-            tableNumber: true,
+            tableName: true,
+            code: true,
+            tableCode: true,
           }
         },
         orderItems: {
@@ -131,7 +142,14 @@ export async function PATCH(
       status: updatedOrder.status,
       orderType: updatedOrder.orderType,
       total: Number(updatedOrder.total),
-      table: updatedOrder.table ? { tableNumber: updatedOrder.table.tableNumber } : null,
+      table: updatedOrder.table
+        ? {
+            tableName: updatedOrder.table.tableName,
+            code: updatedOrder.table.code,
+            tableCode: updatedOrder.table.tableCode,
+            tableNumber: updatedOrder.table.code || updatedOrder.table.tableName,
+          }
+        : null,
       customerName: updatedOrder.customerName,
       createdAt: updatedOrder.createdAt.toISOString(),
       orderItems: updatedOrder.orderItems,

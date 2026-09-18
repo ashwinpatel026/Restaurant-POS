@@ -834,16 +834,64 @@ Authorization: Bearer <jwt_token>
 
 **List Modifier Items**
 - `GET /api/pos/sync/[storeCode]/modifier-items`
-- **Query Params**: `modifierGroupCode`
+- **Query Params**: `modifierGroupCode`, `incremental=true`, `lastSyncAt` (filters on `createdOn`)
 
 **Get Modifier Item**
 - `GET /api/pos/sync/[storeCode]/modifier-items/[id]`
+- **Note**: `[id]` can be numeric `id` (BigInt) or `modifierItemCode` (string)
 
 **Create Modifier Item**
 - `POST /api/pos/sync/[storeCode]/modifier-items`
+- **Body**:
+```json
+{
+  "modifierItemCode": "MI001",
+  "modifierGroupCode": "MG001",
+  "name": "Extra Cheese",
+  "price": 1.5,
+  "isDefault": false,
+  "displayOrder": 1,
+  "isActive": 1
+}
+```
 
 **Update Modifier Item**
 - `PUT /api/pos/sync/[storeCode]/modifier-items/[id]`
+- **Body**: Partial modifier item fields (`name`, `price`, `isDefault`, `displayOrder`, `isActive`, etc.)
+
+**Delete Modifier Item**
+- `DELETE /api/pos/sync/[storeCode]/modifier-items/[id]`
+
+### Menu Item Modifiers
+
+**List Menu Item Modifier Links**
+- `GET /api/pos/sync/[storeCode]/menu-item-modifiers`
+- **Query Params**: `menuItemCode`, `modifierGroupCode`, `incremental=true`, `lastSyncAt` (filters on `createdOn`)
+
+**Get Menu Item Modifier Link**
+- `GET /api/pos/sync/[storeCode]/menu-item-modifiers/[id]`
+- **Note**: `[id]` is numeric `id` (BigInt)
+
+**Create Menu Item Modifier Link**
+- `POST /api/pos/sync/[storeCode]/menu-item-modifiers`
+- **Body**:
+```json
+{
+  "menuItemCode": "WLLOC001MI1",
+  "modifierGroupCode": "WLLOC001MOD1",
+  "isRequired": 1,
+  "isMultiselect": 0,
+  "minSelection": 1,
+  "maxSelection": 1
+}
+```
+
+**Update Menu Item Modifier Link**
+- `PUT /api/pos/sync/[storeCode]/menu-item-modifiers/[id]`
+- **Body**: Partial fields (`isRequired`, `isMultiselect`, `minSelection`, `maxSelection`, etc.)
+
+**Delete Menu Item Modifier Link**
+- `DELETE /api/pos/sync/[storeCode]/menu-item-modifiers/[id]`
 
 ## Error Handling
 

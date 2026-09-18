@@ -66,6 +66,7 @@ export async function GET(
       FROM tbl_menu_category_modifier mcm
       JOIN tbl_modifier_group mg ON mg.modifier_group_code = mcm.modifier_group_code
       WHERE mcm.menu_category_code = ${category.menuCategoryCode}
+        AND (mg.is_delete = false OR mg.is_delete IS NULL)
     `
 
     // Convert BigInt to string for JSON serialization

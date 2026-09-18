@@ -20,7 +20,7 @@ export default function StatusToggle({
   disabled = false,
 }: StatusToggleProps) {
   return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800">
+    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-2 bg-white dark:bg-gray-800">
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-gray-900 dark:text-white">

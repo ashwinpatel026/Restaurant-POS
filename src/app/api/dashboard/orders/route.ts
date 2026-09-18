@@ -56,7 +56,9 @@ export async function GET(request: NextRequest) {
       include: {
         table: {
           select: {
-            tableNumber: true,
+            tableName: true,
+            code: true,
+            tableCode: true,
           }
         },
         orderItems: {
@@ -81,7 +83,15 @@ export async function GET(request: NextRequest) {
       status: order.status,
       orderType: order.orderType,
       total: Number(order.total),
-      table: order.table ? { tableNumber: order.table.tableNumber } : null,
+      table: order.table
+        ? {
+            tableName: order.table.tableName,
+            code: order.table.code,
+            tableCode: order.table.tableCode,
+            // legacy alias for older UI
+            tableNumber: order.table.code || order.table.tableName,
+          }
+        : null,
       customerName: order.customerName,
       createdAt: order.createdAt.toISOString(),
       orderItems: order.orderItems.map(item => ({
@@ -150,12 +160,17 @@ export async function POST(request: NextRequest) {
     // Generate unique order number
     const orderNumber = generateOrderNumber()
 
-    // Resolve tableId from tableNumber if provided
+    // Resolve tableId from code / tableCode if provided
     let resolvedTableId: number | null = null
-    if (tableNumber) {
-      const table = await prisma.table.findUnique({
-        where: { tableNumber },
-        select: { tableId: true }
+    if (tableNumber || body.tableCode || body.code) {
+      const lookup = tableNumber || body.tableCode || body.code
+      const table = await prisma.table.findFirst({
+        where: {
+          storeCode: selectedStoreCode,
+          isDelete: false,
+          OR: [{ code: lookup }, { tableCode: lookup }],
+        },
+        select: { tableId: true },
       })
       if (table) {
         resolvedTableId = table.tableId
@@ -195,7 +210,9 @@ export async function POST(request: NextRequest) {
       include: {
         table: {
           select: {
-            tableNumber: true,
+            tableName: true,
+            code: true,
+            tableCode: true,
           }
         },
         orderItems: true
@@ -212,7 +229,15 @@ export async function POST(request: NextRequest) {
       subtotal: Number(order.subtotal),
       tax: Number(order.tax),
       discount: Number(order.discount),
-      table: order.table ? { tableNumber: order.table.tableNumber } : null,
+      table: order.table
+        ? {
+            tableName: order.table.tableName,
+            code: order.table.code,
+            tableCode: order.table.tableCode,
+            // legacy alias for older UI
+            tableNumber: order.table.code || order.table.tableName,
+          }
+        : null,
       customerName: order.customerName,
       createdAt: order.createdAt.toISOString(),
       orderItems: order.orderItems.map(item => ({

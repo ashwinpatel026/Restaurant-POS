@@ -10,6 +10,7 @@ import {
   ArrowLeftIcon,
   Squares2X2Icon,
   TableCellsIcon,
+  DocumentDuplicateIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import CRUDModal from "@/components/modals/CRUDModal";
@@ -52,8 +53,21 @@ export default function MenuCategoriesPage() {
     [],
   );
 
-  // View mode state
+  // View mode state — restore last preference from localStorage
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+
+  const changeViewMode = (mode: "grid" | "table") => {
+    setViewMode(mode);
+    localStorage.setItem("menuCategoriesViewMode", mode);
+  };
+
+  // Restore saved view mode after mount (avoids SSR/localStorage race)
+  useEffect(() => {
+    const stored = localStorage.getItem("menuCategoriesViewMode");
+    if (stored === "grid" || stored === "table") {
+      setViewMode(stored);
+    }
+  }, []);
 
   useEffect(() => {
     if (selectedStoreCode) {
@@ -126,6 +140,13 @@ export default function MenuCategoriesPage() {
   // Navigation handlers
   const handleAdd = () => {
     router.push("/dashboard/menu/categories/add");
+  };
+
+  const handleClone = (categoryId: number) => {
+    const url = `/dashboard/menu/categories/add?cloneId=${categoryId}${
+      selectedStoreCode ? `&storeCode=${selectedStoreCode}` : ""
+    }`;
+    router.push(url);
   };
 
   const handleEdit = (categoryId: number) => {
@@ -276,7 +297,7 @@ export default function MenuCategoriesPage() {
             </h3>
             <div className="flex items-center space-x-2">
               <button
-                onClick={() => setViewMode("grid")}
+                onClick={() => changeViewMode("grid")}
                 className={`p-2 rounded-lg transition-colors ${
                   viewMode === "grid"
                     ? "bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
@@ -287,7 +308,7 @@ export default function MenuCategoriesPage() {
                 <Squares2X2Icon className="w-5 h-5" />
               </button>
               <button
-                onClick={() => setViewMode("table")}
+                onClick={() => changeViewMode("table")}
                 className={`p-2 rounded-lg transition-colors ${
                   viewMode === "table"
                     ? "bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
@@ -420,6 +441,15 @@ export default function MenuCategoriesPage() {
                         <div className="flex justify-end space-x-2">
                           <button
                             onClick={() =>
+                              handleClone(category.tblMenuCategoryId)
+                            }
+                            className="p-1 text-purple-500 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors duration-200"
+                            title="Clone category"
+                          >
+                            <DocumentDuplicateIcon className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() =>
                               handleEdit(category.tblMenuCategoryId)
                             }
                             className="p-1 text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors duration-200"
@@ -510,6 +540,13 @@ export default function MenuCategoriesPage() {
                     </div>
 
                     <div className="flex justify-end space-x-2">
+                      <button
+                        onClick={() => handleClone(category.tblMenuCategoryId)}
+                        className="p-1 text-purple-500 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors duration-200"
+                        title="Clone category"
+                      >
+                        <DocumentDuplicateIcon className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => handleEdit(category.tblMenuCategoryId)}
                         className="p-1 text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors duration-200"

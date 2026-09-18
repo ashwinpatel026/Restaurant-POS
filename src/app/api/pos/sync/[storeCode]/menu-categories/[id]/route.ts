@@ -33,12 +33,12 @@ export async function GET(
     const catId = parseInt(id)
     if (!isNaN(catId)) {
       category = await locationPrisma.menuCategory.findFirst({
-        where: { menuCategoryId: catId, storeCode }
+        where: { menuCategoryId: catId, storeCode, isDelete: false }
       })
     }
     if (!category) {
       category = await locationPrisma.menuCategory.findFirst({
-        where: { menuCategoryCode: id, storeCode }
+        where: { menuCategoryCode: id, storeCode, isDelete: false }
       })
     }
 

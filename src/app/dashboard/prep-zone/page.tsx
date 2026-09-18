@@ -30,10 +30,7 @@ interface PrepZone {
   prepZoneName: string | null;
   stationCode?: string | null;
   isActive: number;
-  sendToExpediter?: number | null;
-  alwaysPrintTicket?: number | null;
-  printerCode?: string | null;
-  backupPrinterCode?: string | null;
+  profileCode?: string | null;
   createdBy?: number | null;
   createdOn?: string;
   updatedBy?: number | null;
@@ -43,11 +40,12 @@ interface PrepZone {
   storeCode?: string | null;
 }
 
-interface Printer {
-  printerId: string; // Changed to string for BigInt serialization
-  printerCode: string;
-  printerName: string | null;
-  isActive?: number | null;
+interface PrinterProfile {
+  profileId: string;
+  profileCode: string;
+  name: string;
+  printerType: string;
+  isActive: boolean;
 }
 
 export default function PrepZonePage() {
@@ -58,7 +56,7 @@ export default function PrepZonePage() {
   });
 
   const [prepZones, setPrepZones] = useState<PrepZone[]>([]);
-  const [printers, setPrinters] = useState<Printer[]>([]);
+  const [printerProfiles, setPrinterProfiles] = useState<PrinterProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const fetchingRef = useRef(false);
 
@@ -81,11 +79,13 @@ export default function PrepZonePage() {
 
     try {
       setLoading(true);
-      const [zonesRes, printersRes] = await Promise.all([
+      const [zonesRes, profilesRes] = await Promise.all([
         fetch(buildApiUrl("/api/dashboard/menu/prep-zone"), {
           cache: "no-store",
         }),
-        fetch(buildApiUrl("/api/dashboard/printer"), { cache: "no-store" }),
+        fetch(buildApiUrl("/api/dashboard/printer-profile"), {
+          cache: "no-store",
+        }),
       ]);
 
       if (zonesRes.ok) {
@@ -96,9 +96,11 @@ export default function PrepZonePage() {
         toast.error(error.error || "Error loading prep zones");
       }
 
-      if (printersRes.ok) {
-        const data = await printersRes.json();
-        setPrinters(data);
+      if (profilesRes.ok) {
+        const data = await profilesRes.json();
+        setPrinterProfiles(Array.isArray(data?.profiles) ? data.profiles : []);
+      } else {
+        setPrinterProfiles([]);
       }
     } catch (error) {
       toast.error("Error loading data");
@@ -248,7 +250,7 @@ export default function PrepZonePage() {
             <div className="mb-4">
               <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
             </div>
-            <TableSkeleton rows={8} columns={8} />
+            <TableSkeleton rows={8} columns={5} />
           </div>
         </div>
       </DashboardLayout>
@@ -411,45 +413,19 @@ export default function PrepZonePage() {
                   ),
                 },
                 {
-                  header: "Printer",
-                  accessor: "printerCode",
+                  header: "Printer Profile",
+                  accessor: "profileCode",
                   cell: (zone: PrepZone) => (
                     <div className="text-sm text-gray-900 dark:text-white">
-                      {zone.printerCode ? (
+                      {zone.profileCode ? (
                         <div className="flex items-center">
                           <PrinterIcon className="w-4 h-4 mr-2 text-gray-400" />
-                          {printers.find(
-                            (p) => p.printerCode === zone.printerCode
-                          )?.printerName || zone.printerCode}
+                          {printerProfiles.find(
+                            (profile) => profile.profileCode === zone.profileCode
+                          )?.name || zone.profileCode}
                         </div>
                       ) : (
                         <span className="text-gray-400">Not assigned</span>
-                      )}
-                    </div>
-                  ),
-                },
-                {
-                  header: "Send to Expediter",
-                  accessor: "sendToExpediter",
-                  cell: (zone: PrepZone) => (
-                    <div className="flex items-center justify-center">
-                      {zone.sendToExpediter === 1 ? (
-                        <CheckCircleIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
-                      ) : (
-                        <XCircleIcon className="w-5 h-5 text-gray-400 dark:text-gray-500" />
-                      )}
-                    </div>
-                  ),
-                },
-                {
-                  header: "Always Print",
-                  accessor: "alwaysPrintTicket",
-                  cell: (zone: PrepZone) => (
-                    <div className="flex items-center justify-center">
-                      {zone.alwaysPrintTicket === 1 ? (
-                        <CheckCircleIcon className="w-5 h-5 text-green-600 dark:text-green-400" />
-                      ) : (
-                        <XCircleIcon className="w-5 h-5 text-gray-400 dark:text-gray-500" />
                       )}
                     </div>
                   ),
@@ -524,7 +500,7 @@ export default function PrepZonePage() {
       >
         <PrepZoneForm
           zone={editingZone}
-          printers={printers}
+          printerProfiles={printerProfiles}
           onSave={handleSave}
           onCancel={() => {
             setShowModal(false);
@@ -548,21 +524,18 @@ export default function PrepZonePage() {
 // Prep Zone Form Component
 function PrepZoneForm({
   zone,
-  printers,
+  printerProfiles,
   onSave,
   onCancel,
 }: {
   zone?: PrepZone | null;
-  printers: Printer[];
+  printerProfiles: PrinterProfile[];
   onSave: (data: any) => void;
   onCancel: () => void;
 }) {
   const [formData, setFormData] = useState({
     prepZoneName: "",
-    sendToExpediter: false,
-    alwaysPrintTicket: false,
-    printerCode: "",
-    backupPrinterCode: "",
+    profileCode: "",
     isActive: true,
   });
 
@@ -572,11 +545,14 @@ function PrepZoneForm({
     if (zone) {
       setFormData({
         prepZoneName: zone.prepZoneName || "",
-        sendToExpediter: zone.sendToExpediter === 1,
-        alwaysPrintTicket: zone.alwaysPrintTicket === 1,
-        printerCode: zone.printerCode || "",
-        backupPrinterCode: zone.backupPrinterCode || "",
+        profileCode: zone.profileCode || "",
         isActive: zone.isActive === 1,
+      });
+    } else {
+      setFormData({
+        prepZoneName: "",
+        profileCode: "",
+        isActive: true,
       });
     }
   }, [zone]);
@@ -614,61 +590,28 @@ function PrepZoneForm({
 
       <div>
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Printer
+          Printer Profile
         </label>
         <select
-          value={formData.printerCode}
+          value={formData.profileCode}
           onChange={(e) =>
-            setFormData({ ...formData, printerCode: e.target.value })
+            setFormData({ ...formData, profileCode: e.target.value })
           }
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         >
-          <option value="">No printer assigned</option>
-          {printers
-            .filter((p) => p.isActive === 1)
-            .map((printer) => (
-              <option key={printer.printerId} value={printer.printerCode}>
-                {printer.printerName}
+          <option value="">No printer profile assigned</option>
+          {printerProfiles
+            .filter(
+              (profile) =>
+                profile.isActive || profile.profileCode === formData.profileCode
+            )
+            .map((profile) => (
+              <option key={profile.profileId} value={profile.profileCode}>
+                {profile.name}
               </option>
             ))}
         </select>
       </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Backup Printer
-        </label>
-        <select
-          value={formData.backupPrinterCode}
-          onChange={(e) =>
-            setFormData({ ...formData, backupPrinterCode: e.target.value })
-          }
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        >
-          <option value="">Select backup printer</option>
-          {printers
-            .filter((p) => p.isActive === 1)
-            .map((printer) => (
-              <option key={printer.printerId} value={printer.printerCode}>
-                {printer.printerName}
-              </option>
-            ))}
-        </select>
-      </div>
-
-      <StatusToggle
-        label="Send to Expediter"
-        description=""
-        value={formData.sendToExpediter}
-        onChange={(val) => setFormData({ ...formData, sendToExpediter: val })}
-      />
-
-      <StatusToggle
-        label="Always Print Ticket"
-        description=""
-        value={formData.alwaysPrintTicket}
-        onChange={(val) => setFormData({ ...formData, alwaysPrintTicket: val })}
-      />
 
       <StatusToggle
         label="Prep Zone Status"

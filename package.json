@@ -17,7 +17,7 @@
     "db:studio": "prisma studio",
     "sync:migrate": "node scripts/run-sync-migrations.js",
     "sync:triggers": "node scripts/create-sync-triggers.mjs",
-    "docs:generate": "apidoc -i src/app/api -o public/apidoc"
+    "docs:generate": "apidoc -i src/app/api -o public/apidoc && node scripts/patch-apidoc.js"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",

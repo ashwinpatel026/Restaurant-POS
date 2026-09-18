@@ -10,6 +10,7 @@ import {
   ArrowLeftIcon,
   Squares2X2Icon,
   TableCellsIcon,
+  DocumentDuplicateIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import CRUDModal from "@/components/modals/CRUDModal";
@@ -78,8 +79,21 @@ export default function MenuMastersPage() {
   const [selectedEventMenu, setSelectedEventMenu] = useState("");
   const [filteredMasters, setFilteredMasters] = useState<MenuMaster[]>([]);
 
-  // View mode state
+  // View mode state — restore last preference from localStorage
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+
+  const changeViewMode = (mode: "grid" | "table") => {
+    setViewMode(mode);
+    localStorage.setItem("menuMastersViewMode", mode);
+  };
+
+  // Restore saved view mode after mount (avoids SSR/localStorage race)
+  useEffect(() => {
+    const stored = localStorage.getItem("menuMastersViewMode");
+    if (stored === "grid" || stored === "table") {
+      setViewMode(stored);
+    }
+  }, []);
 
   useEffect(() => {
     if (selectedStoreCode) {
@@ -272,6 +286,13 @@ export default function MenuMastersPage() {
     router.push("/dashboard/menu/masters/add");
   };
 
+  const handleClone = (masterId: string) => {
+    const url = `/dashboard/menu/masters/add?cloneId=${masterId}${
+      selectedStoreCode ? `&storeCode=${selectedStoreCode}` : ""
+    }`;
+    router.push(url);
+  };
+
   const handleEdit = (masterId: string) => {
     router.push(`/dashboard/menu/masters/${masterId}/edit`);
   };
@@ -444,7 +465,7 @@ export default function MenuMastersPage() {
             </h3>
             <div className="flex items-center space-x-2">
               <button
-                onClick={() => setViewMode("grid")}
+                onClick={() => changeViewMode("grid")}
                 className={`p-2 rounded-lg transition-colors ${
                   viewMode === "grid"
                     ? "bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
@@ -455,7 +476,7 @@ export default function MenuMastersPage() {
                 <Squares2X2Icon className="w-5 h-5" />
               </button>
               <button
-                onClick={() => setViewMode("table")}
+                onClick={() => changeViewMode("table")}
                 className={`p-2 rounded-lg transition-colors ${
                   viewMode === "table"
                     ? "bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
@@ -617,6 +638,13 @@ export default function MenuMastersPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex justify-end space-x-2">
                           <button
+                            onClick={() => handleClone(master.menuMasterId)}
+                            className="p-1 text-purple-500 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors duration-200"
+                            title="Clone menu master"
+                          >
+                            <DocumentDuplicateIcon className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => handleEdit(master.menuMasterId)}
                             className="p-1 text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors duration-200"
                             title="Edit menu master"
@@ -714,6 +742,13 @@ export default function MenuMastersPage() {
                     </div>
 
                     <div className="flex justify-end space-x-2">
+                      <button
+                        onClick={() => handleClone(master.menuMasterId)}
+                        className="p-1 text-purple-500 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 transition-colors duration-200"
+                        title="Clone menu master"
+                      >
+                        <DocumentDuplicateIcon className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => handleEdit(master.menuMasterId)}
                         className="p-1 text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors duration-200"

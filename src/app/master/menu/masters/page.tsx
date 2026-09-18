@@ -69,8 +69,21 @@ export default function MenuMastersPage() {
   const [selectedEventMenu, setSelectedEventMenu] = useState("");
   const [filteredMasters, setFilteredMasters] = useState<MenuMaster[]>([]);
 
-  // View mode state
+  // View mode state — restore last preference from localStorage
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+
+  const changeViewMode = (mode: "grid" | "table") => {
+    setViewMode(mode);
+    localStorage.setItem("masterMenuMastersViewMode", mode);
+  };
+
+  // Restore saved view mode after mount (avoids SSR/localStorage race)
+  useEffect(() => {
+    const stored = localStorage.getItem("masterMenuMastersViewMode");
+    if (stored === "grid" || stored === "table") {
+      setViewMode(stored);
+    }
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -440,7 +453,7 @@ export default function MenuMastersPage() {
             </h3>
             <div className="flex items-center space-x-2">
               <button
-                onClick={() => setViewMode("grid")}
+                onClick={() => changeViewMode("grid")}
                 className={`p-2 rounded-lg transition-colors ${
                   viewMode === "grid"
                     ? "bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
@@ -451,7 +464,7 @@ export default function MenuMastersPage() {
                 <Squares2X2Icon className="w-5 h-5" />
               </button>
               <button
-                onClick={() => setViewMode("table")}
+                onClick={() => changeViewMode("table")}
                 className={`p-2 rounded-lg transition-colors ${
                   viewMode === "table"
                     ? "bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"

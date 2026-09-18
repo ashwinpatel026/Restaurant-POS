@@ -30,7 +30,7 @@ export async function GET(
     const { id } = await params
     const itemId = BigInt(id)
     const item = await (prisma as any).modifierItem.findUnique({ where: { id: itemId } })
-    if (!item) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (!item || item.isDelete) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     // If storeCode is provided, verify the item belongs to that store or user has access
     if (selectedStoreCode && item.storeCode !== selectedStoreCode) {
@@ -85,7 +85,7 @@ export async function PUT(
       where: { id: itemId } 
     })
     
-    if (!existingItem) {
+    if (!existingItem || existingItem.isDelete) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
@@ -158,14 +158,17 @@ export async function DELETE(
     const itemId = BigInt(id)
 
     const exist = await (prisma as any).modifierItem.findUnique({ where: { id: itemId } })
-    if (!exist) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    if (!exist || exist.isDelete) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     // Verify user has access to this item's store
     if (exist.storeCode && !canAccessStore(accessInfo, exist.storeCode)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    await (prisma as any).modifierItem.delete({ where: { id: itemId } })
+    await (prisma as any).modifierItem.update({
+      where: { id: itemId },
+      data: { isDelete: true, isActive: 0, syncSource: 'location' },
+    })
     return NextResponse.json({ message: 'Deleted successfully' })
   } catch (error) {
     console.error('Error deleting modifier item:', error)

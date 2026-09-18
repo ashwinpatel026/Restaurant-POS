@@ -13,7 +13,7 @@ interface UsePagePermissionOptions {
 /**
  * Hook to check if user has required permissions for a page
  * Redirects to access denied page if user doesn't have permissions
- * 
+ *
  * @param options - Permission check options
  * @returns { hasPermission: boolean, loading: boolean }
  */
@@ -63,12 +63,14 @@ export function usePagePermission(options: UsePagePermissionOptions = {}) {
         }
 
         const data = await res.json();
-        const permissions = Array.isArray(data.permissions) ? data.permissions : [];
+        const permissions = Array.isArray(data.permissions)
+          ? data.permissions
+          : [];
         setUserPermissions(permissions);
 
         // Check if user has at least one of the required permissions
         const hasAnyPermission = requiredPermissions.some((permission) =>
-          permissions.includes(permission)
+          permissions.includes(permission),
         );
 
         const isSuperAdmin = userRole === "SUPER_ADMIN";
@@ -101,4 +103,3 @@ export function usePagePermission(options: UsePagePermissionOptions = {}) {
 
   return { hasPermission, loading, userPermissions };
 }
-

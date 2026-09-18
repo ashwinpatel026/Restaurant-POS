@@ -25,6 +25,11 @@ interface Printer {
   isreceipt?: boolean;
   isdocument?: boolean;
   isKitchen?: boolean;
+  isSerial?: boolean;
+  comport?: string | null;
+  ipAdress?: string | null;
+  printMethod?: string;
+  characterPerLine?: number;
   createdBy?: string | null;
   createdOn?: string | null;
   updatedBy?: string | null;
@@ -309,81 +314,45 @@ export default function PrinterManagementPage() {
                   ),
                 },
                 {
-                  header: "Printer Name",
+                  header: "Printer Name / IP Address",
                   accessor: "printerName",
                   cell: (printer: Printer) => (
                     <div className="flex items-center">
                       <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center mr-3">
                         <PrinterIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                       </div>
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        {printer.printerName}
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">
+                          {printer.printerName}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {printer.ipAdress || "-"}
+                        </div>
                       </div>
                     </div>
                   ),
                 },
                 {
-                  header: "Receipt Printer",
-                  accessor: "isreceipt",
+                  header: "Print Method",
+                  accessor: "printMethod",
                   cell: (printer: Printer) => (
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        printer.isreceipt
-                          ? "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
-                          : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
-                      }`}
-                    >
-                      {printer.isreceipt ? (
-                        <>
-                          <CheckCircleIcon className="w-3 h-3 mr-1" />
-                          Yes
-                        </>
-                      ) : (
-                        <>
-                          <XCircleIcon className="w-3 h-3 mr-1" />
-                          No
-                        </>
-                      )}
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                      {printer.printMethod === "2" ? "2" : "1"}
                     </span>
                   ),
                 },
                 {
-                  header: "Document Printer",
-                  accessor: "isdocument",
+                  header: "Serial",
+                  accessor: "isSerial",
                   cell: (printer: Printer) => (
                     <span
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        printer.isdocument
+                        printer.isSerial
                           ? "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
                           : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
                       }`}
                     >
-                      {printer.isdocument ? (
-                        <>
-                          <CheckCircleIcon className="w-3 h-3 mr-1" />
-                          Yes
-                        </>
-                      ) : (
-                        <>
-                          <XCircleIcon className="w-3 h-3 mr-1" />
-                          No
-                        </>
-                      )}
-                    </span>
-                  ),
-                },
-                {
-                  header: "Kitchen Printer",
-                  accessor: "isKitchen",
-                  cell: (printer: Printer) => (
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        printer.isKitchen
-                          ? "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
-                          : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400"
-                      }`}
-                    >
-                      {printer.isKitchen ? (
+                      {printer.isSerial ? (
                         <>
                           <CheckCircleIcon className="w-3 h-3 mr-1" />
                           Yes
@@ -463,9 +432,10 @@ export default function PrinterManagementPage() {
           setEditingPrinter(null);
         }}
         title={editingPrinter ? "Edit Printer" : "Add New Printer"}
-        size="md"
+        size="lg"
       >
         <PrinterForm
+          key={editingPrinter?.printerId || "new"}
           printer={editingPrinter}
           onSave={handleSave}
           onCancel={() => {
@@ -497,34 +467,77 @@ function PrinterForm({
   onSave: (data: any) => void;
   onCancel: () => void;
 }) {
+  const getCharacterPerLine = (printMethod: string) =>
+    printMethod === "2" ? 40 : 48;
+
   const [formData, setFormData] = useState({
     printerName: "",
+    ipAdress: "",
     isActive: true,
     isreceipt: false,
-    isdocument: false,
     isKitchen: false,
+    isSerial: false,
+    comport: "",
+    printMethod: "1",
+    characterPerLine: 48,
   });
 
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (printer) {
+      const printMethod = printer.printMethod === "2" ? "2" : "1";
       setFormData({
         printerName: printer.printerName || "",
+        ipAdress: printer.ipAdress || "",
         isActive: printer.isActive === 1,
         isreceipt: printer.isreceipt ?? false,
-        isdocument: printer.isdocument ?? false,
         isKitchen: printer.isKitchen ?? false,
+        isSerial: printer.isSerial ?? false,
+        comport: printer.comport || "",
+        printMethod,
+        characterPerLine:
+          printer.characterPerLine ?? getCharacterPerLine(printMethod),
+      });
+    } else {
+      setFormData({
+        printerName: "",
+        ipAdress: "",
+        isActive: true,
+        isreceipt: false,
+        isKitchen: false,
+        isSerial: false,
+        comport: "",
+        printMethod: "1",
+        characterPerLine: 48,
       });
     }
   }, [printer]);
 
+  const handlePrintMethodChange = (printMethod: string) => {
+    setFormData({
+      ...formData,
+      printMethod,
+      characterPerLine: getCharacterPerLine(printMethod),
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (formData.isSerial && !formData.comport.trim()) {
+      toast.error("COM Port is required when Serial is enabled");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await onSave(formData);
+      await onSave({
+        ...formData,
+        characterPerLine: getCharacterPerLine(formData.printMethod),
+        comport: formData.isSerial ? formData.comport.trim() : "",
+      });
     } catch (error) {
       console.error("Error:", error);
     } finally {
@@ -550,6 +563,55 @@ function PrinterForm({
         />
       </div>
 
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          IP Address
+        </label>
+        <input
+          type="text"
+          value={formData.ipAdress}
+          onChange={(e) =>
+            setFormData({ ...formData, ipAdress: e.target.value })
+          }
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          placeholder="Enter IP address"
+        />
+      </div>
+
+      <StatusToggle
+        label="Serial"
+        description="Enable if this printer uses a serial COM port."
+        value={formData.isSerial}
+        onChange={(val) =>
+          setFormData({
+            ...formData,
+            isSerial: val,
+            comport: val ? formData.comport : "",
+          })
+        }
+        trueLabel="Yes"
+        falseLabel="No"
+      />
+
+      {formData.isSerial && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            COM Port *
+          </label>
+          <input
+            type="text"
+            required
+            maxLength={10}
+            value={formData.comport}
+            onChange={(e) =>
+              setFormData({ ...formData, comport: e.target.value })
+            }
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="COM Port Printer"
+          />
+        </div>
+      )}
+
       {/* Printer Type Section */}
       <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800">
         <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-4">
@@ -564,19 +626,38 @@ function PrinterForm({
           />
 
           <StatusToggle
-            label="Is Document Printer"
-            description=""
-            value={formData.isdocument}
-            onChange={(val) => setFormData({ ...formData, isdocument: val })}
-          />
-
-          <StatusToggle
             label="Is Kitchen Printer"
             description=""
             value={formData.isKitchen}
             onChange={(val) => setFormData({ ...formData, isKitchen: val })}
           />
         </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Print Method
+        </label>
+        <select
+          value={formData.printMethod}
+          onChange={(e) => handlePrintMethodChange(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="1">1</option>
+          <option value="2">2</option>
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Character Per Line
+        </label>
+        <input
+          type="number"
+          readOnly
+          value={formData.characterPerLine}
+          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white"
+        />
       </div>
 
       <StatusToggle

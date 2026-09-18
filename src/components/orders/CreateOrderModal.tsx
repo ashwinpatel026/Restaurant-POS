@@ -10,6 +10,7 @@ import {
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { formatCurrency, calculateTax } from "@/lib/utils";
+import { useApiWithStore } from "@/hooks/useApiWithStore";
 
 interface MenuItem {
   id: string;
@@ -26,7 +27,8 @@ interface Category {
 
 interface Table {
   id: string;
-  tableNumber: string;
+  code: string;
+  tableName: string;
 }
 
 interface OrderItem {
@@ -47,6 +49,7 @@ export default function CreateOrderModal({
   onClose,
   onSuccess,
 }: CreateOrderModalProps) {
+  const { buildApiUrl, selectedStoreCode } = useApiWithStore();
   const [categories, setCategories] = useState<Category[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
@@ -60,13 +63,14 @@ export default function CreateOrderModal({
     if (isOpen) {
       fetchData();
     }
-  }, [isOpen]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, selectedStoreCode]);
 
   const fetchData = async () => {
     try {
       const [menuRes, tablesRes] = await Promise.all([
-        fetch("/api/dashboard/menu"),
-        fetch("/api/dashboard/tables?status=AVAILABLE"),
+        fetch(buildApiUrl("/api/dashboard/menu")),
+        fetch(buildApiUrl("/api/dashboard/tables?status=Free")),
       ]);
 
       if (menuRes.ok) {
@@ -76,7 +80,14 @@ export default function CreateOrderModal({
 
       if (tablesRes.ok) {
         const tablesData = await tablesRes.json();
-        setTables(tablesData);
+        const list = Array.isArray(tablesData) ? tablesData : [];
+        setTables(
+          list.map((t: any) => ({
+            id: String(t.tableId ?? t.id),
+            code: t.code,
+            tableName: t.tableName,
+          })),
+        );
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -253,7 +264,7 @@ export default function CreateOrderModal({
                           <option value="">Select a table</option>
                           {tables.map((table) => (
                             <option key={table.id} value={table.id}>
-                              Table {table.tableNumber}
+                              {table.tableName} ({table.code})
                             </option>
                           ))}
                         </select>

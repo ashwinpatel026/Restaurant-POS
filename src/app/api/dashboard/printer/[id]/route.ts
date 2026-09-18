@@ -8,6 +8,7 @@ import {
   checkLocationPermission,
 } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
+import { parsePrinterFields } from '@/lib/printerPayload'
 
 export async function GET(
   request: NextRequest,
@@ -35,8 +36,8 @@ export async function GET(
     const resolvedParams = await params
     const printerId = BigInt(resolvedParams.id)
 
-    const printer = await prisma.printer.findUnique({
-      where: { printerId },
+    const printer = await prisma.printer.findFirst({
+      where: { printerId, isDelete: false },
     })
 
     if (!printer) {
@@ -99,20 +100,28 @@ export async function PUT(
     const resolvedParams = await params
     const printerId = BigInt(resolvedParams.id)
     const body = await request.json()
-
-    const { printerName, isActive, isreceipt, isdocument, isKitchen } = body
+    const payload = parsePrinterFields(body)
+    delete (payload as any).isDelete
+    payload.isdocument = false
 
     // Validate required fields
-    if (!printerName) {
+    if (!payload.printerName) {
       return NextResponse.json(
         { error: 'Printer name is required' },
         { status: 400 }
       )
     }
 
+    if (payload.isSerial && !payload.comport) {
+      return NextResponse.json(
+        { error: 'COM Port is required when Serial is enabled' },
+        { status: 400 }
+      )
+    }
+
     // First check if printer exists and belongs to a store the user can access
-    const existingPrinter = await prisma.printer.findUnique({
-      where: { printerId },
+    const existingPrinter = await prisma.printer.findFirst({
+      where: { printerId, isDelete: false },
     })
 
     if (!existingPrinter) {
@@ -130,11 +139,8 @@ export async function PUT(
     const printer = await prisma.printer.update({
       where: { printerId },
       data: {
-        printerName,
-        isActive: isActive ? 1 : 0,
-        isreceipt: isreceipt ?? false,
-        isdocument: isdocument ?? false,
-        isKitchen: isKitchen ?? false,
+        ...payload,
+        updatedOn: new Date(),
         // Keep the original storeCode, don't change it; if empty, set to selected store
         storeCode: existingPrinter.storeCode || selectedStoreCode,
         // Mark updates from dashboard/location
@@ -181,8 +187,8 @@ export async function DELETE(
     const printerId = BigInt(resolvedParams.id)
 
     // First check if printer exists and user has access
-    const existingPrinter = await prisma.printer.findUnique({
-      where: { printerId },
+    const existingPrinter = await prisma.printer.findFirst({
+      where: { printerId, isDelete: false },
     })
 
     if (!existingPrinter) {
@@ -196,8 +202,14 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    await prisma.printer.delete({
+    await prisma.printer.update({
       where: { printerId },
+      data: {
+        isDelete: true,
+        isActive: 0,
+        updatedOn: new Date(),
+        syncSource: 'location',
+      },
     })
 
     return NextResponse.json({ message: 'Printer deleted successfully' })

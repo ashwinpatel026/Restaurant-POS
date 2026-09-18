@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import { useTheme, Theme } from "@/contexts/ThemeContext";
 import { useApiWithStore } from "@/hooks/useApiWithStore";
 import { formatDecimal } from "@/utils/formatDecimal";
+import SettingsNav from "@/components/settings/SettingsNav";
 
 const DEFAULT_PALETTE = [
   "#3B82F6",
@@ -253,12 +254,14 @@ export default function SettingsPage() {
       <div className="max-w-7xl space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Settings
+            Store Settings
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             Manage your account settings and preferences
           </p>
         </div>
+
+        <SettingsNav />
 
         {/* Appearance */}
         <div className="card">

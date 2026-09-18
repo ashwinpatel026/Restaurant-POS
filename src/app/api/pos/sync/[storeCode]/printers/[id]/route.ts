@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticatePOSRequest, addPOSSyncMetadata } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
+import { applyPrinterFieldUpdates, serializePrinter } from '@/lib/printerPayload'
 
 /**
  * @api {get} /api/pos/sync/:storeCode/printers/:id Get printer
@@ -49,7 +50,8 @@ export async function GET(
       printer = await locationPrisma.printer.findFirst({
         where: {
           printerId: printerId,
-          storeCode
+          storeCode,
+          isDelete: false
         }
       })
     } catch {
@@ -57,8 +59,8 @@ export async function GET(
     }
 
     if (!printer) {
-      printer = await locationPrisma.printer.findUnique({
-        where: { printerCode: id }
+      printer = await locationPrisma.printer.findFirst({
+        where: { printerCode: id, storeCode, isDelete: false }
       })
     }
 
@@ -72,8 +74,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       data: {
-        ...printer,
-        printerId: printer.printerId.toString()
+        ...serializePrinter(printer)
       }
     })
   } catch (error: any) {
@@ -153,7 +154,8 @@ export async function PUT(
       existingPrinter = await locationPrisma.printer.findFirst({
         where: {
           printerId: printerId,
-          storeCode
+          storeCode,
+          isDelete: false
         }
       })
     } catch {
@@ -161,8 +163,8 @@ export async function PUT(
     }
 
     if (!existingPrinter) {
-      existingPrinter = await locationPrisma.printer.findUnique({
-        where: { printerCode: id }
+      existingPrinter = await locationPrisma.printer.findFirst({
+        where: { printerCode: id, storeCode, isDelete: false }
       })
     }
 
@@ -181,12 +183,16 @@ export async function PUT(
     // Preserve existing syncId - it should not change on update
     updateData.syncId = existingPrinter.syncId
 
-    // Update allowed fields
-    if (body.printerName !== undefined) updateData.printerName = body.printerName
-    if (body.isActive !== undefined) updateData.isActive = body.isActive ? 1 : 0
-    if (body.isreceipt !== undefined) updateData.isreceipt = body.isreceipt ?? false
-    if (body.isdocument !== undefined) updateData.isdocument = body.isdocument ?? false
-    if (body.isKitchen !== undefined) updateData.isKitchen = body.isKitchen ?? false
+    applyPrinterFieldUpdates(body, updateData)
+
+    const nextIsSerial = updateData.isSerial ?? existingPrinter.isSerial
+    const nextComport = updateData.comport !== undefined ? updateData.comport : existingPrinter.comport
+    if (nextIsSerial && !nextComport) {
+      return NextResponse.json(
+        { error: 'COM Port is required when Serial is enabled' },
+        { status: 400 }
+      )
+    }
 
     // Update printer
     const updatedPrinter = await locationPrisma.printer.update({
@@ -197,10 +203,7 @@ export async function PUT(
     return NextResponse.json({
       success: true,
       message: 'Printer updated successfully',
-      data: {
-        ...updatedPrinter,
-        printerId: updatedPrinter.printerId.toString()
-      }
+      data: serializePrinter(updatedPrinter)
     })
   } catch (error: any) {
     console.error('Error updating printer:', error)
@@ -258,7 +261,8 @@ export async function DELETE(
       existingPrinter = await locationPrisma.printer.findFirst({
         where: {
           printerId: printerId,
-          storeCode
+          storeCode,
+          isDelete: false
         }
       })
     } catch {
@@ -266,8 +270,8 @@ export async function DELETE(
     }
 
     if (!existingPrinter) {
-      existingPrinter = await locationPrisma.printer.findUnique({
-        where: { printerCode: id }
+      existingPrinter = await locationPrisma.printer.findFirst({
+        where: { printerCode: id, storeCode, isDelete: false }
       })
     }
 
@@ -278,9 +282,12 @@ export async function DELETE(
       )
     }
 
-    // Delete printer
-    await locationPrisma.printer.delete({
-      where: { printerId: existingPrinter.printerId }
+    await locationPrisma.printer.update({
+      where: { printerId: existingPrinter.printerId },
+      data: addPOSSyncMetadata({
+        isDelete: true,
+        isActive: 0,
+      }, storeCode)
     })
 
     return NextResponse.json({

@@ -122,7 +122,10 @@ export async function GET(request: NextRequest) {
         SELECT DISTINCT mcm.modifier_group_code, mcm.menu_category_code, mc.name AS category_name
         FROM tbl_menu_category_modifier mcm
         JOIN tbl_menu_category mc ON mc.menu_category_code = mcm.menu_category_code
+        JOIN tbl_modifier_group mg ON mg.modifier_group_code = mcm.modifier_group_code
         WHERE mcm.menu_category_code = ${filterCategory}
+          AND (mc.is_delete = false OR mc.is_delete IS NULL)
+          AND (mg.is_delete = false OR mg.is_delete IS NULL)
       `
       
       const groupCodes = assignments.map(a => a.modifier_group_code).filter(Boolean)
@@ -133,14 +136,16 @@ export async function GET(request: NextRequest) {
       groups = await (prisma as any).modifierGroup.findMany({
         where: {
           modifierGroupCode: { in: groupCodes },
+          isDelete: false,
           ...storeFilter
         },
         orderBy: { createdOn: 'desc' }
       })
     } else {
-      // Fetch all groups filtered by store
+      // Fetch all groups filtered by store (exclude soft-deleted)
       groups = await (prisma as any).modifierGroup.findMany({
         where: {
+          isDelete: false,
           ...storeFilter
         },
         orderBy: { createdOn: 'desc' }
@@ -166,6 +171,7 @@ export async function GET(request: NextRequest) {
           FROM tbl_menu_category_modifier mcm
           JOIN tbl_menu_category mc ON mc.menu_category_code = mcm.menu_category_code
           WHERE mcm.modifier_group_code = ANY(${chunk}::text[])
+            AND (mc.is_delete = false OR mc.is_delete IS NULL)
         `
       )
       

@@ -41,7 +41,7 @@ export async function GET(
       )
     }
 
-    // Try to find by ID first, then by modifierGroupCode
+    // Try to find by ID first, then by modifierGroupCode (exclude soft-deleted)
     let modifierGroup = null
     const groupId = BigInt(id)
     
@@ -49,7 +49,8 @@ export async function GET(
       modifierGroup = await locationPrisma.modifierGroup.findFirst({
         where: {
           id: groupId,
-          storeCode
+          storeCode,
+          isDelete: false
         }
       })
     } catch {
@@ -60,7 +61,8 @@ export async function GET(
       modifierGroup = await locationPrisma.modifierGroup.findFirst({
         where: {
           modifierGroupCode: id,
-          storeCode
+          storeCode,
+          isDelete: false
         }
       })
     }

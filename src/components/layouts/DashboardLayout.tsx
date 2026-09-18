@@ -31,6 +31,8 @@ import {
   BuildingStorefrontIcon,
   BuildingOfficeIcon,
   UserIcon,
+  ComputerDesktopIcon,
+  QueueListIcon,
 } from "@heroicons/react/24/outline";
 import { useTheme } from "@/contexts/ThemeContext";
 import StoreSelector from "@/components/store/StoreSelector";
@@ -116,9 +118,22 @@ const navigation: MenuItem[] = [
   },
   {
     name: "Printer",
-    href: "/dashboard/printer",
     icon: PrinterIcon,
     permissions: ["printers.view"],
+    children: [
+      {
+        name: "Printer",
+        href: "/dashboard/printer",
+        icon: PrinterIcon,
+        permissions: ["printers.view"],
+      },
+      {
+        name: "Printer Profile",
+        href: "/dashboard/printer-profile",
+        icon: DocumentTextIcon,
+        permissions: ["printers.view"],
+      },
+    ],
   },
   {
     name: "Tax Management",
@@ -260,9 +275,34 @@ const navigation: MenuItem[] = [
   },
   {
     name: "Settings",
-    href: "/dashboard/settings",
     icon: Cog6ToothIcon,
     permissions: ["settings.view", "settings.manage"],
+    children: [
+      {
+        name: "Store Settings",
+        href: "/dashboard/settings",
+        icon: BuildingStorefrontIcon,
+        permissions: ["settings.view", "settings.manage"],
+      },
+      {
+        name: "Station Settings",
+        href: "/dashboard/settings/station",
+        icon: ComputerDesktopIcon,
+        permissions: ["settings.view", "settings.manage"],
+      },
+      {
+        name: "Sequence Settings",
+        href: "/dashboard/settings/sequence",
+        icon: QueueListIcon,
+        permissions: ["settings.view", "settings.manage"],
+      },
+      {
+        name: "Reports Settings",
+        href: "/dashboard/settings/reports",
+        icon: ChartBarIcon,
+        permissions: ["settings.view", "settings.manage"],
+      },
+    ],
   },
 ];
 

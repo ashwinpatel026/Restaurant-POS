@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { prepZoneName, sendToExpediter, alwaysPrintTicket, printerCode, backupPrinterCode, isActive } = body
+    const { prepZoneName, profileCode, isActive } = body
 
     // Validate required fields
     if (!prepZoneName) {
@@ -156,10 +156,7 @@ export async function POST(request: NextRequest) {
         prepZoneCode,
         prepZoneName,
         isActive: isActive ? 1 : 0,
-        sendToExpediter: sendToExpediter ? 1 : 0,
-        alwaysPrintTicket: alwaysPrintTicket ? 1 : 0,
-        printerCode: printerCode || null,
-        backupPrinterCode: backupPrinterCode || null,
+        profileCode: profileCode || null,
         createdBy: parseInt(session.user.id),
         isSyncToWeb: 0,
         isSyncToLocal: 0,

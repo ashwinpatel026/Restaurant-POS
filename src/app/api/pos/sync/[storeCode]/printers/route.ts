@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticatePOSRequest, addPOSSyncMetadata } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
+import { parsePrinterFields, serializePrinter } from '@/lib/printerPayload'
 
 /**
  * @api {get} /api/pos/sync/:storeCode/printers List printers
@@ -52,7 +53,7 @@ export async function GET(
     const incremental = url.searchParams.get('incremental') === 'true'
 
     // Build where clause
-    const where: any = { storeCode }
+    const where: any = { storeCode, isDelete: false }
     if (incremental && lastSyncAt) {
       where.updatedOn = { gte: new Date(lastSyncAt) }
     }
@@ -67,10 +68,7 @@ export async function GET(
       success: true,
       storeCode,
       count: printers.length,
-      data: printers.map(printer => ({
-        ...printer,
-        printerId: printer.printerId.toString()
-      }))
+      data: printers.map(serializePrinter)
     })
   } catch (error: any) {
     console.error('Error fetching printers:', error)
@@ -142,12 +140,20 @@ export async function POST(
       )
     }
 
-    const { printerCode, printerName, isActive = 1, isreceipt = false, isdocument = false, isKitchen = false } = body
+    const printerCode = body.printerCode || body.printer_code
+    const payload = parsePrinterFields(body)
 
     // Validate required fields
-    if (!printerCode || !printerName) {
+    if (!printerCode || !payload.printerName) {
       return NextResponse.json(
         { error: 'printerCode and printerName are required' },
+        { status: 400 }
+      )
+    }
+
+    if (payload.isSerial && !payload.comport) {
+      return NextResponse.json(
+        { error: 'COM Port is required when Serial is enabled' },
         { status: 400 }
       )
     }
@@ -167,11 +173,7 @@ export async function POST(
     // Prepare data with POS sync metadata
     const printerData = addPOSSyncMetadata({
       printerCode,
-      printerName,
-      isActive: isActive ? 1 : 0,
-      isreceipt: isreceipt ?? false,
-      isdocument: isdocument ?? false,
-      isKitchen: isKitchen ?? false,
+      ...payload,
       createdBy: body.createdBy ? parseInt(body.createdBy) : null,
       createdOn: new Date()
     }, storeCode)
@@ -184,10 +186,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       message: 'Printer created successfully',
-      data: {
-        ...printer,
-        printerId: printer.printerId.toString()
-      }
+      data: serializePrinter(printer)
     }, { status: 201 })
   } catch (error: any) {
     console.error('Error creating printer:', error)
