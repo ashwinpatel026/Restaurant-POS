@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const SETTINGS_LINKS = [
   { name: "Store Settings", href: "/dashboard/settings" },
+  { name: "Store Info", href: "/dashboard/settings/store" },
   { name: "Station Settings", href: "/dashboard/settings/station" },
   { name: "Sequence Settings", href: "/dashboard/settings/sequence" },
   { name: "Reports Settings", href: "/dashboard/settings/reports" },

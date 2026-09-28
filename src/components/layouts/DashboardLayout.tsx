@@ -159,6 +159,28 @@ const navigation: MenuItem[] = [
     permissions: ["fee.view", "fee.create", "fee.update", "fee.delete"],
   },
   {
+    name: "Customer Management",
+    href: "/dashboard/customer",
+    icon: UserIcon,
+    permissions: [
+      "customers.view",
+      "customers.create",
+      "customers.update",
+      "customers.delete",
+    ],
+  },
+  {
+    name: "Course Management",
+    href: "/dashboard/course",
+    icon: QueueListIcon,
+    permissions: [
+      "courses.view",
+      "courses.create",
+      "courses.update",
+      "courses.delete",
+    ],
+  },
+  {
     name: "Gift Card Management",
     href: "/dashboard/gift-cards",
     icon: CalculatorIcon,
@@ -281,6 +303,12 @@ const navigation: MenuItem[] = [
       {
         name: "Store Settings",
         href: "/dashboard/settings",
+        icon: BuildingStorefrontIcon,
+        permissions: ["settings.view", "settings.manage"],
+      },
+      {
+        name: "Store Info",
+        href: "/dashboard/settings/store",
         icon: BuildingStorefrontIcon,
         permissions: ["settings.view", "settings.manage"],
       },

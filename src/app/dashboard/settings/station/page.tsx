@@ -62,6 +62,7 @@ interface TenderRow {
   tenderTypeId: string;
   tenderName: string;
   tenderType: string | null;
+  deviceSelectionCode: string | null;
   cashDrawerCode: string | null;
   isActive: boolean;
   displayOrder: number;
@@ -86,8 +87,16 @@ interface TenderCashDrawer {
   comPort?: string | null;
 }
 
+interface TenderPaymentDevice {
+  payDeviceCode: string;
+  payDeviceName: string | null;
+  payDeviceType?: string | null;
+  isActive?: boolean;
+}
+
 interface PaymentDeviceRow {
   configId: string;
+  payDeviceCode?: string;
   payDeviceName: string;
   payDeviceType: string | null;
   appId: string | null;
@@ -120,6 +129,7 @@ const EMPTY_CASH_DRAWER_FORM = {
 const EMPTY_TENDER_FORM = {
   tenderName: "",
   tenderType: "Cash",
+  deviceSelectionCode: "",
   cashDrawerCode: "",
   isActive: true,
   displayOrder: "0",
@@ -215,6 +225,9 @@ export default function StationSettingsPage() {
   const [tenderExternalPays, setTenderExternalPays] = useState<
     ExternalPayTender[]
   >([]);
+  const [tenderPaymentDevices, setTenderPaymentDevices] = useState<
+    TenderPaymentDevice[]
+  >([]);
   const [tenderLoading, setTenderLoading] = useState(false);
   const [tenderModalOpen, setTenderModalOpen] = useState(false);
   const [externalPayModalOpen, setExternalPayModalOpen] = useState(false);
@@ -287,6 +300,7 @@ export default function StationSettingsPage() {
         setTenderFees([]);
         setTenderCashDrawers([]);
         setTenderExternalPays([]);
+        setTenderPaymentDevices([]);
         setPaymentDevices([]);
         setCashDrawers([]);
         setCashDrawerPrinters([]);
@@ -453,6 +467,9 @@ export default function StationSettingsPage() {
         setTenderExternalPays(
           Array.isArray(payload?.externalPays) ? payload.externalPays : [],
         );
+        setTenderPaymentDevices(
+          Array.isArray(payload?.paymentDevices) ? payload.paymentDevices : [],
+        );
       } catch (error) {
         if (!isMounted) return;
         setTenders([]);
@@ -592,6 +609,11 @@ export default function StationSettingsPage() {
           ? refreshPayload.externalPays
           : [],
       );
+      setTenderPaymentDevices(
+        Array.isArray(refreshPayload?.paymentDevices)
+          ? refreshPayload.paymentDevices
+          : [],
+      );
     }
   };
 
@@ -602,6 +624,7 @@ export default function StationSettingsPage() {
         ? {
             tenderName: tender.tenderName || "",
             tenderType: tender.tenderType || "Cash",
+            deviceSelectionCode: tender.deviceSelectionCode || "",
             cashDrawerCode: tender.cashDrawerCode || "",
             isActive: tender.isActive !== false,
             displayOrder: String(tender.displayOrder ?? 0),
@@ -645,6 +668,11 @@ export default function StationSettingsPage() {
 
     if (!tenderForm.tenderName.trim()) {
       toast.error("Tender name is required");
+      return;
+    }
+
+    if (tenderForm.tenderType === "Card" && !tenderForm.deviceSelectionCode) {
+      toast.error("Payment device is required for Card tenders");
       return;
     }
 
@@ -756,6 +784,9 @@ export default function StationSettingsPage() {
     const refreshPayload = await refresh.json().catch(() => null);
     if (refresh.ok) {
       setPaymentDevices(
+        Array.isArray(refreshPayload?.devices) ? refreshPayload.devices : [],
+      );
+      setTenderPaymentDevices(
         Array.isArray(refreshPayload?.devices) ? refreshPayload.devices : [],
       );
     }
@@ -1748,12 +1779,17 @@ export default function StationSettingsPage() {
             </label>
             <select
               value={tenderForm.tenderType}
-              onChange={(event) =>
+              onChange={(event) => {
+                const nextType = event.target.value;
                 setTenderForm((prev) => ({
                   ...prev,
-                  tenderType: event.target.value,
-                }))
-              }
+                  tenderType: nextType,
+                  deviceSelectionCode:
+                    nextType === "Card" ? prev.deviceSelectionCode : "",
+                  externalPayCode:
+                    nextType === "External Pay" ? prev.externalPayCode : "",
+                }));
+              }}
               className={modalInputClassName}
             >
               {TENDER_TYPES.map((type) => (
@@ -1763,6 +1799,41 @@ export default function StationSettingsPage() {
               ))}
             </select>
           </div>
+
+          {tenderForm.tenderType === "Card" && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Payment Device *
+              </label>
+              <select
+                value={tenderForm.deviceSelectionCode}
+                onChange={(event) =>
+                  setTenderForm((prev) => ({
+                    ...prev,
+                    deviceSelectionCode: event.target.value,
+                  }))
+                }
+                className={modalInputClassName}
+              >
+                <option value="">Select payment device</option>
+                {tenderPaymentDevices.map((device) => (
+                  <option
+                    key={device.payDeviceCode}
+                    value={device.payDeviceCode}
+                  >
+                    {device.payDeviceName || device.payDeviceCode}
+                    {device.payDeviceType ? ` (${device.payDeviceType})` : ""}
+                  </option>
+                ))}
+              </select>
+              {tenderPaymentDevices.length === 0 && (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  No payment devices found for this station. Add one from Open
+                  Payment Device.
+                </p>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">

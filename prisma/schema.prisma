@@ -1177,3 +1177,77 @@ model GiftCard {
   @@unique([syncId, storeCode])
   @@map("tbl_gift_card")
 }
+
+model Course {
+  courseId     Int       @id @default(autoincrement()) @map("course_id")
+  courseName    String    @map("course_name") @db.VarChar(50)
+  displayOrder  Int       @map("display_order")
+  isActive      Boolean   @default(true) @map("is_active")
+  isDelete      Boolean   @default(false) @map("is_delete")
+  storeCode     String?   @map("store_code") @db.VarChar(100)
+  createdBy     BigInt?   @map("createdby")
+  createdOn     DateTime  @default(now()) @map("createdon")
+  updatedBy     BigInt?   @map("updatedby")
+  updatedOn     DateTime? @map("updatedon")
+  syncId        String    @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource    String?   @default("location") @map("sync_source") @db.VarChar(20)
+
+  @@index([storeCode])
+  @@index([syncId])
+  @@map("tbl_course")
+}
+
+model CustomerMaster {
+  customerId    BigInt    @id @default(autoincrement()) @map("customer_id")
+  customerCode  String    @map("customer_code") @db.VarChar(40)
+  phoneNumber   String    @map("phone_number") @db.VarChar(20)
+  customerName  String    @map("customer_name") @db.VarChar(150)
+  addressLine1  String?   @map("address_line1") @db.VarChar(255)
+  addressLine2  String?   @map("address_line2") @db.VarChar(150)
+  city          String?   @map("city") @db.VarChar(100)
+  state         String?   @map("state") @db.VarChar(100)
+  zipCode       String?   @map("zip_code") @db.VarChar(20)
+  email         String?   @map("email") @db.VarChar(150)
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime? @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt     DateTime? @default(now()) @map("updated_at") @db.Timestamp(6)
+  country       String?   @map("country") @db.VarChar(50)
+  isDelete      Boolean   @default(false) @map("is_delete")
+  storeCode     String?   @map("store_code") @db.VarChar(50)
+  businessName  String?   @map("business_name") @db.VarChar(100)
+  createdBy     BigInt?   @map("createdby")
+  updatedBy     BigInt?   @map("updatedby")
+  syncId        String    @default(uuid()) @map("sync_id") @db.Uuid
+  syncSource    String?   @default("location") @map("sync_source") @db.VarChar(20)
+
+  @@index([storeCode])
+  @@index([customerCode])
+  @@index([phoneNumber])
+  @@index([syncId])
+  @@map("tbl_customer_master")
+}
+
+model Store {
+  storeId             BigInt    @id @default(autoincrement()) @map("storeid")
+  storeName           String?   @map("storename") @db.VarChar(50)
+  storeAddress1       String?   @map("storeaddress1") @db.VarChar(200)
+  storeAddress2       String?   @map("storeaddress2") @db.VarChar(200)
+  storeCity           String?   @map("storecity") @db.VarChar(30)
+  storeState          String?   @map("storestate") @db.VarChar(20)
+  storeZipCode        String?   @map("storezipcode") @db.VarChar(10)
+  storePhoneNumber    String?   @map("storephonenumber") @db.VarChar(15)
+  storeFaxNumber      String?   @map("storefaxnumber") @db.VarChar(15)
+  storeAccountNumber  String?   @map("storeaccountnumber") @db.VarChar(30)
+  storeRoutingNumber  String?   @map("storeroutingnumber") @db.VarChar(30)
+  isActive            Boolean   @default(true) @map("is_active")
+  createdBy           Int       @map("created_by")
+  createdOn           DateTime  @default(now()) @map("created_on") @db.Timestamp(6)
+  updatedBy           Int?      @map("updated_by")
+  updatedOn           DateTime? @map("updated_on") @db.Timestamp(6)
+  isDelete            Boolean?  @default(false) @map("is_delete")
+  storeCode           String?   @default("") @map("store_code") @db.VarChar(50)
+  companyCode         String?   @map("company_code") @db.VarChar(50)
+
+  @@index([storeCode])
+  @@map("tbl_store")
+}

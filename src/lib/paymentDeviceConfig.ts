@@ -92,6 +92,39 @@ export async function listPaymentDevices(storeCode: string, stationCode: string)
   );
 }
 
+export async function findPaymentDeviceByCode(options: {
+  storeCode: string;
+  stationCode: string;
+  payDeviceCode: string;
+}) {
+  const delegate = getDelegate();
+  if (delegate) {
+    return delegate.findFirst({
+      where: {
+        storeCode: options.storeCode,
+        stationCode: options.stationCode,
+        payDeviceCode: options.payDeviceCode,
+        isDelete: false,
+      },
+    });
+  }
+
+  const records = (await prisma.$queryRawUnsafe(
+    `SELECT ${SELECT_COLUMNS}
+     FROM tbl_payment_device_config
+     WHERE store_code = $1
+       AND station_code = $2
+       AND pay_device_code = $3
+       AND COALESCE(is_delete, false) = false
+     LIMIT 1`,
+    options.storeCode,
+    options.stationCode,
+    options.payDeviceCode,
+  )) as any[];
+
+  return records[0] ?? null;
+}
+
 export async function findPaymentDeviceById(configId: bigint) {
   const delegate = getDelegate();
   if (delegate) {
@@ -110,6 +143,37 @@ export async function findPaymentDeviceById(configId: bigint) {
   )) as any[];
 
   return records[0] ?? null;
+}
+
+export async function validateCardPaymentDevice(options: {
+  tenderType: string;
+  deviceSelectionCode: string | null;
+  storeCode: string;
+  stationCode: string | null;
+}) {
+  if (options.tenderType !== "Card") {
+    return null;
+  }
+
+  if (!options.deviceSelectionCode) {
+    return "Payment device is required for Card tenders";
+  }
+
+  if (!options.stationCode) {
+    return "Station is required";
+  }
+
+  const device = await findPaymentDeviceByCode({
+    storeCode: options.storeCode,
+    stationCode: options.stationCode,
+    payDeviceCode: options.deviceSelectionCode,
+  });
+
+  if (!device) {
+    return "Selected payment device is invalid for this station";
+  }
+
+  return null;
 }
 
 export async function findDuplicatePaymentDevice(options: {

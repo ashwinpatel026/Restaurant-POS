@@ -8,6 +8,11 @@ import {
 import { prisma } from "@/lib/database";
 import { listExternalPays, serializeExternalPay } from "@/lib/externalPayMaster";
 import {
+  listPaymentDevices,
+  serializePaymentDevice,
+  validateCardPaymentDevice,
+} from "@/lib/paymentDeviceConfig";
+import {
   createTender,
   findDuplicateTender,
   generateTenderCode,
@@ -21,19 +26,23 @@ const TENDER_TYPES = ["Cash", "Card", "Gift Card", "External Pay"] as const;
 
 function parseTenderPayload(body: Record<string, unknown>) {
   const tenderName = String(body.tenderName || "").trim();
-  const tenderType = String(body.tenderType || "").trim() || "Cash";
+  const rawTenderType = String(body.tenderType || "").trim() || "Cash";
+  const tenderType = TENDER_TYPES.includes(
+    rawTenderType as (typeof TENDER_TYPES)[number],
+  )
+    ? rawTenderType
+    : "Cash";
   const displayOrder = Number.parseInt(String(body.displayOrder ?? "0"), 10);
   const preAuthAmount = Number(body.preAuthAmount ?? 0);
   const surchargePer = Number(body.surchargePer ?? 0);
 
   return {
     tenderName,
-    tenderType: TENDER_TYPES.includes(
-      tenderType as (typeof TENDER_TYPES)[number],
-    )
-      ? tenderType
-      : "Cash",
-    deviceSelectionCode: String(body.deviceSelectionCode || "").trim() || null,
+    tenderType,
+    deviceSelectionCode:
+      tenderType === "Card"
+        ? String(body.deviceSelectionCode || "").trim() || null
+        : null,
     cashDrawerCode: String(body.cashDrawerCode || "").trim() || null,
     isActive: body.isActive !== false,
     displayOrder: Number.isFinite(displayOrder) ? displayOrder : 0,
@@ -41,7 +50,7 @@ function parseTenderPayload(body: Record<string, unknown>) {
       tenderType === "External Pay"
         ? String(body.externalPayCode || "").trim() || null
         : null,
-    requiresDevice: body.requiresDevice === true,
+    requiresDevice: tenderType === "Card",
     allowTip: body.allowTip === true,
     feeCode: String(body.feeCode || "").trim() || null,
     surchargePer: Number.isFinite(surchargePer) ? surchargePer : 0,
@@ -95,18 +104,21 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const [records, fees, cashDrawers, externalPays] = await Promise.all([
-      listTenders(selectedStoreCode, stationCode),
-      listFeeOptions(selectedStoreCode),
-      listCashDrawerOptions(selectedStoreCode),
-      listExternalPays(selectedStoreCode, stationCode),
-    ]);
+    const [records, fees, cashDrawers, externalPays, paymentDevices] =
+      await Promise.all([
+        listTenders(selectedStoreCode, stationCode),
+        listFeeOptions(selectedStoreCode),
+        listCashDrawerOptions(selectedStoreCode),
+        listExternalPays(selectedStoreCode, stationCode),
+        listPaymentDevices(selectedStoreCode, stationCode),
+      ]);
 
     return NextResponse.json({
       tenders: records.map(serializeTender),
       fees,
       cashDrawers,
       externalPays: externalPays.map(serializeExternalPay),
+      paymentDevices: paymentDevices.map(serializePaymentDevice),
     });
   } catch (error) {
     console.error("Error fetching tenders:", error);
@@ -144,6 +156,16 @@ export async function POST(request: NextRequest) {
         { error: "Tender name is required" },
         { status: 400 },
       );
+    }
+
+    const deviceError = await validateCardPaymentDevice({
+      tenderType: payload.tenderType,
+      deviceSelectionCode: payload.deviceSelectionCode,
+      storeCode: selectedStoreCode,
+      stationCode,
+    });
+    if (deviceError) {
+      return NextResponse.json({ error: deviceError }, { status: 400 });
     }
 
     const station = await prisma.station.findFirst({

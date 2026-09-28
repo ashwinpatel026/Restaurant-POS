@@ -27,6 +27,8 @@ const MODULES = {
   employees: ['create', 'update', 'delete', 'view'],
   employee_types: ['create', 'update', 'delete', 'view'],
   discount: ['create', 'update', 'delete', 'view'],
+  courses: ['create', 'update', 'delete', 'view'],
+  customers: ['create', 'update', 'delete', 'view'],
   reports: ['view', 'export'],
   roles: ['create', 'update', 'delete', 'view'],
   permissions: ['view'],

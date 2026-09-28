@@ -269,6 +269,87 @@ All routes require authentication via:
 
 ---
 
+### 9. Courses
+
+#### List All Courses
+
+- **GET** `/api/pos/sync/[storeCode]/courses`
+- **Query Params**:
+  - `incremental=true` - Only get updated records
+  - `lastSyncAt=2024-01-15T10:00:00Z` - Get records updated after this time
+
+#### Get Single Course
+
+- **GET** `/api/pos/sync/[storeCode]/courses/[id]`
+- `[id]` is numeric `courseId`
+
+#### Create Course
+
+- **POST** `/api/pos/sync/[storeCode]/courses`
+- **Body**: `{ courseName, displayOrder, isActive?, createdBy?, syncId? }`
+
+#### Update Course
+
+- **PUT** `/api/pos/sync/[storeCode]/courses/[id]`
+- **Body**: `{ courseName?, displayOrder?, isActive?, isDelete?, updatedBy? }`
+
+#### Delete Course
+
+- **DELETE** `/api/pos/sync/[storeCode]/courses/[id]`
+- Soft-deletes the course (`isDelete=true`, `isActive=false`)
+
+---
+
+### 10. Customers
+
+#### List All Customers
+
+- **GET** `/api/pos/sync/[storeCode]/customers`
+- **Query Params**:
+  - `incremental=true` - Only get updated records
+  - `lastSyncAt=2024-01-15T10:00:00Z` - Get records updated after this time
+
+#### Get Single Customer
+
+- **GET** `/api/pos/sync/[storeCode]/customers/[id]`
+- `[id]` can be numeric `customerId` or string `customerCode`
+
+#### Create Customer
+
+- **POST** `/api/pos/sync/[storeCode]/customers`
+- **Body**: `{ customerCode, phoneNumber, customerName, businessName?, email?, addressLine1?, addressLine2?, city?, state?, zipCode?, country?, isActive?, createdBy?, syncId? }`
+
+#### Update Customer
+
+- **PUT** `/api/pos/sync/[storeCode]/customers/[id]`
+- **Body**: `{ customerCode?, phoneNumber?, customerName?, businessName?, email?, addressLine1?, addressLine2?, city?, state?, zipCode?, country?, isActive?, isDelete?, updatedBy? }`
+
+#### Delete Customer
+
+- **DELETE** `/api/pos/sync/[storeCode]/customers/[id]`
+- Soft-deletes the customer (`isDelete=true`, `isActive=false`)
+
+---
+
+### 11. Store
+
+One record per store. This is separate from store settings.
+
+#### Get Store Info
+
+- **GET** `/api/pos/sync/[storeCode]/store`
+- **Query Params**:
+  - `incremental=true` - Return the record only when updated since `lastSyncAt`
+  - `lastSyncAt=2024-01-15T10:00:00Z`
+
+#### Create or Update Store Info
+
+- **PUT** `/api/pos/sync/[storeCode]/store`
+- **Body**: `{ storeName?, storeAddress1?, storeAddress2?, storeCity?, storeState?, storeZipCode?, storePhoneNumber?, storeFaxNumber?, storeAccountNumber?, storeRoutingNumber?, companyCode?, isActive?, createdBy, updatedBy? }`
+- `createdBy` is required when the store record does not exist yet
+
+---
+
 ## Location Information (Still Available)
 
 ### Get Location Info
