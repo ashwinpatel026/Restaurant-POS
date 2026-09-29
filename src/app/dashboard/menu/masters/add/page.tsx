@@ -69,8 +69,6 @@ function AddMenuMasterContent() {
   const [selectedEvents, setSelectedEvents] = useState<Set<string>>(
     new Set()
   );
-  const selectedEventsRef = useRef(selectedEvents);
-  selectedEventsRef.current = selectedEvents;
 
   // Refs for auto-focus on validation errors
   const nameRef = useRef<HTMLInputElement>(null);
@@ -320,7 +318,7 @@ function AddMenuMasterContent() {
     try {
       const prepZoneCodes = Array.from(selectedPrepZones);
       const stationCodes = Array.from(selectedStations);
-      const eventCodes = Array.from(selectedEventsRef.current);
+      const eventCodes = Array.from(selectedEvents);
       const response = await fetch(buildApiUrl("/api/dashboard/menu/masters"), {
         method: "POST",
         headers: {

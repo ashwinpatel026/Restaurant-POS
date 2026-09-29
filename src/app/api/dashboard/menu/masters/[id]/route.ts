@@ -4,7 +4,6 @@ import { authOptions } from '@/lib/auth'
 import { getUserAccessInfo, getSelectedStoreCode, canAccessStore, checkLocationPermission } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 import { softDeleteCategoriesAndItemsByMasterCode } from '@/lib/menuSoftDelete'
-import { normalizeEventCodes, saveMenuMasterTimeEvents } from '@/lib/menuMasterTimeEvents'
 
 export async function GET(
   request: NextRequest,
@@ -101,6 +100,7 @@ export async function PUT(
       prepZoneCodes,
       stationCodes,
       eventCodes,
+      isEventMenu,
       isActive,
       disableInPOS,
       deptCode
@@ -125,11 +125,7 @@ export async function PUT(
       }
     }
 
-    const selectedEventCodes = normalizeEventCodes(eventCodes)
-    const userId = parseInt(session.user.id)
-    const storeCode = existingMaster.storeCode || selectedStoreCode || ''
-
-    // Update menu master and persist selected time events on its menu items
+    // Update menu master
     const updateData = {
       name,
       labelName: labelName || null,
@@ -138,31 +134,41 @@ export async function PUT(
       deptCode: deptCode || null,
       prepZoneCode: prepZoneCodes && prepZoneCodes.length > 0 ? prepZoneCodes : null,
       stationCode: stationCodes && stationCodes.length > 0 ? stationCodes : null,
-      isEventMenu: selectedEventCodes.length > 0 ? 1 : 0,
+      isEventMenu: isEventMenu || 0,
       isActive: isActive ?? 1,
       disableInPOS: disableInPOS ?? 0,
-      updatedBy: userId,
+      updatedBy: parseInt(session.user.id),
       updatedOn: new Date(),
       syncSource: 'location' // Set sync_source to 'location' when updated from dashboard
     }
 
-    const menuMaster = await prisma.$transaction(async (tx) => {
-      const updated = await tx.menuMaster.update({
-        where: { menuMasterId: masterId },
-        data: updateData
-      })
+    const menuMaster = await prisma.menuMaster.update({
+      where: { menuMasterId: masterId },
+      data: updateData
+    })
 
-      if (storeCode) {
-        await saveMenuMasterTimeEvents(tx, {
-          menuMasterCode: existingMaster.menuMasterCode,
-          storeCode,
-          eventCodes: selectedEventCodes,
-          userId,
+    // Handle event associations - delete all existing and create new ones
+    // Delete all existing event associations
+    await prisma.menuMasterEvent.deleteMany({
+      where: {
+        menuMasterCode: existingMaster.menuMasterCode
+      }
+    })
+
+    // Create new associations for all provided event codes
+    if (eventCodes && Array.isArray(eventCodes) && eventCodes.length > 0 && isEventMenu === 1) {
+      for (const eventCode of eventCodes) {
+        await prisma.menuMasterEvent.create({
+          data: {
+            menuMasterCode: existingMaster.menuMasterCode,
+            eventCode: eventCode,
+            createdBy: parseInt(session.user.id),
+            storeCode: existingMaster.storeCode || selectedStoreCode || null,
+            syncSource: 'location' // Set sync_source to 'location' when created from dashboard
+          }
         })
       }
-
-      return updated
-    }, { timeout: 60000 })
+    }
 
     // Convert BigInt to string for JSON serialization
     const menuWithStringId = {
