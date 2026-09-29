@@ -128,28 +128,54 @@ export async function GET(request: NextRequest) {
     // Convert BigInt and Decimal to string/number for JSON serialization
     // If events came from raw query, they need special handling
     const eventsWithStringId = events.map((event: any) => {
-      // If event came from raw query, it might have different structure
+      // Raw SQL keeps database column names. Do not spread that row:
+      // created_by and updated_by are BigInt and JSON.stringify cannot serialize them.
       if (event.Event_code) {
-        // Convert raw query result to expected format
         return convertEventForJson({
-          ...event,
+          id: event.id,
           eventCode: event.Event_code,
           eventName: event.EventName,
-          byFixedValue: event.by_fixed_value,
-          overrideAllEvents: event.override_all_events,
           deptCode: event.dept_code,
           globalPriceAmountAdd: event.GlobalPrice_Amount_Add,
           globalPriceAmountDisc: event.GlobalPrice_Amount_Disc,
           globalPricePerAdd: event.GlobalPrice_Per_Add,
           globalPricePerDisc: event.GlobalPrice_Per_Disc,
-          createdDate: event.created_date,
-          updatedOn: event.updated_on,
-          createdBy: event.created_by,
-          updatedBy: event.updated_by,
-          id: event.id,
-          storeCode: event.store_code,
+          monday: event.Monday,
+          monStartTime: event.Mon_StartTime,
+          monEndTime: event.Mon_EndTime,
+          tuesday: event.Tuesday,
+          tueStartTime: event.Tue_StartTime,
+          tueEndTime: event.Tue_EndTime,
+          wednesday: event.Wednesday,
+          wedStartTime: event.Wed_StartTime,
+          wedEndTime: event.Wed_EndTime,
+          thursday: event.Thursday,
+          thuStartTime: event.Thu_StartTime,
+          thuEndTime: event.Thu_EndTime,
+          friday: event.FriDay,
+          friStartTime: event.Fri_StartTime,
+          friEndTime: event.Fri_EndTime,
+          saturday: event.Saturday,
+          satStartTime: event.Sat_StartTime,
+          satEndTime: event.Sat_EndTime,
+          sunday: event.SunDay,
+          sunStartTime: event.Sun_StartTime,
+          sunEndTime: event.Sun_EndTime,
+          eventStartDate: event.Event_Start_Date,
+          eventEndDate: event.Event_End_Date,
+          byFixedValue: event.by_fixed_value,
+          overrideAllEvents: event.override_all_events,
+          isDelete: event.is_delete,
           isActive: event.is_active,
-          isDelete: event.is_delete
+          createdBy: event.created_by,
+          createdDate: event.created_date,
+          updatedBy: event.updated_by,
+          updatedOn: event.updated_on,
+          storeCode: event.store_code,
+          isSyncToWeb: event.is_sync_to_web,
+          isSyncToLocal: event.is_sync_to_local,
+          syncId: event.sync_id,
+          syncSource: event.sync_source,
         })
       }
       return convertEventForJson(event)

@@ -3,6 +3,23 @@ import { authenticatePOSRequest, addPOSSyncMetadata } from '@/lib/posApiHelper'
 import { locationPrisma } from '@/lib/databaseManager'
 import { normalizeDeptCode } from '@/lib/deptCodeHelper'
 
+function serializeTimeEvent(record: any) {
+  return {
+    ...record,
+    id: record.id.toString(),
+    createdBy: record.createdBy != null ? record.createdBy.toString() : null,
+    updatedBy: record.updatedBy != null ? record.updatedBy.toString() : null,
+    globalPriceAmountAdd:
+      record.globalPriceAmountAdd != null ? Number(record.globalPriceAmountAdd) : null,
+    globalPriceAmountDisc:
+      record.globalPriceAmountDisc != null ? Number(record.globalPriceAmountDisc) : null,
+    globalPricePerAdd:
+      record.globalPricePerAdd != null ? Number(record.globalPricePerAdd) : null,
+    globalPricePerDisc:
+      record.globalPricePerDisc != null ? Number(record.globalPricePerDisc) : null,
+  }
+}
+
 /**
  * @api {get} /api/pos/sync/:storeCode/time-events/:id Get time event
  * @apiName GetTimeEvent
@@ -49,10 +66,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      data: {
-        ...event,
-        id: event.id.toString()
-      }
+      data: serializeTimeEvent(event)
     })
   } catch (error: any) {
     console.error('Error fetching time event:', error)
@@ -194,10 +208,7 @@ export async function PUT(
     return NextResponse.json({
       success: true,
       message: 'Time event updated successfully',
-      data: {
-        ...updated,
-        id: updated.id.toString()
-      }
+      data: serializeTimeEvent(updated)
     })
   } catch (error: any) {
     console.error('Error updating time event:', error)
