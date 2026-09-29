@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { getUserAccessInfo, getSelectedStoreCode, buildStoreFilter, checkLocationPermission } from '@/lib/auth/accessControl'
 import { prisma } from '@/lib/database'
 import { checkDuplicate } from '@/lib/validation'
+import { normalizeEventCodes, saveMenuMasterTimeEvents } from '@/lib/menuMasterTimeEvents'
 
 // Helper function to generate unique menu master code
 async function generateMenuMasterCode(storeCode: string): Promise<string> {
@@ -258,7 +259,6 @@ export async function POST(request: NextRequest) {
       prepZoneCodes,
       stationCodes,
       eventCodes,
-      isEventMenu,
       isActive,
       disableInPOS,
       deptCode
@@ -279,8 +279,10 @@ export async function POST(request: NextRequest) {
 
     // Generate unique menu master code for the selected store
     const menuMasterCode = await generateMenuMasterCode(selectedStoreCode)
+    const selectedEventCodes = normalizeEventCodes(eventCodes)
+    const userId = parseInt(session.user.id)
 
-    // Create menu master
+    // Create menu master and persist selected time events on its menu items
     const createData = {
       menuMasterCode,
       name,
@@ -290,33 +292,29 @@ export async function POST(request: NextRequest) {
       deptCode: deptCode || null,
       prepZoneCode: prepZoneCodes && prepZoneCodes.length > 0 ? prepZoneCodes : null,
       stationCode: stationCodes && stationCodes.length > 0 ? stationCodes : null,
-      isEventMenu: isEventMenu || 0,
+      isEventMenu: selectedEventCodes.length > 0 ? 1 : 0,
       isActive: isActive ?? 1,
       disableInPOS: disableInPOS ?? 0,
       isDelete: false,
-      createdBy: parseInt(session.user.id),
+      createdBy: userId,
       storeCode: selectedStoreCode,
       syncSource: 'location' // Set sync_source to 'location' when created from dashboard
     }
 
-    const menuMaster = await prisma.menuMaster.create({
-      data: createData
-    })
+    const menuMaster = await prisma.$transaction(async (tx) => {
+      const created = await tx.menuMaster.create({
+        data: createData
+      })
 
-    // If this is an event menu, create associations for all event codes
-    if (eventCodes && Array.isArray(eventCodes) && eventCodes.length > 0 && isEventMenu === 1) {
-      for (const eventCode of eventCodes) {
-        await prisma.menuMasterEvent.create({
-          data: {
-            menuMasterCode: menuMasterCode,
-            eventCode: eventCode,
-            createdBy: parseInt(session.user.id),
-            storeCode: selectedStoreCode,
-            syncSource: 'location' // Set sync_source to 'location' when created from dashboard
-          }
-        })
-      }
-    }
+      await saveMenuMasterTimeEvents(tx, {
+        menuMasterCode,
+        storeCode: selectedStoreCode,
+        eventCodes: selectedEventCodes,
+        userId,
+      })
+
+      return created
+    }, { timeout: 60000 })
 
     // Convert BigInt to string for JSON serialization
     const menuWithStringId = {
