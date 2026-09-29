@@ -1,4 +1,4 @@
-# POS Sync API Routes References
+# POS Sync API Routes Reference
 
 This document lists all available POS Sync API routes organized by entity.
 
