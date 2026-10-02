@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 
 export const useFormikAutoFocus = (
   formik: any,
-  fieldRefs: Record<string, React.RefObject<HTMLElement>>
+  fieldRefs: Record<string, React.RefObject<HTMLElement | null>>
 ) => {
   const prevIsSubmittingRef = useRef(formik.isSubmitting);
   const hasScrolledRef = useRef(false);
