@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { masterPrisma } from '@/lib/databaseManager'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { checkMasterPermission } from '@/lib/auth/accessControl'
-import { syncService } from '@/lib/sync/syncService'
+import { syncProcessor } from '@/lib/sync/syncProcessor'
 
 // GET role details
 export async function GET(
@@ -148,36 +148,18 @@ export async function PUT(
             NULL
           )
         `
-
-        // Trigger immediate sync to all locations
-        try {
-          const locations = await masterPrisma.location.findMany({
-            where: { isActive: 1 },
-            select: { storeCode: true }
-          })
-
-          // Sync to all locations in parallel (don't wait for completion)
-          Promise.all(
-            locations.map(location =>
-              syncService.syncToLocation({
-                locationCode: location.storeCode,
-                tableName: 'tbl_role',
-                fullSync: false
-              }).catch(err => {
-                console.error(`Failed to sync role to ${location.storeCode}:`, err)
-              })
-            )
-          ).catch(err => {
-            console.error('Error during parallel sync:', err)
-          })
-        } catch (syncError) {
-          console.error('Error triggering immediate sync for role update:', syncError)
-          // Don't fail the request if immediate sync fails
-        }
       } catch (syncError) {
         console.error('Error creating sync log for role update:', syncError)
         // Don't fail the request if sync log creation fails
       }
+    }
+
+    // Write the updated role into the shared location database.
+    try {
+      await syncProcessor.upsertLocationRoleFromMaster(updatedRole.roleCode)
+      await syncProcessor.acknowledgePendingRoleLogs(updatedRole.roleCode, ['tbl_role'])
+    } catch (syncError) {
+      console.error('Error syncing role update to location database:', syncError)
     }
 
     return NextResponse.json({
@@ -318,36 +300,18 @@ export async function DELETE(
             NULL
           )
         `
-
-        // Trigger immediate sync to all locations
-        try {
-          const locations = await masterPrisma.location.findMany({
-            where: { isActive: 1 },
-            select: { storeCode: true }
-          })
-
-          // Sync to all locations in parallel (don't wait for completion)
-          Promise.all(
-            locations.map(location =>
-              syncService.syncToLocation({
-                locationCode: location.storeCode,
-                tableName: 'tbl_role',
-                fullSync: false
-              }).catch(err => {
-                console.error(`Failed to sync role deletion to ${location.storeCode}:`, err)
-              })
-            )
-          ).catch(err => {
-            console.error('Error during parallel sync:', err)
-          })
-        } catch (syncError) {
-          console.error('Error triggering immediate sync for role deletion:', syncError)
-          // Don't fail the request if immediate sync fails
-        }
       } catch (syncError) {
         console.error('Error creating sync log for role deletion:', syncError)
         // Don't fail the request if sync log creation fails
       }
+    }
+
+    // Remove the role from the shared location database.
+    try {
+      await syncProcessor.deleteLocationRole(code)
+      await syncProcessor.acknowledgePendingRoleLogs(code, ['tbl_role', 'tbl_role_permission'])
+    } catch (syncError) {
+      console.error('Error syncing role deletion to location database:', syncError)
     }
 
     return NextResponse.json({ message: 'Role deleted successfully' })

@@ -65,6 +65,9 @@ export default function SyncManagementPage() {
 
   const syncableTables = [
     { value: "", label: "All Tables" },
+    { value: "tbl_permission", label: "Permissions" },
+    { value: "tbl_role", label: "Roles" },
+    { value: "tbl_role_permission", label: "Role Permissions" },
     { value: "tbl_master_printer", label: "Printer Master" },
     { value: "tbl_master_department_type", label: "Department Type" },
     { value: "tbl_master_department", label: "Department" },

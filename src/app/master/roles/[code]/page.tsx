@@ -80,7 +80,12 @@ export default function RoleDetailPage() {
       });
 
       if (response.ok) {
-        toast.success("Permissions updated successfully");
+        const data = await response.json();
+        if (data.locationSyncError) {
+          toast.error(data.message || "Permissions saved, but location sync failed");
+        } else {
+          toast.success("Permissions updated successfully");
+        }
         fetchRole();
       } else {
         const error = await response.json();

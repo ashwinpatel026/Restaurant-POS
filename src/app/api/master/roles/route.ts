@@ -3,7 +3,7 @@ import { masterPrisma } from '@/lib/databaseManager'
 import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { checkMasterPermission } from '@/lib/auth/accessControl'
 import { randomUUID } from 'crypto'
-import { syncService } from '@/lib/sync/syncService'
+import { syncProcessor } from '@/lib/sync/syncProcessor'
 
 // GET all roles
 export async function GET(request: NextRequest) {
@@ -142,35 +142,17 @@ export async function POST(request: NextRequest) {
           NULL
         )
       `
-
-      // Trigger immediate sync to all locations
-      try {
-        const locations = await masterPrisma.location.findMany({
-          where: { isActive: 1 },
-          select: { storeCode: true }
-        })
-
-        // Sync to all locations in parallel (don't wait for completion)
-        Promise.all(
-          locations.map(location =>
-            syncService.syncToLocation({
-              locationCode: location.storeCode,
-              tableName: 'tbl_role',
-              fullSync: false
-            }).catch(err => {
-              console.error(`Failed to sync role to ${location.storeCode}:`, err)
-            })
-          )
-        ).catch(err => {
-          console.error('Error during parallel sync:', err)
-        })
-      } catch (syncError) {
-        console.error('Error triggering immediate sync for role:', syncError)
-        // Don't fail the request if immediate sync fails
-      }
     } catch (syncError) {
       console.error('Error creating sync log for role:', syncError)
       // Don't fail the request if sync log creation fails
+    }
+
+    // Write the new role into the shared location database.
+    try {
+      await syncProcessor.upsertLocationRoleFromMaster(role.roleCode)
+      await syncProcessor.acknowledgePendingRoleLogs(role.roleCode, ['tbl_role'])
+    } catch (syncError) {
+      console.error('Error syncing role to location database:', syncError)
     }
 
     return NextResponse.json({

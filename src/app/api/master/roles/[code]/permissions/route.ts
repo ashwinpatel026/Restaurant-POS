@@ -4,7 +4,7 @@ import { verifyMasterAdmin } from '@/lib/masterAuthHelper'
 import { checkMasterPermission } from '@/lib/auth/accessControl'
 import { clearPermissionCache } from '@/lib/auth/permissionService'
 import { randomUUID } from 'crypto'
-import { syncService } from '@/lib/sync/syncService'
+import { syncProcessor } from '@/lib/sync/syncProcessor'
 
 // GET role permissions
 export async function GET(
@@ -168,50 +168,29 @@ export async function PUT(
       console.error('Error creating sync log for role permission update:', syncError)
     }
 
-    // Clear permission cache for this role
+    // Clear master permission cache for this role
     clearPermissionCache(code)
 
-    // Trigger immediate sync to all locations for role_permissions
+    // Write the current master set into the shared location database.
+    // Location login reads roles / permissions / role_permissions from there.
+    let locationSyncError: string | null = null
     try {
-      const locations = await masterPrisma.location.findMany({
-        where: { isActive: 1 },
-        select: { storeCode: true }
-      })
-
-      // Debug logging (commented out - uncomment if needed for debugging)
-      // console.log(`[role-permissions] Triggering sync for role ${code} to ${locations.length} locations`)
-      // console.log(`[role-permissions] Permissions to sync:`, permissions)
-
-      // Sync to all locations in parallel (don't wait for completion, but log results)
-      Promise.all(
-        locations.map(async location => {
-          try {
-            const result = await syncService.syncToLocation({
-              locationCode: location.storeCode,
-              tableName: 'tbl_role_permission',
-              fullSync: false
-            })
-            // console.log(`[role-permissions] Successfully synced to ${location.storeCode}`)
-            return result
-          } catch (err) {
-            console.error(`[role-permissions] Failed to sync role permissions to ${location.storeCode}:`, err)
-            throw err
-          }
-        })
-      ).then(() => {
-        // console.log(`[role-permissions] All syncs completed for role ${code}`)
-      }).catch(err => {
-        console.error(`[role-permissions] Error during parallel sync for role ${code}:`, err)
-      })
-    } catch (syncError) {
-      console.error(`[role-permissions] Error triggering immediate sync for role ${code}:`, syncError)
-      // Don't fail the request if immediate sync fails
+      await syncProcessor.upsertLocationRoleFromMaster(code)
+      await syncProcessor.upsertLocationPermissionsFromMaster(permissions)
+      await syncProcessor.replaceRolePermissionSet(code, permissions)
+      await syncProcessor.acknowledgePendingRoleLogs(code, ['tbl_role_permission'])
+    } catch (syncError: any) {
+      locationSyncError = syncError?.message || 'Location sync failed'
+      console.error(`[role-permissions] Error syncing role ${code} to location database:`, syncError)
     }
 
     return NextResponse.json({
       roleCode: code,
       permissions,
-      message: 'Permissions updated successfully'
+      locationSyncError,
+      message: locationSyncError
+        ? `Permissions saved, but location sync failed: ${locationSyncError}`
+        : 'Permissions updated successfully'
     })
   } catch (error) {
     console.error('Error updating role permissions:', error)

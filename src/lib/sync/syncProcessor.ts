@@ -5,6 +5,7 @@
 
 import { randomUUID } from 'crypto';
 import { locationPrisma, masterPrisma } from '@/lib/databaseManager';
+import { clearPermissionCache as clearLocationPermissionCache } from '@/lib/auth/locationPermissionService';
 import {
   SyncLogEntry,
   SyncResult,
@@ -486,86 +487,15 @@ export class SyncProcessor {
     ) {
       const roleCode = (parsedData as any)?.role_code;
       const permissions: string[] = (parsedData as any)?.permissions || [];
-      const syncSource = (parsedData as any)?.sync_source || 'server';
 
       if (!roleCode) {
         throw new Error('role_code missing in tbl_role_permission sync payload');
       }
 
-      const escape = (val: string) => String(val).replace(/'/g, "''");
-      const escapedRole = escape(roleCode);
-
-      // Use advisory lock to prevent concurrent updates to the same role
-      // Hash the role_code to get a lock ID (PostgreSQL advisory locks use bigint)
-      const lockId = this.hashStringToBigInt(roleCode);
-
-      // Retry logic for deadlocks
-      const maxRetries = 5;
-      let retryCount = 0;
-      let lastError: any = null;
-
-      while (retryCount < maxRetries) {
-        try {
-          await locationPrisma.$transaction(async tx => {
-            // Acquire advisory lock for this role to prevent concurrent updates
-            await tx.$executeRawUnsafe(
-              `SELECT pg_advisory_xact_lock(${lockId})`
-            );
-
-            // Replace the entire permission set for this role
-            await tx.$executeRawUnsafe(
-              `DELETE FROM ${locationTableName} WHERE "role_code" = '${escapedRole}'::VARCHAR`
-            );
-
-            if (permissions.length > 0) {
-              const values = permissions
-                .map(code => {
-                  const escapedPerm = escape(code);
-                  const newSyncId = randomUUID();
-                  return `('${escapedRole}'::VARCHAR, '${escapedPerm}'::VARCHAR, '${newSyncId}'::UUID, '${escape(syncSource)}')`;
-                })
-                .join(', ');
-
-              await tx.$executeRawUnsafe(`
-                INSERT INTO ${locationTableName} ("role_code", "permission_code", "sync_id", "sync_source")
-                VALUES ${values}
-                ON CONFLICT ("role_code", "permission_code") DO UPDATE SET
-                  "sync_id" = EXCLUDED."sync_id",
-                  "sync_source" = EXCLUDED."sync_source"
-              `);
-            }
-          }, {
-            timeout: 30000, // 30 seconds timeout for bulk permission updates
-          });
-
-          // Success - break out of retry loop
-          return;
-        } catch (error: any) {
-          lastError = error;
-
-          // Check if it's a deadlock error (PostgreSQL error code 40P01 or Prisma error P2010 with deadlock message)
-          const isDeadlock = error.code === 'P2010' || error.code === '40P01' ||
-            (error.message && (error.message.includes('deadlock') || error.message.includes('40P01'))) ||
-            (error.meta && error.meta.code === '40P01');
-
-          if (isDeadlock) {
-            retryCount++;
-            if (retryCount < maxRetries) {
-              // Exponential backoff: wait 100ms, 200ms, 400ms, 800ms, 1600ms
-              const waitTime = Math.min(100 * Math.pow(2, retryCount - 1), 2000);
-              console.log(`Deadlock detected for role ${roleCode}, retrying in ${waitTime}ms (attempt ${retryCount}/${maxRetries})`);
-              await new Promise(resolve => setTimeout(resolve, waitTime));
-              continue;
-            }
-          }
-
-          // Not a deadlock or max retries reached - throw the error
-          throw error;
-        }
-      }
-
-      // If we get here, all retries failed
-      throw lastError || new Error('Failed to sync role permissions after retries');
+      await this.upsertLocationRoleFromMaster(roleCode);
+      await this.upsertLocationPermissionsFromMaster(permissions);
+      await this.replaceRolePermissionSet(roleCode, permissions);
+      return;
     }
 
     // Filter out sync fields from data (we'll set them separately)
@@ -2460,11 +2390,13 @@ export class SyncProcessor {
    */
   private async markSyncFailed(entryId: bigint, errorMessage: string): Promise<void> {
     const escapedError = errorMessage.replace(/'/g, "''");
+    // Do not overwrite a row another worker already marked synced.
     await masterPrisma.$executeRawUnsafe(`
       UPDATE sync_log
       SET sync_status = 2,
           error_message = '${escapedError}'
       WHERE id = ${entryId}
+        AND sync_status = 0
     `);
   }
 
@@ -2493,6 +2425,7 @@ export class SyncProcessor {
             last_retry_at = CURRENT_TIMESTAMP,
             sync_status = 0
         WHERE id = ${entry.id}
+          AND sync_status = 0
       `);
     } else {
       // Max retries reached, mark as failed
@@ -3018,19 +2951,215 @@ export class SyncProcessor {
   }
 
   /**
-   * Hash a string to a bigint for PostgreSQL advisory locks
-   * Uses a simple hash function to convert string to number
+   * Copy the master role into the location database, matched by role_code.
+   * Permission rows reference roles, so the parent must exist before the mapping is written.
    */
-  private hashStringToBigInt(str: string): number {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
+  async upsertLocationRoleFromMaster(roleCode: string): Promise<void> {
+    const role = await masterPrisma.role.findUnique({
+      where: { roleCode },
+    });
+
+    if (!role) {
+      throw new Error(`Role ${roleCode} not found in master database`);
     }
-    // Convert to positive number and use modulo to fit in safe integer range
-    // PostgreSQL advisory locks use bigint, but we'll use a safe range
-    return Math.abs(hash) % Number.MAX_SAFE_INTEGER;
+
+    const data = {
+      roleName: role.roleName,
+      description: role.description,
+      isSystemRole: role.isSystemRole,
+      isActive: role.isActive,
+      syncSource: role.syncSource || 'server',
+    };
+
+    const existing = await locationPrisma.role.findUnique({
+      where: { roleCode: role.roleCode },
+    });
+
+    if (existing) {
+      await locationPrisma.role.update({
+        where: { roleCode: role.roleCode },
+        data,
+      });
+      return;
+    }
+
+    try {
+      await locationPrisma.role.create({
+        data: {
+          roleCode: role.roleCode,
+          ...data,
+          ...(role.syncId ? { syncId: role.syncId } : {}),
+        },
+      });
+    } catch (error: any) {
+      if (error?.code !== 'P2002') {
+        throw error;
+      }
+      await locationPrisma.role.create({
+        data: {
+          roleCode: role.roleCode,
+          ...data,
+        },
+      });
+    }
+  }
+
+  /**
+   * Copy master permission rows into the location database so role mappings
+   * can be inserted without a foreign-key failure.
+   */
+  async upsertLocationPermissionsFromMaster(permissionCodes: string[]): Promise<void> {
+    if (permissionCodes.length === 0) {
+      return;
+    }
+
+    const permissions = await masterPrisma.permission.findMany({
+      where: { permissionCode: { in: permissionCodes } },
+    });
+
+    const found = new Set(permissions.map((permission) => permission.permissionCode));
+    const missing = permissionCodes.filter((code) => !found.has(code));
+    if (missing.length > 0) {
+      throw new Error(`Permissions not found in master database: ${missing.join(', ')}`);
+    }
+
+    for (const permission of permissions) {
+      const data = {
+        permissionName: permission.permissionName,
+        module: permission.module,
+        action: permission.action,
+        description: permission.description,
+        isActive: permission.isActive,
+        syncSource: permission.syncSource || 'server',
+      };
+
+      const existing = await locationPrisma.permission.findUnique({
+        where: { permissionCode: permission.permissionCode },
+      });
+
+      if (existing) {
+        await locationPrisma.permission.update({
+          where: { permissionCode: permission.permissionCode },
+          data,
+        });
+        continue;
+      }
+
+      try {
+        await locationPrisma.permission.create({
+          data: {
+            permissionCode: permission.permissionCode,
+            ...data,
+            ...(permission.syncId ? { syncId: permission.syncId } : {}),
+          },
+        });
+      } catch (error: any) {
+        if (error?.code !== 'P2002') {
+          throw error;
+        }
+        await locationPrisma.permission.create({
+          data: {
+            permissionCode: permission.permissionCode,
+            ...data,
+          },
+        });
+      }
+    }
+  }
+
+  /**
+   * Replace one role's location permission set with the given codes.
+   * Removed permissions are deleted; the location login reads this table.
+   */
+  async replaceRolePermissionSet(roleCode: string, permissionCodes: string[]): Promise<void> {
+    const uniqueCodes = [...new Set(permissionCodes)];
+
+    await locationPrisma.$transaction(async (tx) => {
+      await tx.rolePermission.deleteMany({
+        where: { roleCode },
+      });
+
+      if (uniqueCodes.length > 0) {
+        await tx.rolePermission.createMany({
+          data: uniqueCodes.map((permissionCode) => ({
+            roleCode,
+            permissionCode,
+            syncId: randomUUID(),
+            syncSource: 'server',
+          })),
+        });
+      }
+    }, { timeout: 30000 });
+
+    clearLocationPermissionCache(roleCode);
+  }
+
+  /**
+   * Full sync: write every master role, permission, and mapping into the location database.
+   * Returns the number of role-permission mappings written.
+   */
+  async syncAllRolePermissionsFromMaster(): Promise<number> {
+    const [roles, permissions, rolePermissions] = await Promise.all([
+      masterPrisma.role.findMany(),
+      masterPrisma.permission.findMany(),
+      masterPrisma.rolePermission.findMany(),
+    ]);
+
+    for (const role of roles) {
+      await this.upsertLocationRoleFromMaster(role.roleCode);
+    }
+
+    await this.upsertLocationPermissionsFromMaster(
+      permissions.map((permission) => permission.permissionCode)
+    );
+
+    const byRole = new Map<string, string[]>();
+    for (const role of roles) {
+      byRole.set(role.roleCode, []);
+    }
+    for (const mapping of rolePermissions) {
+      const current = byRole.get(mapping.roleCode) || [];
+      current.push(mapping.permissionCode);
+      byRole.set(mapping.roleCode, current);
+    }
+
+    for (const [roleCode, codes] of byRole) {
+      await this.replaceRolePermissionSet(roleCode, codes);
+    }
+
+    clearLocationPermissionCache();
+    return rolePermissions.length;
+  }
+
+  /**
+   * Remove a role and its permission mappings from the location database.
+   */
+  async deleteLocationRole(roleCode: string): Promise<void> {
+    await locationPrisma.rolePermission.deleteMany({
+      where: { roleCode },
+    });
+    await locationPrisma.role.deleteMany({
+      where: { roleCode },
+    });
+    clearLocationPermissionCache(roleCode);
+  }
+
+  /**
+   * Mark pending sync_log rows for this role as synced after the location
+   * tables were updated from the current master rows. Stops an older queued
+   * payload from overwriting the set that was just written.
+   */
+  async acknowledgePendingRoleLogs(roleCode: string, tableNames: string[]): Promise<void> {
+    for (const tableName of tableNames) {
+      await masterPrisma.$executeRaw`
+        UPDATE sync_log
+        SET sync_status = 1,
+            synced_at = NOW()
+        WHERE sync_status = 0
+          AND table_name = ${tableName}
+          AND data->>'role_code' = ${roleCode}
+      `;
+    }
   }
 
   /**

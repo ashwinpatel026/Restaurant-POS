@@ -113,6 +113,31 @@ export class SyncService {
   }
 
   /**
+   * Sync a global table (roles, permissions, role_permissions) once.
+   * Those tables live in the shared location database, not per store.
+   * Syncing every store in parallel races on the same rows and the first
+   * store marks the single sync_log row complete, so later stores never apply it.
+   */
+  async syncGlobalTable(tableName: string): Promise<SyncResult | null> {
+    const location = await masterPrisma.location.findFirst({
+      where: { isActive: 1 },
+      select: { storeCode: true },
+      orderBy: { storeCode: 'asc' },
+    });
+
+    if (!location?.storeCode) {
+      console.warn(`[sync] No active location; skipped global sync for ${tableName}`);
+      return null;
+    }
+
+    return this.syncToLocation({
+      locationCode: location.storeCode,
+      tableName,
+      fullSync: false,
+    });
+  }
+
+  /**
    * Incremental sync: Process only pending sync_log entries
    */
   private async incrementalSyncTable(
@@ -253,6 +278,37 @@ export class SyncService {
     };
 
     try {
+      // Junction table: replace each role's permission set from master so
+      // removed permissions are deleted in the location database.
+      if (tableName === 'tbl_role_permission') {
+        console.log(`[SYNC] Replacing location role_permissions from master for ${locationCode}`);
+        try {
+          const recordsSynced = await syncProcessor.syncAllRolePermissionsFromMaster();
+          result.recordsProcessed = recordsSynced;
+          result.recordsSucceeded = recordsSynced;
+          result.recordsFailed = 0;
+          result.success = true;
+
+          await this.updateSyncStatus(locationCode, tableName, 0, null);
+
+          result.completedAt = new Date();
+          result.duration = Date.now() - startTime;
+          return result;
+        } catch (error: any) {
+          result.success = false;
+          result.errors.push({
+            recordId: '',
+            operation: 'UPDATE',
+            error: error.message,
+            tableName,
+          });
+          await this.updateSyncStatus(locationCode, tableName, 1, error.message || 'Unknown error');
+          result.completedAt = new Date();
+          result.duration = Date.now() - startTime;
+          return result;
+        }
+      }
+
       // Special handling for menu item time event table - use dedicated sync function
       if (tableName === 'tbl_master_menuitem_timeevent') {
         console.log(`[SYNC] Using dedicated sync function for ${tableName}`);
@@ -540,6 +596,17 @@ export class SyncService {
    * Process pending syncs for all locations (auto-sync)
    */
   async processPendingSyncs(): Promise<void> {
+    // Global tables are stored once in the shared location database.
+    // Apply them before the per-store loop so one store cannot consume the log
+    // while another is still reading it.
+    for (const tableName of ['tbl_permission', 'tbl_role', 'tbl_role_permission']) {
+      try {
+        await this.syncGlobalTable(tableName);
+      } catch (error) {
+        console.error(`Failed to sync global table ${tableName}:`, error);
+      }
+    }
+
     // Get all active locations
     const locations = await masterPrisma.location.findMany({
       where: { isActive: 1 },
